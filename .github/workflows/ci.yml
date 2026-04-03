@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Force a publish candidate review for the selected ref
+        type: boolean
+        default: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+      - name: Install
+        run: vp install --frozen-lockfile
+      - name: Check
+        run: vp check
+      - name: Test
+        run: vp test
+      - name: Pack
+        run: vp pack
+      - name: Pack Dry Run
+        run: npm pack --dry-run
+
+  prepare-publish:
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      package_name: ${{ steps.package.outputs.package_name }}
+      package_version: ${{ steps.package.outputs.package_version }}
+      should_publish: ${{ steps.npm.outputs.should_publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: package
+        name: Read package metadata
+        run: |
+          node <<'EOF'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `package_name=${pkg.name}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `package_version=${pkg.version}\n`);
+          EOF
+      - id: npm
+        name: Check whether the version is already published
+        env:
+          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
+        run: |
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} is already on npm."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} is unpublished and ready for review."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    if: needs.prepare-publish.outputs.should_publish == 'true'
+    needs:
+      - verify
+      - prepare-publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    concurrency:
+      group: npm-publish-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://www.npmjs.com/package/${{ needs.prepare-publish.outputs.package_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+      - name: Install
+        run: vp install --frozen-lockfile
+      - name: Publish
+        run: npm publish --provenance --access public
+      - name: Tag release
+        env:
+          VERSION: ${{ needs.prepare-publish.outputs.package_version }}
+        run: |
+          git fetch --tags
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "$TAG"

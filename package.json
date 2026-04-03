@@ -1,0 +1,62 @@
+{
+  "name": "granola-toolkit",
+  "version": "0.1.0",
+  "description": "CLI toolkit for exporting and working with Granola notes and transcripts",
+  "keywords": [
+    "cli",
+    "granola",
+    "notes",
+    "transcripts"
+  ],
+  "homepage": "https://github.com/kkarimi/granola-toolkit#readme",
+  "bugs": {
+    "url": "https://github.com/kkarimi/granola-toolkit/issues"
+  },
+  "author": "Nima Karimi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kkarimi/granola-toolkit.git"
+  },
+  "bin": {
+    "granola": "dist/cli.js"
+  },
+  "files": [
+    "README.md",
+    "dist/cli.js"
+  ],
+  "type": "module",
+  "main": "dist/cli.js",
+  "module": "dist/cli.js",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check",
+    "dev": "vp pack --watch",
+    "fmt": "vp fmt",
+    "lint": "vp lint",
+    "pack:dry-run": "npm pack --dry-run",
+    "prepublishOnly": "vp pack",
+    "release": "node scripts/release.mjs",
+    "start": "node dist/cli.js",
+    "notes": "node dist/cli.js notes",
+    "transcripts": "node dist/cli.js transcripts",
+    "test": "vp test",
+    "typecheck": "vp exec tsc --noEmit",
+    "prepare": "vp config"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "^5.9.3",
+    "vite-plus": "0.1.15"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@11.7.0"
+}
