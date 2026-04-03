@@ -8,10 +8,12 @@ const state = {
   quickOpen: "",
   search: "",
   selectedMeeting: null,
+  selectedMeetingBundle: null,
   selectedMeetingId: null,
   sort: "updated-desc",
   updatedFrom: "",
   updatedTo: "",
+  workspaceTab: "notes",
 };
 
 const els = {
@@ -30,6 +32,7 @@ const els = {
   transcriptButton: document.querySelector("[data-export-transcripts]"),
   updatedFrom: document.querySelector("[data-updated-from]"),
   updatedTo: document.querySelector("[data-updated-to]"),
+  workspaceTabs: document.querySelectorAll("[data-workspace-tab]"),
 };
 
 function escapeHtml(value) {
@@ -71,6 +74,12 @@ function currentFilterSummary() {
   return parts.join(", ");
 }
 
+function renderWorkspaceTabs() {
+  for (const button of els.workspaceTabs) {
+    button.dataset.selected = button.dataset.workspaceTab === state.workspaceTab ? "true" : "false";
+  }
+}
+
 function renderAppState() {
   if (!state.appState) {
     els.appState.innerHTML = "<p>Waiting for server state…</p>";
@@ -107,6 +116,7 @@ function renderMeetingList() {
   if (state.meetings.length === 0) {
     state.selectedMeetingId = null;
     state.selectedMeeting = null;
+    state.selectedMeetingBundle = null;
     const filterSummary = currentFilterSummary();
     const message = filterSummary
       ? "No meetings match " + filterSummary + "."
@@ -137,6 +147,8 @@ function renderMeetingList() {
 }
 
 function renderMeetingDetail() {
+  renderWorkspaceTabs();
+
   if (state.detailError) {
     els.empty.hidden = false;
     els.empty.textContent = state.detailError;
@@ -161,15 +173,46 @@ function renderMeetingDetail() {
     '<div class="detail-chip">Transcript: ' + escapeHtml(String(record.meeting.transcriptSegmentCount)) + " segments</div>",
   ].join("");
 
+  const bundle = state.selectedMeetingBundle;
+  const metadataLines = [
+    "Title: " + (record.meeting.title || record.meeting.id),
+    "Created: " + record.meeting.createdAt,
+    "Updated: " + record.meeting.updatedAt,
+    "Tags: " + (record.meeting.tags.length ? record.meeting.tags.join(", ") : "none"),
+    "Transcript loaded: " + (record.meeting.transcriptLoaded ? "yes" : "no"),
+  ].join("\n");
+
+  let mainTitle = "Notes";
+  let mainBody = record.noteMarkdown || "";
+
+  switch (state.workspaceTab) {
+    case "transcript":
+      mainTitle = "Transcript";
+      mainBody = record.transcriptText || "(Transcript unavailable)";
+      break;
+    case "metadata":
+      mainTitle = "Metadata";
+      mainBody = metadataLines;
+      break;
+    case "raw":
+      mainTitle = "Raw Bundle";
+      mainBody = JSON.stringify(bundle || record, null, 2);
+      break;
+    default:
+      break;
+  }
+
   els.detailBody.innerHTML = [
-    '<section class="detail-section">',
-    "<h2>Notes</h2>",
-    '<pre class="detail-pre">' + escapeHtml(record.noteMarkdown || "") + "</pre>",
+    '<div class="workspace-grid">',
+    '<aside class="detail-section workspace-sidebar">',
+    "<h2>Meeting Metadata</h2>",
+    '<pre class="detail-pre">' + escapeHtml(metadataLines) + "</pre>",
+    "</aside>",
+    '<section class="detail-section workspace-main">',
+    "<h2>" + escapeHtml(mainTitle) + "</h2>",
+    '<pre class="detail-pre">' + escapeHtml(mainBody) + "</pre>",
     "</section>",
-    '<section class="detail-section">',
-    "<h2>Transcript</h2>",
-    '<pre class="detail-pre">' + escapeHtml(record.transcriptText || "(Transcript unavailable)") + "</pre>",
-    "</section>",
+    "</div>",
   ].join("");
 }
 
@@ -225,6 +268,7 @@ async function loadMeetings(options = {}) {
   } catch (error) {
     state.listError = error instanceof Error ? error.message : String(error);
     state.selectedMeeting = null;
+    state.selectedMeetingBundle = null;
     state.detailError = state.listError;
     renderMeetingList();
     renderMeetingDetail();
@@ -238,10 +282,12 @@ async function loadMeeting(id) {
   try {
     state.detailError = "";
     const payload = await fetchJson("/meetings/" + encodeURIComponent(id));
+    state.selectedMeetingBundle = payload;
     state.selectedMeeting = payload.meeting || null;
     renderMeetingDetail();
   } catch (error) {
     state.selectedMeeting = null;
+    state.selectedMeetingBundle = null;
     state.detailError = error instanceof Error ? error.message : String(error);
     renderMeetingDetail();
   }
@@ -381,6 +427,59 @@ els.quickOpen.addEventListener("keydown", (event) => {
 
 els.quickOpenButton.addEventListener("click", () => {
   void quickOpenMeeting();
+});
+
+els.workspaceTabs.forEach((button) => {
+  button.addEventListener("click", () => {
+    state.workspaceTab = button.dataset.workspaceTab || "notes";
+    renderMeetingDetail();
+  });
+});
+
+document.addEventListener("keydown", (event) => {
+  if (
+    event.target instanceof HTMLInputElement ||
+    event.target instanceof HTMLSelectElement ||
+    event.target instanceof HTMLTextAreaElement
+  ) {
+    return;
+  }
+
+  const tabs = ["notes", "transcript", "metadata", "raw"];
+  if (event.key === "1") {
+    state.workspaceTab = "notes";
+    renderMeetingDetail();
+    return;
+  }
+
+  if (event.key === "2") {
+    state.workspaceTab = "transcript";
+    renderMeetingDetail();
+    return;
+  }
+
+  if (event.key === "3") {
+    state.workspaceTab = "metadata";
+    renderMeetingDetail();
+    return;
+  }
+
+  if (event.key === "4") {
+    state.workspaceTab = "raw";
+    renderMeetingDetail();
+    return;
+  }
+
+  const currentIndex = tabs.indexOf(state.workspaceTab);
+  if (event.key === "]") {
+    state.workspaceTab = tabs[(currentIndex + 1) % tabs.length];
+    renderMeetingDetail();
+  }
+
+  if (event.key === "[") {
+    state.workspaceTab = tabs[(currentIndex + tabs.length - 1) % tabs.length];
+    renderMeetingDetail();
+  }
 });
 
 const events = new EventSource("/events");
@@ -614,6 +713,37 @@ void refreshAll().catch((error) => {
         width: min(440px, 100%);
       }
 
+      .workspace-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        padding: 0 24px 18px;
+      }
+
+      .workspace-tab {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 10px 14px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+      }
+
+      .workspace-tab[data-selected="true"] {
+        background: var(--ink);
+        color: white;
+        border-color: var(--ink);
+      }
+
+      .workspace-hint {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin-left: auto;
+      }
+
       .button {
         border: 0;
         border-radius: 999px;
@@ -670,6 +800,17 @@ void refreshAll().catch((error) => {
         overflow: auto;
       }
 
+      .workspace-grid {
+        display: grid;
+        grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .workspace-sidebar,
+      .workspace-main {
+        margin-bottom: 0;
+      }
+
       .detail-section {
         margin-bottom: 20px;
         padding: 20px;
@@ -708,8 +849,13 @@ void refreshAll().catch((error) => {
         }
 
         .field-row--inline,
-        .toolbar-form {
+        .toolbar-form,
+        .workspace-grid {
           grid-template-columns: 1fr;
+        }
+
+        .workspace-hint {
+          margin-left: 0;
         }
       }
     </style>
@@ -768,6 +914,13 @@ void refreshAll().catch((error) => {
           </div>
           <p>Initial beta web client. It speaks to the same local API that future TUI and attach flows will use.</p>
         </section>
+        <nav class="workspace-tabs">
+          <button class="workspace-tab" data-workspace-tab="notes">Notes</button>
+          <button class="workspace-tab" data-workspace-tab="transcript">Transcript</button>
+          <button class="workspace-tab" data-workspace-tab="metadata">Metadata</button>
+          <button class="workspace-tab" data-workspace-tab="raw">Raw</button>
+          <span class="workspace-hint">1-4 switch tabs, [ and ] cycle</span>
+        </nav>
         <div class="detail-meta" data-detail-meta></div>
         <div class="detail-body" data-detail-body>
           <div class="empty" data-empty>Select a meeting to inspect its notes and transcript.</div>

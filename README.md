@@ -208,7 +208,8 @@ The initial browser client includes:
 - a searchable meeting list
 - sort and updated-date filters
 - quick open by meeting id or title
-- a meeting detail view with notes and transcript panes
+- a focused meeting workspace with notes, transcript, metadata, and raw tabs
+- keyboard-first workspace switching with `1`-`4`, `[` and `]`
 - app-state status from the shared core
 - note and transcript export actions backed by the same local API
 - stronger empty and error states for list/detail failures

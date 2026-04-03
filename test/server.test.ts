@@ -264,6 +264,8 @@ describe("startGranolaServer", () => {
     expect(html).toContain("<title>Granola Toolkit</title>");
     expect(html).toContain("Meeting Workspace");
     expect(html).toContain('new EventSource("/events")');
+    expect(html).toContain('data-workspace-tab="notes"');
+    expect(html).toContain("1-4 switch tabs");
   });
 
   test("supports meeting filters and quick-open routes", async () => {
