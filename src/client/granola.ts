@@ -3,15 +3,30 @@ import type { GranolaDocument } from "../types.ts";
 import { parseDocument } from "./parsers.ts";
 import type { AuthenticatedHttpClient } from "./http.ts";
 
-const USER_AGENT = "Granola/5.354.0";
-const CLIENT_VERSION = "5.354.0";
+const DEFAULT_CLIENT_VERSION = "5.354.0";
 const DOCUMENTS_URL = "https://api.granola.ai/v2/get-documents";
 
+function resolveClientVersion(value?: string): string {
+  return value?.trim() || process.env.GRANOLA_CLIENT_VERSION?.trim() || DEFAULT_CLIENT_VERSION;
+}
+
 export class GranolaApiClient {
+  private readonly clientVersion: string;
+  private readonly documentsUrl: string;
+
   constructor(
     private readonly httpClient: AuthenticatedHttpClient,
-    private readonly documentsUrl = DOCUMENTS_URL,
-  ) {}
+    options: string | { clientVersion?: string; documentsUrl?: string } = DOCUMENTS_URL,
+  ) {
+    if (typeof options === "string") {
+      this.documentsUrl = options;
+      this.clientVersion = resolveClientVersion();
+      return;
+    }
+
+    this.documentsUrl = options.documentsUrl ?? DOCUMENTS_URL;
+    this.clientVersion = resolveClientVersion(options.clientVersion);
+  }
 
   async listDocuments(options: { limit?: number; timeoutMs: number }): Promise<GranolaDocument[]> {
     const documents: GranolaDocument[] = [];
@@ -28,8 +43,8 @@ export class GranolaApiClient {
         },
         {
           headers: {
-            "User-Agent": USER_AGENT,
-            "X-Client-Version": CLIENT_VERSION,
+            "User-Agent": `Granola/${this.clientVersion}`,
+            "X-Client-Version": this.clientVersion,
           },
           timeoutMs: options.timeoutMs,
         },

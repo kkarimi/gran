@@ -214,6 +214,7 @@ Supported environment variables:
 - `TIMEOUT`
 - `CACHE_FILE`
 - `TRANSCRIPT_OUTPUT`
+- `GRANOLA_CLIENT_VERSION`
 
 ## Development Checks
 

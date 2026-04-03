@@ -42,4 +42,81 @@ describe("AuthenticatedHttpClient", () => {
     expect(response.status).toBe(200);
     expect(requests).toBe(2);
   });
+
+  test("retries transient status codes with backoff", async () => {
+    let requests = 0;
+    const sleeps: number[] = [];
+
+    const source: AccessTokenSource = {
+      async loadAccessToken() {
+        return "token-1";
+      },
+    };
+
+    const client = new AuthenticatedHttpClient({
+      fetchImpl: async () => {
+        requests += 1;
+
+        if (requests === 1) {
+          return new Response("retry later", {
+            headers: {
+              "retry-after": "1",
+            },
+            status: 429,
+            statusText: "Too Many Requests",
+          });
+        }
+
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      },
+      retryBaseDelayMs: 25,
+      sleepImpl: async (delayMs) => {
+        sleeps.push(delayMs);
+      },
+      tokenProvider: new CachedTokenProvider(source),
+    });
+
+    const response = await client.request({
+      timeoutMs: 5_000,
+      url: "https://example.test",
+    });
+
+    expect(response.status).toBe(200);
+    expect(requests).toBe(2);
+    expect(sleeps).toEqual([1000]);
+  });
+
+  test("retries fetch failures before surfacing the response", async () => {
+    let requests = 0;
+    const sleeps: number[] = [];
+
+    const client = new AuthenticatedHttpClient({
+      fetchImpl: async () => {
+        requests += 1;
+        if (requests === 1) {
+          throw new Error("temporary network issue");
+        }
+
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      },
+      retryBaseDelayMs: 50,
+      sleepImpl: async (delayMs) => {
+        sleeps.push(delayMs);
+      },
+      tokenProvider: new CachedTokenProvider({
+        async loadAccessToken() {
+          return "token-1";
+        },
+      }),
+    });
+
+    const response = await client.request({
+      timeoutMs: 5_000,
+      url: "https://example.test",
+    });
+
+    expect(response.status).toBe(200);
+    expect(requests).toBe(2);
+    expect(sleeps).toEqual([50]);
+  });
 });
