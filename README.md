@@ -35,6 +35,7 @@ granola --help
 granola auth login
 granola meeting --help
 granola notes --help
+granola serve --help
 granola transcripts --help
 ```
 
@@ -47,6 +48,7 @@ vp pack
 node dist/cli.js --help
 node dist/cli.js meeting --help
 node dist/cli.js notes --help
+node dist/cli.js serve --help
 node dist/cli.js transcripts --help
 ```
 
@@ -87,6 +89,14 @@ granola meeting view 1234abcd
 granola meeting notes 1234abcd
 granola meeting transcript 1234abcd --format json
 granola meeting export 1234abcd --format yaml
+```
+
+Run the local API server:
+
+```bash
+granola serve
+granola serve --port 4096
+granola serve --hostname 0.0.0.0 --port 4096
 ```
 
 ## How It Works
@@ -166,6 +176,22 @@ The machine-readable `export` command includes:
 - a meeting summary
 - structured note data plus rendered Markdown
 - structured transcript data plus rendered transcript text when available
+
+### Server
+
+`serve` starts a long-lived local `Granola Toolkit` server on one shared app instance.
+
+The initial server API includes:
+
+- `GET /health`
+- `GET /state`
+- `GET /events` for server-sent state updates
+- `GET /meetings`
+- `GET /meetings/:id`
+- `POST /exports/notes`
+- `POST /exports/transcripts`
+
+This is the foundation for the future `granola web` client and any attachable TUI flows.
 
 ## Auth
 

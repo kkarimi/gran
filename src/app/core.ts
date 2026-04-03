@@ -22,6 +22,7 @@ import { granolaCacheCandidates } from "../utils.ts";
 import type {
   GranolaAppAuthState,
   GranolaAppExportRunState,
+  GranolaAppStateEvent,
   GranolaAppState,
   GranolaAppSurface,
   GranolaMeetingBundle,
@@ -105,6 +106,7 @@ export class GranolaApp {
   #cacheResolved = false;
   #granolaClient?: GranolaDocumentsClient;
   #documents?: GranolaDocument[];
+  #listeners = new Set<(event: GranolaAppStateEvent) => void>();
   readonly #state: GranolaAppState;
 
   constructor(
@@ -119,16 +121,36 @@ export class GranolaApp {
     return cloneState(this.#state);
   }
 
+  subscribe(listener: (event: GranolaAppStateEvent) => void): () => void {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
+  }
+
   setUiState(patch: Partial<GranolaAppState["ui"]>): GranolaAppState {
     this.#state.ui = {
       ...this.#state.ui,
       ...patch,
     };
+    this.emitStateUpdate();
     return this.getState();
   }
 
   private nowIso(): string {
     return (this.deps.now ?? (() => new Date()))().toISOString();
+  }
+
+  private emitStateUpdate(): void {
+    const event: GranolaAppStateEvent = {
+      state: this.getState(),
+      timestamp: this.nowIso(),
+      type: "state.updated",
+    };
+
+    for (const listener of this.#listeners) {
+      listener(event);
+    }
   }
 
   private async getGranolaClient(): Promise<GranolaDocumentsClient> {
@@ -148,6 +170,7 @@ export class GranolaApp {
     const runtime = await this.deps.createGranolaClient();
     this.#granolaClient = runtime.client;
     this.#state.auth = { ...runtime.auth };
+    this.emitStateUpdate();
     return this.#granolaClient;
   }
 
@@ -174,6 +197,7 @@ export class GranolaApp {
       loaded: true,
       loadedAt: this.nowIso(),
     };
+    this.emitStateUpdate();
     return documents;
   }
 
@@ -209,6 +233,7 @@ export class GranolaApp {
       loadedAt: cacheData ? this.nowIso() : undefined,
       transcriptCount: cacheData ? transcriptCount(cacheData) : 0,
     };
+    this.emitStateUpdate();
 
     if (options.required && !cacheData) {
       throw this.missingCacheError();
@@ -267,6 +292,7 @@ export class GranolaApp {
       ranAt: this.nowIso(),
       written,
     };
+    this.emitStateUpdate();
     this.setUiState({
       view: "notes-export",
     });
@@ -298,6 +324,7 @@ export class GranolaApp {
       ranAt: this.nowIso(),
       written,
     };
+    this.emitStateUpdate();
     this.setUiState({
       view: "transcripts-export",
     });

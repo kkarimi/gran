@@ -91,3 +91,9 @@ export interface GranolaMeetingListResult {
   format?: "json" | "text" | "yaml";
   meetings: MeetingSummaryRecord[];
 }
+
+export interface GranolaAppStateEvent {
+  state: GranolaAppState;
+  timestamp: string;
+  type: "state.updated";
+}
