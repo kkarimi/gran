@@ -3,6 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   buildTranscriptExport,
   formatTranscript,
+  normaliseTranscriptSegments,
   renderTranscriptExport,
 } from "../src/transcripts.ts";
 
@@ -93,6 +94,100 @@ describe("formatTranscript", () => {
         text: "Hello",
       }),
     ]);
+  });
+
+  test("sorts transcript segments deterministically and prefers final segments", () => {
+    const segments = normaliseTranscriptSegments([
+      {
+        documentId: "doc-4",
+        endTimestamp: "2024-01-01T10:00:15Z",
+        id: "seg-2",
+        isFinal: true,
+        source: "system",
+        startTimestamp: "2024-01-01T10:00:10Z",
+        text: "Second",
+      },
+      {
+        documentId: "doc-4",
+        endTimestamp: "2024-01-01T10:00:05Z",
+        id: "seg-1",
+        isFinal: false,
+        source: "microphone",
+        startTimestamp: "2024-01-01T10:00:00Z",
+        text: "Draft",
+      },
+      {
+        documentId: "doc-4",
+        endTimestamp: "2024-01-01T10:00:06Z",
+        id: "seg-1",
+        isFinal: true,
+        source: "microphone",
+        startTimestamp: "2024-01-01T10:00:00Z",
+        text: "First",
+      },
+    ]);
+
+    expect(segments).toEqual([
+      expect.objectContaining({
+        id: "seg-1",
+        isFinal: true,
+        text: "First",
+      }),
+      expect.objectContaining({
+        id: "seg-2",
+        isFinal: true,
+        text: "Second",
+      }),
+    ]);
+  });
+
+  test("keeps raw transcript output unfiltered", () => {
+    const output = renderTranscriptExport(
+      buildTranscriptExport(
+        {
+          createdAt: "2024-01-01T00:00:00Z",
+          id: "doc-raw",
+          title: "Raw transcript",
+          updatedAt: "2024-01-01T01:00:00Z",
+        },
+        normaliseTranscriptSegments([
+          {
+            documentId: "doc-raw",
+            endTimestamp: "2024-01-01T10:00:06Z",
+            id: "seg-1",
+            isFinal: true,
+            source: "microphone",
+            startTimestamp: "2024-01-01T10:00:00Z",
+            text: "Final line",
+          },
+        ]),
+        [
+          {
+            documentId: "doc-raw",
+            endTimestamp: "2024-01-01T10:00:05Z",
+            id: "seg-1",
+            isFinal: false,
+            source: "microphone",
+            startTimestamp: "2024-01-01T10:00:00Z",
+            text: "Draft line",
+          },
+          {
+            documentId: "doc-raw",
+            endTimestamp: "2024-01-01T10:00:06Z",
+            id: "seg-1",
+            isFinal: true,
+            source: "microphone",
+            startTimestamp: "2024-01-01T10:00:00Z",
+            text: "Final line",
+          },
+        ],
+      ),
+      "raw",
+    );
+
+    expect(output).toContain('"isFinal": false');
+    expect(output).toContain('"text": "Draft line"');
+    expect(output).toContain('"text": "Final line"');
   });
 
   test("renders transcript exports as yaml", () => {

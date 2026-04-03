@@ -15,9 +15,75 @@ import {
   transcriptSpeakerLabel,
 } from "./utils.ts";
 
+function transcriptSegmentKey(segment: TranscriptSegment): string {
+  if (segment.id) {
+    return `id:${segment.id}`;
+  }
+
+  return [segment.documentId, segment.source, segment.startTimestamp, segment.endTimestamp].join(
+    "|",
+  );
+}
+
+function compareSegmentTimestamps(left: string, right: string): number {
+  if (left === right) {
+    return 0;
+  }
+
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+
+  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime)) {
+    return leftTime - rightTime;
+  }
+
+  return compareStrings(left, right);
+}
+
+function compareTranscriptSegments(left: TranscriptSegment, right: TranscriptSegment): number {
+  return (
+    compareSegmentTimestamps(left.startTimestamp, right.startTimestamp) ||
+    compareSegmentTimestamps(left.endTimestamp, right.endTimestamp) ||
+    compareStrings(left.source, right.source) ||
+    compareStrings(left.id, right.id) ||
+    compareStrings(left.text, right.text)
+  );
+}
+
+function preferredTranscriptSegment(
+  current: TranscriptSegment | undefined,
+  candidate: TranscriptSegment,
+): TranscriptSegment {
+  if (!current) {
+    return candidate;
+  }
+
+  if (candidate.isFinal !== current.isFinal) {
+    return candidate.isFinal ? candidate : current;
+  }
+
+  return compareSegmentTimestamps(candidate.endTimestamp, current.endTimestamp) > 0 ||
+    candidate.text.length > current.text.length
+    ? candidate
+    : current;
+}
+
+export function normaliseTranscriptSegments(segments: TranscriptSegment[]): TranscriptSegment[] {
+  const selected = new Map<string, TranscriptSegment>();
+
+  for (const segment of [...segments].sort(compareTranscriptSegments)) {
+    const key = transcriptSegmentKey(segment);
+    const current = selected.get(key);
+    selected.set(key, preferredTranscriptSegment(current, segment));
+  }
+
+  return [...selected.values()].sort(compareTranscriptSegments);
+}
+
 export function buildTranscriptExport(
   document: CacheDocument,
   segments: TranscriptSegment[],
+  rawSegments: TranscriptSegment[] = segments,
 ): TranscriptExportRecord {
   const renderedSegments: TranscriptExportSegmentRecord[] = segments.map((segment) => ({
     endTimestamp: segment.endTimestamp,
@@ -34,7 +100,7 @@ export function buildTranscriptExport(
     id: document.id,
     raw: {
       document,
-      segments,
+      segments: rawSegments,
     },
     segments: renderedSegments,
     title: document.title,
@@ -97,7 +163,11 @@ function formatTranscriptText(transcript: TranscriptExportRecord): string {
 }
 
 export function formatTranscript(document: CacheDocument, segments: TranscriptSegment[]): string {
-  return renderTranscriptExport(buildTranscriptExport(document, segments), "text");
+  const normalisedSegments = normaliseTranscriptSegments(segments);
+  return renderTranscriptExport(
+    buildTranscriptExport(document, normalisedSegments, segments),
+    "text",
+  );
 }
 
 function transcriptFilename(document: CacheDocument): string {
@@ -142,7 +212,8 @@ export async function writeTranscripts(
         updatedAt: "",
       };
 
-      const transcript = buildTranscriptExport(document, segments);
+      const normalisedSegments = normaliseTranscriptSegments(segments);
+      const transcript = buildTranscriptExport(document, normalisedSegments, segments);
       const content = renderTranscriptExport(transcript, format);
       if (!content) {
         return [];
