@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { documentToMarkdown } from "../src/notes.ts";
+import { buildNoteExport, documentToMarkdown, renderNoteExport } from "../src/notes.ts";
 
 describe("documentToMarkdown", () => {
   test("prefers ProseMirror content and writes YAML frontmatter", () => {
@@ -53,5 +53,51 @@ describe("documentToMarkdown", () => {
     expect(markdown).toContain("## Summary");
     expect(markdown).toContain("- Point one");
     expect(markdown).toContain("- Point two");
+  });
+
+  test("builds structured note exports with a content source", () => {
+    const note = buildNoteExport({
+      content: "fallback content",
+      createdAt: "2024-01-01T00:00:00Z",
+      id: "doc-3",
+      notes: {
+        content: [{ content: [{ text: "hello", type: "text" }], type: "paragraph" }],
+        type: "doc",
+      },
+      notesPlain: "",
+      tags: [],
+      title: "Structured note",
+      updatedAt: "2024-01-02T00:00:00Z",
+    });
+
+    expect(note.content).toContain("hello");
+    expect(note.contentSource).toBe("notes");
+  });
+
+  test("renders note exports as json", () => {
+    const output = renderNoteExport(
+      {
+        content: "Hello",
+        contentSource: "content",
+        createdAt: "2024-01-01T00:00:00Z",
+        id: "doc-json",
+        raw: {
+          content: "Hello",
+          createdAt: "2024-01-01T00:00:00Z",
+          id: "doc-json",
+          notesPlain: "",
+          tags: [],
+          title: "JSON note",
+          updatedAt: "2024-01-02T00:00:00Z",
+        },
+        tags: ["work"],
+        title: "JSON note",
+        updatedAt: "2024-01-02T00:00:00Z",
+      },
+      "json",
+    );
+
+    expect(output).toContain('"contentSource": "content"');
+    expect(output).toContain('"title": "JSON note"');
   });
 });

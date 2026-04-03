@@ -58,12 +58,14 @@ Export notes:
 
 ```bash
 node dist/cli.js notes --supabase "$HOME/Library/Application Support/Granola/supabase.json"
+node dist/cli.js notes --format json --output ./notes-json
 ```
 
 Export transcripts:
 
 ```bash
 node dist/cli.js transcripts --cache "$HOME/Library/Application Support/Granola/cache-v3.json"
+node dist/cli.js transcripts --format yaml --output ./transcripts-yaml
 ```
 
 ## How It Works
@@ -77,9 +79,10 @@ The flow is:
 1. read your local `supabase.json`
 2. extract the WorkOS access token from it
 3. call Granola's paginated documents API
-4. choose the best available note content for each document
-5. convert ProseMirror content into Markdown
-6. write one Markdown file per document into the output directory
+4. normalise each document into a structured note export
+5. choose the best available note content for each document
+6. render that export as Markdown, JSON, YAML, or raw JSON
+7. write one file per document into the output directory
 
 Content is chosen in this order:
 
@@ -88,7 +91,7 @@ Content is chosen in this order:
 3. `last_viewed_panel.original_content`
 4. raw `content`
 
-Each note file includes:
+Markdown note files include:
 
 - YAML frontmatter with the document id, created timestamp, updated timestamp, and tags
 - a top-level heading from the note title
@@ -102,14 +105,17 @@ The flow is:
 
 1. read Granola's cache JSON from disk
 2. parse the cache payload, whether it is double-encoded or already an object
-3. match transcript segments to documents by document id
-4. format segments as `[HH:MM:SS] Speaker: Text`
-5. write one `.txt` file per document into the output directory
+3. normalise transcript data into a structured export per document
+4. match transcript segments to documents by document id
+5. render each export as text, JSON, YAML, or raw JSON
+6. write one file per document into the output directory
 
 Speaker labels are currently normalised to:
 
 - `You` for `microphone`
 - `System` for everything else
+
+Structured output formats are useful when you want to post-process exports in scripts instead of reading the default human-oriented Markdown or text files.
 
 ### Incremental Writes
 

@@ -1,6 +1,14 @@
 import { join } from "node:path";
 
-import type { CacheData, CacheDocument, TranscriptSegment } from "./types.ts";
+import { toJson, toYaml } from "./render.ts";
+import type {
+  CacheData,
+  CacheDocument,
+  TranscriptExportRecord,
+  TranscriptExportSegmentRecord,
+  TranscriptOutputFormat,
+  TranscriptSegment,
+} from "./types.ts";
 import {
   compareStrings,
   ensureDirectory,
@@ -12,35 +20,113 @@ import {
   writeTextFile,
 } from "./utils.ts";
 
-export function formatTranscript(document: CacheDocument, segments: TranscriptSegment[]): string {
-  if (segments.length === 0) {
+export function buildTranscriptExport(
+  document: CacheDocument,
+  segments: TranscriptSegment[],
+): TranscriptExportRecord {
+  const renderedSegments: TranscriptExportSegmentRecord[] = segments.map((segment) => ({
+    endTimestamp: segment.endTimestamp,
+    id: segment.id,
+    isFinal: segment.isFinal,
+    source: segment.source,
+    speaker: transcriptSpeakerLabel(segment),
+    startTimestamp: segment.startTimestamp,
+    text: segment.text,
+  }));
+
+  return {
+    createdAt: document.createdAt,
+    id: document.id,
+    raw: {
+      document,
+      segments,
+    },
+    segments: renderedSegments,
+    title: document.title,
+    updatedAt: document.updatedAt,
+  };
+}
+
+export function renderTranscriptExport(
+  transcript: TranscriptExportRecord,
+  format: TranscriptOutputFormat = "text",
+): string {
+  switch (format) {
+    case "json":
+      return toJson({
+        createdAt: transcript.createdAt,
+        id: transcript.id,
+        segments: transcript.segments,
+        title: transcript.title,
+        updatedAt: transcript.updatedAt,
+      });
+    case "raw":
+      return toJson(transcript.raw);
+    case "yaml":
+      return toYaml({
+        createdAt: transcript.createdAt,
+        id: transcript.id,
+        segments: transcript.segments,
+        title: transcript.title,
+        updatedAt: transcript.updatedAt,
+      });
+    case "text":
+      break;
+  }
+
+  return formatTranscriptText(transcript);
+}
+
+function formatTranscriptText(transcript: TranscriptExportRecord): string {
+  if (transcript.segments.length === 0) {
     return "";
   }
 
   const header = [
     "=".repeat(80),
-    document.title || document.id,
-    `ID: ${document.id}`,
-    document.createdAt ? `Created: ${document.createdAt}` : "",
-    document.updatedAt ? `Updated: ${document.updatedAt}` : "",
-    `Segments: ${segments.length}`,
+    transcript.title || transcript.id,
+    `ID: ${transcript.id}`,
+    transcript.createdAt ? `Created: ${transcript.createdAt}` : "",
+    transcript.updatedAt ? `Updated: ${transcript.updatedAt}` : "",
+    `Segments: ${transcript.segments.length}`,
     "=".repeat(80),
     "",
   ].filter(Boolean);
 
-  const body = segments.map((segment) => {
+  const body = transcript.segments.map((segment) => {
     const time = formatTimestampForTranscript(segment.startTimestamp);
-    return `[${time}] ${transcriptSpeakerLabel(segment)}: ${segment.text}`;
+    return `[${time}] ${segment.speaker}: ${segment.text}`;
   });
 
   return `${[...header, ...body].join("\n").trimEnd()}\n`;
+}
+
+export function formatTranscript(document: CacheDocument, segments: TranscriptSegment[]): string {
+  return renderTranscriptExport(buildTranscriptExport(document, segments), "text");
 }
 
 function transcriptFilename(document: CacheDocument): string {
   return sanitiseFilename(document.title || document.id, "untitled");
 }
 
-export async function writeTranscripts(cacheData: CacheData, outputDir: string): Promise<number> {
+function transcriptFileExtension(format: TranscriptOutputFormat): string {
+  switch (format) {
+    case "json":
+      return ".json";
+    case "raw":
+      return ".raw.json";
+    case "text":
+      return ".txt";
+    case "yaml":
+      return ".yaml";
+  }
+}
+
+export async function writeTranscripts(
+  cacheData: CacheData,
+  outputDir: string,
+  format: TranscriptOutputFormat = "text",
+): Promise<number> {
   await ensureDirectory(outputDir);
 
   const entries = Object.entries(cacheData.transcripts)
@@ -66,13 +152,14 @@ export async function writeTranscripts(cacheData: CacheData, outputDir: string):
     };
 
     const filename = makeUniqueFilename(transcriptFilename(document), used);
-    const filePath = join(outputDir, `${filename}.txt`);
+    const filePath = join(outputDir, `${filename}${transcriptFileExtension(format)}`);
 
     if (!(await shouldWriteFile(filePath, document.updatedAt))) {
       continue;
     }
 
-    const content = formatTranscript(document, segments);
+    const transcript = buildTranscriptExport(document, segments);
+    const content = renderTranscriptExport(transcript, format);
     if (!content) {
       continue;
     }

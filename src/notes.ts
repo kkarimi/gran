@@ -1,6 +1,12 @@
 import { join } from "node:path";
 
-import type { GranolaDocument } from "./types.ts";
+import { toJson, toYaml } from "./render.ts";
+import type {
+  GranolaDocument,
+  NoteContentSource,
+  NoteExportRecord,
+  NoteOutputFormat,
+} from "./types.ts";
 import { convertProseMirrorToMarkdown } from "./prosemirror.ts";
 import {
   compareStrings,
@@ -14,45 +20,128 @@ import {
   writeTextFile,
 } from "./utils.ts";
 
-export function documentToMarkdown(document: GranolaDocument): string {
+function selectNoteContent(document: GranolaDocument): {
+  content: string;
+  source: NoteContentSource;
+} {
+  const notes = convertProseMirrorToMarkdown(document.notes).trim();
+  if (notes) {
+    return { content: notes, source: "notes" };
+  }
+
+  const lastViewedPanel = convertProseMirrorToMarkdown(document.lastViewedPanel?.content).trim();
+  if (lastViewedPanel) {
+    return { content: lastViewedPanel, source: "lastViewedPanel.content" };
+  }
+
+  const originalContent = htmlToMarkdownFallback(
+    document.lastViewedPanel?.originalContent ?? "",
+  ).trim();
+  if (originalContent) {
+    return { content: originalContent, source: "lastViewedPanel.originalContent" };
+  }
+
+  return { content: document.content.trim(), source: "content" };
+}
+
+export function buildNoteExport(document: GranolaDocument): NoteExportRecord {
+  const { content, source } = selectNoteContent(document);
+  return {
+    content,
+    contentSource: source,
+    createdAt: document.createdAt,
+    id: document.id,
+    raw: document,
+    tags: document.tags,
+    title: document.title,
+    updatedAt: document.updatedAt,
+  };
+}
+
+export function renderNoteExport(
+  note: NoteExportRecord,
+  format: NoteOutputFormat = "markdown",
+): string {
+  switch (format) {
+    case "json":
+      return toJson({
+        content: note.content,
+        contentSource: note.contentSource,
+        createdAt: note.createdAt,
+        id: note.id,
+        tags: note.tags,
+        title: note.title,
+        updatedAt: note.updatedAt,
+      });
+    case "raw":
+      return toJson(note.raw);
+    case "yaml":
+      return toYaml({
+        content: note.content,
+        contentSource: note.contentSource,
+        createdAt: note.createdAt,
+        id: note.id,
+        tags: note.tags,
+        title: note.title,
+        updatedAt: note.updatedAt,
+      });
+    case "markdown":
+      break;
+  }
+
   const lines: string[] = [
     "---",
-    `id: ${quoteYamlString(document.id)}`,
-    `created: ${quoteYamlString(document.createdAt)}`,
-    `updated: ${quoteYamlString(document.updatedAt)}`,
+    `id: ${quoteYamlString(note.id)}`,
+    `created: ${quoteYamlString(note.createdAt)}`,
+    `updated: ${quoteYamlString(note.updatedAt)}`,
   ];
 
-  if (document.tags.length > 0) {
+  if (note.tags.length > 0) {
     lines.push("tags:");
-    for (const tag of document.tags) {
+    for (const tag of note.tags) {
       lines.push(`  - ${quoteYamlString(tag)}`);
     }
   }
 
   lines.push("---", "");
 
-  if (document.title.trim()) {
-    lines.push(`# ${document.title.trim()}`, "");
+  if (note.title.trim()) {
+    lines.push(`# ${note.title.trim()}`, "");
   }
 
-  const content =
-    convertProseMirrorToMarkdown(document.notes).trim() ||
-    convertProseMirrorToMarkdown(document.lastViewedPanel?.content).trim() ||
-    htmlToMarkdownFallback(document.lastViewedPanel?.originalContent ?? "").trim() ||
-    document.content.trim();
-
-  if (content) {
-    lines.push(content);
+  if (note.content) {
+    lines.push(note.content);
   }
 
   return `${lines.join("\n").trimEnd()}\n`;
+}
+
+export function documentToMarkdown(document: GranolaDocument): string {
+  return renderNoteExport(buildNoteExport(document), "markdown");
 }
 
 function documentFilename(document: GranolaDocument): string {
   return sanitiseFilename(document.title || document.id, "untitled");
 }
 
-export async function writeNotes(documents: GranolaDocument[], outputDir: string): Promise<number> {
+function noteFileExtension(format: NoteOutputFormat): string {
+  switch (format) {
+    case "json":
+      return ".json";
+    case "raw":
+      return ".raw.json";
+    case "yaml":
+      return ".yaml";
+    case "markdown":
+      return ".md";
+  }
+}
+
+export async function writeNotes(
+  documents: GranolaDocument[],
+  outputDir: string,
+  format: NoteOutputFormat = "markdown",
+): Promise<number> {
   await ensureDirectory(outputDir);
 
   const sorted = [...documents].sort(
@@ -66,13 +155,14 @@ export async function writeNotes(documents: GranolaDocument[], outputDir: string
 
   for (const document of sorted) {
     const filename = makeUniqueFilename(documentFilename(document), used);
-    const filePath = join(outputDir, `${filename}.md`);
+    const filePath = join(outputDir, `${filename}${noteFileExtension(format)}`);
 
     if (!(await shouldWriteFile(filePath, latestDocumentTimestamp(document)))) {
       continue;
     }
 
-    await writeTextFile(filePath, documentToMarkdown(document));
+    const note = buildNoteExport(document);
+    await writeTextFile(filePath, renderNoteExport(note, format));
     written += 1;
   }
 

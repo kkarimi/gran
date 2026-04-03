@@ -2,6 +2,7 @@ import { CachedTokenProvider, NoopTokenStore, SupabaseFileTokenSource } from "..
 import { GranolaApiClient } from "../client/granola.ts";
 import { AuthenticatedHttpClient } from "../client/http.ts";
 import { loadConfig } from "../config.ts";
+import type { NoteOutputFormat } from "../types.ts";
 import { writeNotes } from "../notes.ts";
 import { granolaSupabaseCandidates } from "../utils.ts";
 
@@ -15,7 +16,8 @@ Usage:
   granola notes [options]
 
 Options:
-  --output <path>     Output directory for Markdown files (default: ./notes)
+  --format <value>    Output format: markdown, json, yaml, raw (default: markdown)
+  --output <path>     Output directory for note files (default: ./notes)
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
@@ -25,8 +27,9 @@ Options:
 }
 
 export const notesCommand: CommandDefinition = {
-  description: "Export Granola notes to Markdown",
+  description: "Export Granola notes",
   flags: {
+    format: { type: "string" },
     help: { type: "boolean" },
     output: { type: "string" },
     timeout: { type: "string" },
@@ -49,6 +52,8 @@ export const notesCommand: CommandDefinition = {
     debug(config.debug, "supabase", config.supabase);
     debug(config.debug, "timeoutMs", config.notes.timeoutMs);
     debug(config.debug, "output", config.notes.output);
+    const format = resolveNoteFormat(commandFlags.format);
+    debug(config.debug, "format", format);
 
     console.log("Fetching documents from Granola API...");
     const tokenSource = new SupabaseFileTokenSource(config.supabase);
@@ -63,9 +68,23 @@ export const notesCommand: CommandDefinition = {
     });
 
     console.log(`Exporting ${documents.length} notes to ${config.notes.output}...`);
-    const written = await writeNotes(documents, config.notes.output);
+    const written = await writeNotes(documents, config.notes.output, format);
     console.log("✓ Export completed successfully");
     debug(config.debug, "notes written", written);
     return 0;
   },
 };
+
+function resolveNoteFormat(value: string | boolean | undefined): NoteOutputFormat {
+  switch (value) {
+    case undefined:
+      return "markdown";
+    case "json":
+    case "markdown":
+    case "raw":
+    case "yaml":
+      return value;
+    default:
+      throw new Error("invalid notes format: expected markdown, json, yaml, or raw");
+  }
+}

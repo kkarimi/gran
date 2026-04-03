@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { parseCacheContents } from "../cache.ts";
 import { loadConfig } from "../config.ts";
+import type { TranscriptOutputFormat } from "../types.ts";
 import { writeTranscripts } from "../transcripts.ts";
 import { granolaCacheCandidates } from "../utils.ts";
 
@@ -16,6 +17,7 @@ Usage:
 
 Options:
   --cache <path>      Path to Granola cache JSON
+  --format <value>    Output format: text, json, yaml, raw (default: text)
   --output <path>     Output directory for transcript files (default: ./transcripts)
   --debug             Enable debug logging
   --config <path>     Path to .granola.toml
@@ -24,9 +26,10 @@ Options:
 }
 
 export const transcriptsCommand: CommandDefinition = {
-  description: "Export Granola transcripts to text files",
+  description: "Export Granola transcripts",
   flags: {
     cache: { type: "string" },
+    format: { type: "string" },
     help: { type: "boolean" },
     output: { type: "string" },
   },
@@ -47,6 +50,8 @@ export const transcriptsCommand: CommandDefinition = {
     debug(config.debug, "using config", config.configFileUsed ?? "(none)");
     debug(config.debug, "cacheFile", config.transcripts.cacheFile);
     debug(config.debug, "output", config.transcripts.output);
+    const format = resolveTranscriptFormat(commandFlags.format);
+    debug(config.debug, "format", format);
 
     console.log("Reading Granola cache file...");
     const cacheContents = await readFile(config.transcripts.cacheFile, "utf8");
@@ -56,9 +61,23 @@ export const transcriptsCommand: CommandDefinition = {
     ).length;
 
     console.log(`Exporting ${transcriptCount} transcripts to ${config.transcripts.output}...`);
-    const written = await writeTranscripts(cacheData, config.transcripts.output);
+    const written = await writeTranscripts(cacheData, config.transcripts.output, format);
     console.log("✓ Export completed successfully");
     debug(config.debug, "transcripts written", written);
     return 0;
   },
 };
+
+function resolveTranscriptFormat(value: string | boolean | undefined): TranscriptOutputFormat {
+  switch (value) {
+    case undefined:
+      return "text";
+    case "json":
+    case "raw":
+    case "text":
+    case "yaml":
+      return value;
+    default:
+      throw new Error("invalid transcripts format: expected text, json, yaml, or raw");
+  }
+}
