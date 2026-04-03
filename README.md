@@ -119,9 +119,21 @@ Structured output formats are useful when you want to post-process exports in sc
 
 ### Incremental Writes
 
-Both commands are incremental. They only rewrite an export file when the source document appears newer than the file already on disk.
+Both commands keep a small hidden state file in the output directory to track:
 
-That means repeated runs are cheap, and you can safely point the CLI at the same output directory over time.
+- document id to filename
+- content hash
+- source timestamp
+- last export time
+
+That state is used to:
+
+- keep filenames stable even if a meeting title changes later
+- skip rewrites when the rendered content is unchanged
+- migrate old files cleanly when the output format changes
+- delete stale exports when a document disappears from the source data
+
+That makes repeated runs cheap and keeps long-lived export directories much cleaner.
 
 ## Config
 

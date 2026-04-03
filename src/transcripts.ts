@@ -1,5 +1,4 @@
-import { join } from "node:path";
-
+import { syncManagedExports } from "./export-state.ts";
 import { toJson, toYaml } from "./render.ts";
 import type {
   CacheData,
@@ -11,13 +10,9 @@ import type {
 } from "./types.ts";
 import {
   compareStrings,
-  ensureDirectory,
   formatTimestampForTranscript,
-  makeUniqueFilename,
   sanitiseFilename,
-  shouldWriteFile,
   transcriptSpeakerLabel,
-  writeTextFile,
 } from "./utils.ts";
 
 export function buildTranscriptExport(
@@ -127,8 +122,6 @@ export async function writeTranscripts(
   outputDir: string,
   format: TranscriptOutputFormat = "text",
 ): Promise<number> {
-  await ensureDirectory(outputDir);
-
   const entries = Object.entries(cacheData.transcripts)
     .filter(([, segments]) => segments.length > 0)
     .sort(([leftId], [rightId]) => {
@@ -140,33 +133,32 @@ export async function writeTranscripts(
       );
     });
 
-  const used = new Map<string, number>();
-  let written = 0;
+  return await syncManagedExports({
+    items: entries.flatMap(([documentId, segments]) => {
+      const document = cacheData.documents[documentId] ?? {
+        createdAt: "",
+        id: documentId,
+        title: documentId,
+        updatedAt: "",
+      };
 
-  for (const [documentId, segments] of entries) {
-    const document = cacheData.documents[documentId] ?? {
-      createdAt: "",
-      id: documentId,
-      title: documentId,
-      updatedAt: "",
-    };
+      const transcript = buildTranscriptExport(document, segments);
+      const content = renderTranscriptExport(transcript, format);
+      if (!content) {
+        return [];
+      }
 
-    const filename = makeUniqueFilename(transcriptFilename(document), used);
-    const filePath = join(outputDir, `${filename}${transcriptFileExtension(format)}`);
-
-    if (!(await shouldWriteFile(filePath, document.updatedAt))) {
-      continue;
-    }
-
-    const transcript = buildTranscriptExport(document, segments);
-    const content = renderTranscriptExport(transcript, format);
-    if (!content) {
-      continue;
-    }
-
-    await writeTextFile(filePath, content);
-    written += 1;
-  }
-
-  return written;
+      return [
+        {
+          content,
+          extension: transcriptFileExtension(format),
+          id: document.id,
+          preferredStem: transcriptFilename(document),
+          sourceUpdatedAt: document.updatedAt,
+        },
+      ];
+    }),
+    kind: "transcripts",
+    outputDir,
+  });
 }

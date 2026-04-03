@@ -29,9 +29,29 @@ const ensureMainBranch = () => {
   }
 };
 
+const ensurePublishedBaseline = () => {
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+
+  let publishedVersion = "";
+  try {
+    publishedVersion = execText(`npm view ${pkg.name} version`);
+  } catch {
+    throw new Error(
+      `Current package ${pkg.name}@${pkg.version} is not published yet. Finish publishing the current version before bumping again.`,
+    );
+  }
+
+  if (publishedVersion !== pkg.version) {
+    throw new Error(
+      `Current package.json version ${pkg.version} does not match npm (${publishedVersion}). Finish publishing that release before bumping again.`,
+    );
+  }
+};
+
 const release = () => {
   ensureCleanTree();
   ensureMainBranch();
+  ensurePublishedBaseline();
 
   if (!supportedKinds.has(kind)) {
     throw new Error(`Unsupported release kind: ${kind}. Use patch, minor, or major.`);

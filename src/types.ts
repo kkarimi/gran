@@ -110,6 +110,22 @@ export interface TranscriptExportRecord {
   updatedAt: string;
 }
 
+export type ExportStateKind = "notes" | "transcripts";
+
+export interface ExportStateEntry {
+  contentHash: string;
+  exportedAt: string;
+  fileName: string;
+  fileStem: string;
+  sourceUpdatedAt: string;
+}
+
+export interface ExportStateFile {
+  entries: Record<string, ExportStateEntry>;
+  kind: ExportStateKind;
+  version: number;
+}
+
 export interface NotesOptions {
   output: string;
   timeoutMs: number;

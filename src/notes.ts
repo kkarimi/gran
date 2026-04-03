@@ -1,5 +1,4 @@
-import { join } from "node:path";
-
+import { syncManagedExports } from "./export-state.ts";
 import { toJson, toYaml } from "./render.ts";
 import type {
   GranolaDocument,
@@ -10,14 +9,10 @@ import type {
 import { convertProseMirrorToMarkdown } from "./prosemirror.ts";
 import {
   compareStrings,
-  ensureDirectory,
   htmlToMarkdownFallback,
   latestDocumentTimestamp,
-  makeUniqueFilename,
   quoteYamlString,
   sanitiseFilename,
-  shouldWriteFile,
-  writeTextFile,
 } from "./utils.ts";
 
 function selectNoteContent(document: GranolaDocument): {
@@ -142,29 +137,25 @@ export async function writeNotes(
   outputDir: string,
   format: NoteOutputFormat = "markdown",
 ): Promise<number> {
-  await ensureDirectory(outputDir);
-
   const sorted = [...documents].sort(
     (left, right) =>
       compareStrings(left.title || left.id, right.title || right.id) ||
       compareStrings(left.id, right.id),
   );
 
-  const used = new Map<string, number>();
-  let written = 0;
+  return await syncManagedExports({
+    items: sorted.map((document) => {
+      const note = buildNoteExport(document);
 
-  for (const document of sorted) {
-    const filename = makeUniqueFilename(documentFilename(document), used);
-    const filePath = join(outputDir, `${filename}${noteFileExtension(format)}`);
-
-    if (!(await shouldWriteFile(filePath, latestDocumentTimestamp(document)))) {
-      continue;
-    }
-
-    const note = buildNoteExport(document);
-    await writeTextFile(filePath, renderNoteExport(note, format));
-    written += 1;
-  }
-
-  return written;
+      return {
+        content: renderNoteExport(note, format),
+        extension: noteFileExtension(format),
+        id: note.id,
+        preferredStem: documentFilename(document),
+        sourceUpdatedAt: latestDocumentTimestamp(document),
+      };
+    }),
+    kind: "notes",
+    outputDir,
+  });
 }
