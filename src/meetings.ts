@@ -11,6 +11,8 @@ import type {
   GranolaDocument,
   NoteContentSource,
   NoteExportRecord,
+  NoteOutputFormat,
+  TranscriptOutputFormat,
   TranscriptExportRecord,
   TranscriptExportSegmentRecord,
 } from "./types.ts";
@@ -19,6 +21,8 @@ import { compareStrings, formatTimestampForTranscript, latestDocumentTimestamp }
 export type MeetingListOutputFormat = "json" | "text" | "yaml";
 export type MeetingDetailOutputFormat = "json" | "text" | "yaml";
 export type MeetingExportOutputFormat = "json" | "yaml";
+export type MeetingNotesOutputFormat = NoteOutputFormat;
+export type MeetingTranscriptOutputFormat = TranscriptOutputFormat;
 
 export interface MeetingSummaryRecord {
   createdAt: string;
@@ -135,12 +139,14 @@ function buildMeetingTranscript(
   segmentCount: number;
   transcript: MeetingTranscriptRecord | null;
   transcriptText: string | null;
+  transcriptRecord: TranscriptExportRecord | null;
 } {
   if (!cacheData) {
     return {
       loaded: false,
       segmentCount: 0,
       transcript: null,
+      transcriptRecord: null,
       transcriptText: null,
     };
   }
@@ -152,6 +158,7 @@ function buildMeetingTranscript(
       loaded: true,
       segmentCount: 0,
       transcript: null,
+      transcriptRecord: null,
       transcriptText: null,
     };
   }
@@ -166,6 +173,7 @@ function buildMeetingTranscript(
     loaded: true,
     segmentCount: transcript.segments.length,
     transcript: serialiseTranscript(transcript),
+    transcriptRecord: transcript,
     transcriptText: renderTranscriptExport(transcript, "text"),
   };
 }
@@ -392,4 +400,24 @@ export function renderMeetingExport(
     case "yaml":
       return toYaml(record);
   }
+}
+
+export function renderMeetingNotes(
+  document: GranolaDocument,
+  format: MeetingNotesOutputFormat = "markdown",
+): string {
+  return renderNoteExport(buildNoteExport(document), format);
+}
+
+export function renderMeetingTranscript(
+  document: GranolaDocument,
+  cacheData?: CacheData,
+  format: MeetingTranscriptOutputFormat = "text",
+): string {
+  const transcript = buildMeetingTranscript(document, cacheData).transcriptRecord;
+  if (!transcript) {
+    return "";
+  }
+
+  return renderTranscriptExport(transcript, format);
 }

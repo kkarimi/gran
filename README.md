@@ -81,6 +81,8 @@ Inspect individual meetings:
 granola meeting list --limit 10
 granola meeting list --search planning
 granola meeting view 1234abcd
+granola meeting notes 1234abcd
+granola meeting transcript 1234abcd --format json
 granola meeting export 1234abcd --format yaml
 ```
 
@@ -143,13 +145,18 @@ The flow is:
 2. fetch documents from Granola's API
 3. optionally load the local cache for transcript data
 4. resolve a meeting by full id or unique id prefix
-5. render either a list, a human-readable meeting view, or a machine-readable export bundle
+5. render either a list, a combined meeting view, focused notes/transcript output, or a machine-readable export bundle
 
 The human-readable `view` command shows:
 
 - meeting metadata
 - the selected notes content
 - transcript lines when the local cache is available
+
+The focused meeting subcommands are:
+
+- `meeting notes` for just the selected note output
+- `meeting transcript` for just the selected transcript output
 
 The machine-readable `export` command includes:
 

@@ -7,6 +7,7 @@ import {
   getSessionFromSupabaseContents,
   MemorySessionStore,
   MemoryTokenStore,
+  SupabaseContentsSessionSource,
   StoredSessionTokenProvider,
   type AccessTokenSource,
 } from "../src/client/auth.ts";
@@ -94,6 +95,39 @@ describe("CachedTokenProvider", () => {
       expect.objectContaining({
         accessToken: "token-2",
         refreshToken: "refresh-2",
+      }),
+    );
+  });
+
+  test("falls back to the source session when refresh fails", async () => {
+    const store = new MemorySessionStore();
+    await store.writeSession({
+      accessToken: "token-1",
+      clientId: "client_GranolaMac",
+      refreshToken: "refresh-1",
+    });
+
+    const provider = new StoredSessionTokenProvider(store, {
+      fetchImpl: async () =>
+        new Response("bad refresh", { status: 400, statusText: "Bad Request" }),
+      source: new SupabaseContentsSessionSource(
+        JSON.stringify({
+          workos_tokens: JSON.stringify({
+            access_token: "token-from-source",
+            client_id: "client_GranolaMac",
+            refresh_token: "refresh-from-source",
+          }),
+        }),
+      ),
+    });
+
+    await provider.invalidate();
+
+    expect(await provider.getAccessToken()).toBe("token-from-source");
+    expect(await store.readSession()).toEqual(
+      expect.objectContaining({
+        accessToken: "token-from-source",
+        refreshToken: "refresh-from-source",
       }),
     );
   });

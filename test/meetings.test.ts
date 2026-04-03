@@ -5,6 +5,8 @@ import {
   listMeetings,
   renderMeetingExport,
   renderMeetingList,
+  renderMeetingNotes,
+  renderMeetingTranscript,
   renderMeetingView,
   resolveMeeting,
 } from "../src/meetings.ts";
@@ -139,10 +141,24 @@ describe("meeting rendering", () => {
     expect(parsed.transcriptText).toContain("Hello team");
   });
 
+  test("renders focused meeting notes and transcript outputs", () => {
+    const notesOutput = renderMeetingNotes(documents[0]!, "markdown");
+    const transcriptOutput = renderMeetingTranscript(documents[0]!, cacheData, "text");
+    const rawTranscript = renderMeetingTranscript(documents[0]!, cacheData, "raw");
+
+    expect(notesOutput).toContain("# Alpha Sync");
+    expect(notesOutput).toContain("Alpha notes");
+    expect(transcriptOutput).toContain("[09:00:01] You: Hello team");
+    expect(rawTranscript).toContain('"segments"');
+    expect(rawTranscript).toContain('"text": "Hello team"');
+  });
+
   test("shows unloaded transcript state when cache data is unavailable", () => {
     const viewText = renderMeetingView(buildMeetingRecord(documents[1]!), "text");
+    const transcriptOutput = renderMeetingTranscript(documents[1]!, undefined, "text");
 
     expect(viewText).toContain("Transcript: cache not loaded");
     expect(viewText).toContain("(Granola cache not loaded)");
+    expect(transcriptOutput).toBe("");
   });
 });

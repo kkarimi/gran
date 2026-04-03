@@ -326,15 +326,24 @@ export class StoredSessionTokenProvider implements AccessTokenProvider {
   async invalidate(): Promise<void> {
     const session = await this.loadSession().catch(() => undefined);
     if (session?.refreshToken && session.clientId) {
-      const refreshedSession = await refreshGranolaSession(session, this.options.fetchImpl);
-      this.#session = refreshedSession;
-      await this.store.writeSession(refreshedSession);
-      return;
+      try {
+        const refreshedSession = await refreshGranolaSession(session, this.options.fetchImpl);
+        this.#session = refreshedSession;
+        await this.store.writeSession(refreshedSession);
+        return;
+      } catch {
+        if (!this.options.source) {
+          this.#session = undefined;
+          await this.store.clearSession();
+          throw new Error("failed to refresh stored Granola session");
+        }
+      }
     }
 
     if (this.options.source) {
       const sourcedSession = await this.options.source.loadSession();
       this.#session = sourcedSession;
+      await this.store.writeSession(sourcedSession);
       return;
     }
 
