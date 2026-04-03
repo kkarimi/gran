@@ -55,7 +55,7 @@ export function firstExistingPath(candidates: string[]): string | undefined {
     }
   }
 
-  return candidates[0];
+  return undefined;
 }
 
 export function granolaSupabaseCandidates(): string[] {

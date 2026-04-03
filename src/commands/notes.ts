@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { CachedTokenProvider, NoopTokenStore, SupabaseFileTokenSource } from "../client/auth.ts";
 import { GranolaApiClient } from "../client/granola.ts";
 import { AuthenticatedHttpClient } from "../client/http.ts";
@@ -46,6 +48,10 @@ export const notesCommand: CommandDefinition = {
       throw new Error(
         `supabase.json not found. Pass --supabase or create .granola.toml. Expected locations include: ${granolaSupabaseCandidates().join(", ")}`,
       );
+    }
+
+    if (!existsSync(config.supabase)) {
+      throw new Error(`supabase.json not found: ${config.supabase}`);
     }
 
     debug(config.debug, "using config", config.configFileUsed ?? "(none)");

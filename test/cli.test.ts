@@ -50,4 +50,30 @@ describe("runCli", () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining("Commands:"));
     expect(error).not.toHaveBeenCalled();
   });
+
+  test("surfaces a clean error for a missing supabase file", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const exitCode = await runCli(["notes", "--supabase", "/tmp/granola-missing-supabase.json"]);
+
+    expect(exitCode).toBe(1);
+    expect(log).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      "supabase.json not found: /tmp/granola-missing-supabase.json",
+    );
+  });
+
+  test("surfaces a clean error for a missing cache file", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const exitCode = await runCli(["transcripts", "--cache", "/tmp/granola-missing-cache.json"]);
+
+    expect(exitCode).toBe(1);
+    expect(log).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      "Granola cache file not found: /tmp/granola-missing-cache.json",
+    );
+  });
 });

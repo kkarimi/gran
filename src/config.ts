@@ -77,6 +77,10 @@ async function loadTomlConfig(
   configPath?: string,
 ): Promise<{ path?: string; values: Record<string, unknown> }> {
   if (configPath) {
+    if (!existsSync(configPath)) {
+      throw new Error(`config file not found: ${configPath}`);
+    }
+
     const contents = await readUtf8(configPath);
     return {
       path: configPath,

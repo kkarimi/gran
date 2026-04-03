@@ -38,4 +38,16 @@ describe("loadConfig", () => {
     expect(config.transcripts.cacheFile).toBe("/tmp/cache.json");
     expect(config.transcripts.output).toBe("./transcripts-out");
   });
+
+  test("throws a clean error when an explicit config file is missing", async () => {
+    const configPath = join(tmpdir(), "granola-toolkit-missing-config.toml");
+
+    await expect(
+      loadConfig({
+        env: {},
+        globalFlags: { config: configPath },
+        subcommandFlags: {},
+      }),
+    ).rejects.toThrow(`config file not found: ${configPath}`);
+  });
 });

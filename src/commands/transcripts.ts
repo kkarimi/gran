@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
 import { parseCacheContents } from "../cache.ts";
@@ -45,6 +46,10 @@ export const transcriptsCommand: CommandDefinition = {
       throw new Error(
         `Granola cache file not found. Pass --cache or create .granola.toml. Expected locations include: ${granolaCacheCandidates().join(", ")}`,
       );
+    }
+
+    if (!existsSync(config.transcripts.cacheFile)) {
+      throw new Error(`Granola cache file not found: ${config.transcripts.cacheFile}`);
     }
 
     debug(config.debug, "using config", config.configFileUsed ?? "(none)");
