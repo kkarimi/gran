@@ -1,0 +1,115 @@
+{
+  "cache": {
+    "state": {
+      "panelTemplates": {},
+      "featureFlags": {},
+      "workspaceData": {},
+      "documents": {
+        "fixture-cache-doc-1": {
+          "id": "fixture-cache-doc-1",
+          "user_id": "fixture-user-1",
+          "title": "Fixture Cache Meeting",
+          "cloned_from": null,
+          "chapters": null,
+          "created_at": "2026-04-01T08:45:06.606Z",
+          "updated_at": "2026-04-01T08:45:16.686Z",
+          "type": "meeting",
+          "deleted_at": null,
+          "notes": {
+            "type": "doc",
+            "content": [
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "fixture-cache-note-1"
+                }
+              }
+            ]
+          },
+          "notes_plain": "",
+          "notes_markdown": "",
+          "overview": null,
+          "transcribe": true,
+          "google_calendar_event": {
+            "id": "fixture-calendar-event-2",
+            "summary": "Fixture Cache Meeting",
+            "location": "https://example.com/cache-meeting",
+            "start": {
+              "dateTime": "2026-04-01T09:45:00+01:00",
+              "timeZone": "Europe/London"
+            },
+            "end": {
+              "dateTime": "2026-04-01T10:00:00+01:00",
+              "timeZone": "Europe/London"
+            }
+          },
+          "public": false,
+          "people": {
+            "creator": {
+              "name": "Fixture User",
+              "email": "fixture@example.com"
+            },
+            "attendees": [],
+            "conferencing": {
+              "type": "zoom",
+              "title": "Join Zoom",
+              "url": "https://example.com/cache-meeting"
+            },
+            "url": "https://calendar.example.com/cache-event"
+          },
+          "meeting_end_count": 0,
+          "selected_template": null,
+          "valid_meeting": null,
+          "summary": null,
+          "affinity_note_id": null,
+          "hubspot_note_url": null,
+          "sharing_link_visibility": "public",
+          "show_private_notes": true,
+          "attachments": null,
+          "visibility": null,
+          "workspace_id": "fixture-workspace-id",
+          "transcript_deleted_at": null,
+          "attio_shared_at": null,
+          "creation_source": "macOS",
+          "metadata": null,
+          "was_trashed": null,
+          "is_primary_event_note": null,
+          "is_scratchpad": null,
+          "ydoc_state": null,
+          "ydoc_version": null
+        }
+      },
+      "transcripts": {
+        "fixture-cache-doc-1": [
+          {
+            "id": "fixture-segment-1",
+            "document_id": "fixture-cache-doc-1",
+            "start_timestamp": "2026-04-01T08:45:18.237Z",
+            "end_timestamp": "2026-04-01T08:45:19.287Z",
+            "text": "Link.",
+            "source": "system",
+            "is_final": true
+          },
+          {
+            "id": "fixture-segment-2",
+            "document_id": "fixture-cache-doc-1",
+            "start_timestamp": "2026-04-01T08:45:19.960Z",
+            "end_timestamp": "2026-04-01T08:45:21.130Z",
+            "text": "Alright.",
+            "source": "microphone",
+            "is_final": true
+          },
+          {
+            "id": "fixture-segment-3",
+            "document_id": "fixture-cache-doc-1",
+            "start_timestamp": "2026-04-01T08:45:30.627Z",
+            "end_timestamp": "2026-04-01T08:45:32.367Z",
+            "text": "Hey, team. Morning.",
+            "source": "system",
+            "is_final": true
+          }
+        ]
+      }
+    }
+  }
+}

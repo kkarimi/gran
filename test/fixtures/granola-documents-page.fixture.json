@@ -1,0 +1,173 @@
+{
+  "docs": [
+    {
+      "id": "fixture-doc-1",
+      "created_at": "2026-04-02T09:00:27.200Z",
+      "notes": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "fixture-note-paragraph-1"
+            }
+          }
+        ]
+      },
+      "title": "Fixture Payment Ops",
+      "user_id": "fixture-user-1",
+      "cloned_from": null,
+      "notes_plain": "",
+      "transcribe": false,
+      "google_calendar_event": {
+        "id": "fixture-calendar-event-1",
+        "summary": "Fixture Payment Ops",
+        "location": "https://example.com/fixture-meeting",
+        "start": {
+          "dateTime": "2026-04-02T10:00:00+01:00",
+          "timeZone": "Europe/London"
+        },
+        "end": {
+          "dateTime": "2026-04-02T10:15:00+01:00",
+          "timeZone": "Europe/London"
+        },
+        "creator": {
+          "email": "fixture@example.com"
+        },
+        "organizer": {
+          "email": "fixture@example.com"
+        },
+        "recurringEventId": "fixture-recurring-event-id",
+        "iCalUID": "fixture-ical-uid",
+        "calendarId": "fixture-calendar-id",
+        "status": "confirmed",
+        "htmlLink": "https://calendar.example.com/fixture-event"
+      },
+      "updated_at": "2026-04-02T09:23:08.050Z",
+      "deleted_at": null,
+      "type": "meeting",
+      "overview": null,
+      "public": false,
+      "people": {
+        "url": "https://calendar.example.com/fixture-event",
+        "creator": {
+          "name": "Fixture User",
+          "email": "fixture@example.com",
+          "details": {
+            "person": {
+              "name": {
+                "fullName": "Fixture User"
+              },
+              "avatar": "https://cdn.example.com/avatar.png",
+              "linkedin": {
+                "handle": "in/fixture-user"
+              },
+              "employment": {
+                "name": "Fixture Company",
+                "title": "Fixture Role"
+              }
+            },
+            "company": {
+              "name": "Fixture Company"
+            }
+          }
+        },
+        "attendees": [],
+        "conferencing": {
+          "url": "https://example.com/fixture-meeting",
+          "type": "zoom",
+          "title": "Join Zoom"
+        }
+      },
+      "chapters": null,
+      "meeting_end_count": 1,
+      "notes_markdown": "",
+      "selected_template": null,
+      "valid_meeting": true,
+      "summary": null,
+      "affinity_note_id": null,
+      "has_shareable_link": true,
+      "show_private_notes": false,
+      "attachments": null,
+      "hubspot_note_url": null,
+      "creation_source": "macOS",
+      "subscription_plan_id": "granola.plan.business.v1",
+      "status": null,
+      "external_transcription_id": null,
+      "audio_file_handle": null,
+      "privacy_mode_enabled": false,
+      "workspace_id": "fixture-workspace-id",
+      "visibility": null,
+      "sharing_link_visibility": "public",
+      "notification_config": null,
+      "transcript_deleted_at": null,
+      "metadata": null,
+      "attio_shared_at": null,
+      "was_trashed": null,
+      "is_primary_event_note": null,
+      "ydoc_state": null,
+      "ydoc_version": null,
+      "zoom_rtms_permission": null,
+      "is_scratchpad": null,
+      "last_viewed_panel": {
+        "document_id": "fixture-doc-1",
+        "created_at": "2026-04-02T09:23:07.935Z",
+        "title": "Summary",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "id": "fixture-heading-1",
+                "level": 3
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fixture heading"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "attrs": {
+                "tight": true
+              },
+              "content": [
+                {
+                  "type": "listItem",
+                  "attrs": {
+                    "id": "fixture-list-item-1"
+                  },
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "attrs": {
+                        "id": "fixture-list-paragraph-1"
+                      },
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Fixture bullet"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "original_content": "<h3>Fixture heading</h3><ul><li>Fixture bullet</li></ul>",
+        "updated_at": "2026-04-02T09:23:08.050Z",
+        "content_updated_at": "2026-04-02T09:23:08.050Z",
+        "deleted_at": null,
+        "id": "fixture-panel-id",
+        "last_viewed_at": "2026-04-02T09:23:08.050Z",
+        "template_slug": "summary"
+      }
+    }
+  ],
+  "deleted": ["fixture-deleted-doc-1", "fixture-deleted-doc-2"]
+}

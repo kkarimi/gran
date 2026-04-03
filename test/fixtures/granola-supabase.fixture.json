@@ -1,0 +1,6 @@
+{
+  "cognito_tokens": "{\"access_token\":\"fixture-cognito-access-token\",\"expires_in\":3600,\"refresh_token\":\"fixture-cognito-refresh-token\",\"token_type\":\"Bearer\",\"id_token\":\"fixture-cognito-id-token\",\"obtained_at\":\"2026-04-03T12:00:00.000Z\"}",
+  "user_info": "{\"id\":\"fixture-user-id\",\"email\":\"fixture@example.com\",\"user_metadata\":{\"full_name\":\"Fixture User\"},\"signed_in_on_platforms\":[\"macOS\"],\"dub_id\":\"fixture-dub-id\",\"signup_platform\":\"macOS\",\"google_ads_click_id\":null,\"facebook_ads_click_id\":null,\"created_at\":\"2026-04-03T12:00:00.000Z\",\"has_valid_web_scopes\":true,\"zoom_id\":null,\"person\":null}",
+  "workos_tokens": "{\"access_token\":\"fixture-workos-access-token\",\"expires_in\":3600,\"refresh_token\":\"fixture-workos-refresh-token\",\"token_type\":\"Bearer\",\"obtained_at\":\"2026-04-03T12:00:00.000Z\",\"session_id\":\"fixture-workos-session-id\",\"external_id\":\"fixture-external-id\",\"sign_in_method\":\"google-oauth\"}",
+  "session_id": "fixture-session-id"
+}
