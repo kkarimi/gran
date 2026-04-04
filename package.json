@@ -52,6 +52,7 @@
     "release:patch": "node scripts/release.mjs patch",
     "standalone:build": "node scripts/build-standalone.mjs",
     "standalone:smoke": "node scripts/build-standalone.mjs --smoke-test",
+    "staged:check": "node scripts/staged-check.mjs",
     "start": "node dist/cli.js",
     "notes": "node dist/cli.js notes",
     "tui": "node dist/cli.js tui",

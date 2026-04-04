@@ -38,7 +38,7 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
   },
   staged: {
-    "*": "vp check --fix",
+    "*": "npm run staged:check",
   },
   fmt: {
     ignorePatterns: ["src/web/generated.ts"],
