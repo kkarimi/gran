@@ -3,8 +3,13 @@ import { notFound } from "next/navigation";
 
 export const revalidate = false;
 
-export async function GET(_req: Request, { params }: RouteContext<"/llms.mdx/docs/[[...slug]]">) {
+type DocsMarkdownRouteContext = {
+  params: Promise<{ slug?: string[] }>;
+};
+
+export async function GET(_req: Request, { params }: DocsMarkdownRouteContext) {
   const { slug } = await params;
+  if (!slug) notFound();
   const page = source.getPage(slug?.slice(0, -1));
   if (!page) notFound();
 
