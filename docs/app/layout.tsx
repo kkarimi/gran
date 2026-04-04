@@ -3,6 +3,7 @@ import "./global.css";
 import { IBM_Plex_Sans } from "next/font/google";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { docsSearchPublicRoute, docsSiteUrl } from "@/lib/shared";
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -16,14 +17,23 @@ export const metadata: Metadata = {
   },
   description:
     "Documentation for Granola Toolkit, a toolkit for working with Granola meetings, notes, transcripts, folders, and local workspaces.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_DOCS_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(docsSiteUrl),
 };
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={ibmPlexSans.className} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
-        <RootProvider>{children}</RootProvider>
+        <RootProvider
+          search={{
+            options: {
+              api: docsSearchPublicRoute,
+              type: "static",
+            },
+          }}
+        >
+          {children}
+        </RootProvider>
       </body>
     </html>
   );

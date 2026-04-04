@@ -30,8 +30,8 @@ granola tui
 
 ## Documentation
 
-The detailed documentation now lives in the dedicated docs app under
-[`docs/`](https://github.com/kkarimi/granola-toolkit/tree/main/docs).
+The detailed documentation now lives at
+[`kkarimi.github.io/granola-toolkit`](https://kkarimi.github.io/granola-toolkit/).
 
 Local docs development:
 
@@ -42,13 +42,13 @@ npm run docs:check
 
 Key docs entry points:
 
-- [`Overview`](https://github.com/kkarimi/granola-toolkit/blob/main/docs/content/docs/index.mdx)
-- [`Getting Started`](https://github.com/kkarimi/granola-toolkit/blob/main/docs/content/docs/getting-started.mdx)
-- [`Exporting`](https://github.com/kkarimi/granola-toolkit/blob/main/docs/content/docs/exporting.mdx)
-- [`Meetings and Folders`](https://github.com/kkarimi/granola-toolkit/blob/main/docs/content/docs/meetings-and-folders.mdx)
-- [`Server, Web, and TUI`](https://github.com/kkarimi/granola-toolkit/blob/main/docs/content/docs/server-web-and-tui.mdx)
-- [`Auth and Configuration`](https://github.com/kkarimi/granola-toolkit/blob/main/docs/content/docs/auth-and-configuration.mdx)
-- [`Development`](https://github.com/kkarimi/granola-toolkit/blob/main/docs/content/docs/development.mdx)
+- [`Overview`](https://kkarimi.github.io/granola-toolkit/docs/)
+- [`Getting Started`](https://kkarimi.github.io/granola-toolkit/docs/getting-started/)
+- [`Exporting`](https://kkarimi.github.io/granola-toolkit/docs/exporting/)
+- [`Meetings and Folders`](https://kkarimi.github.io/granola-toolkit/docs/meetings-and-folders/)
+- [`Server, Web, and TUI`](https://kkarimi.github.io/granola-toolkit/docs/server-web-and-tui/)
+- [`Auth and Configuration`](https://kkarimi.github.io/granola-toolkit/docs/auth-and-configuration/)
+- [`Development`](https://kkarimi.github.io/granola-toolkit/docs/development/)
 
 ## Local Development
 
