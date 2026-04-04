@@ -12,6 +12,7 @@ import {
 import type {
   GranolaAppApi,
   GranolaAppState,
+  GranolaAppAuthState,
   GranolaAppStateEvent,
   GranolaMeetingBundle,
   MeetingSummaryRecord,
@@ -19,6 +20,7 @@ import type {
 } from "../app/index.ts";
 
 import { buildGranolaTuiSummary, renderGranolaTuiMeetingTab } from "./helpers.ts";
+import { GranolaTuiAuthOverlay, type GranolaTuiAuthActionId } from "./auth.ts";
 import { GranolaTuiQuickOpenPalette } from "./palette.ts";
 import { granolaTuiTheme } from "./theme.ts";
 import type { GranolaTuiWorkspaceTab } from "./types.ts";
@@ -354,6 +356,102 @@ class GranolaTuiWorkspace implements Component {
     this.tui.requestRender();
   }
 
+  private async reloadAfterAuthChange(): Promise<void> {
+    const preferredMeetingId = this.#selectedMeeting?.document.id ?? this.#selectedMeetingId;
+
+    try {
+      await this.loadMeetings({
+        forceRefresh: true,
+        preferredMeetingId,
+        setStatus: false,
+      });
+
+      if (this.#selectedMeetingId) {
+        await this.loadMeeting(this.#selectedMeetingId, {
+          ensureMeetingVisible: true,
+        });
+        return;
+      }
+
+      this.#selectedMeeting = undefined;
+      this.#detailError = "";
+      this.#detailScroll = 0;
+      this.tui.requestRender();
+    } catch {
+      // Status is already updated by the loaders.
+    }
+  }
+
+  private async runAuthAction(actionId: GranolaTuiAuthActionId): Promise<void> {
+    let successMessage = "";
+
+    try {
+      switch (actionId) {
+        case "login":
+          this.setStatus("Importing desktop session…");
+          await this.app.loginAuth();
+          successMessage = "Stored session imported";
+          break;
+        case "refresh":
+          this.setStatus("Refreshing stored session…");
+          await this.app.refreshAuth();
+          successMessage = "Stored session refreshed";
+          break;
+        case "use-stored":
+          this.setStatus("Switching to stored session…");
+          await this.app.switchAuthMode("stored-session");
+          successMessage = "Using stored session";
+          break;
+        case "use-supabase":
+          this.setStatus("Switching to supabase.json…");
+          await this.app.switchAuthMode("supabase-file");
+          successMessage = "Using supabase.json";
+          break;
+        case "logout":
+          this.setStatus("Signing out…");
+          await this.app.logoutAuth();
+          successMessage = "Stored session removed";
+          break;
+      }
+
+      await this.reloadAfterAuthChange();
+      this.setStatus(successMessage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.setStatus(message, "error");
+    }
+  }
+
+  private openAuthPanel(auth: GranolaAppAuthState = this.#appState.auth): void {
+    if (this.#overlay) {
+      return;
+    }
+
+    const closeOverlay = () => {
+      this.#overlay?.hide();
+      this.#overlay = undefined;
+      this.tui.setFocus(this);
+      this.tui.requestRender();
+    };
+
+    const overlay = new GranolaTuiAuthOverlay({
+      auth,
+      onCancel: closeOverlay,
+      onRun: async (actionId) => {
+        closeOverlay();
+        await this.runAuthAction(actionId);
+      },
+    });
+
+    this.#overlay = this.tui.showOverlay(overlay, {
+      anchor: "center",
+      maxHeight: "70%",
+      minWidth: 52,
+      width: "72%",
+    });
+    this.setStatus("Auth session");
+  }
+
   private openQuickOpen(): void {
     if (this.#overlay) {
       return;
@@ -406,6 +504,11 @@ class GranolaTuiWorkspace implements Component {
 
     if (matchesKey(data, "/") || matchesKey(data, "ctrl+p")) {
       this.openQuickOpen();
+      return;
+    }
+
+    if (matchesKey(data, "a")) {
+      this.openAuthPanel();
       return;
     }
 
@@ -615,7 +718,7 @@ class GranolaTuiWorkspace implements Component {
 
     const footerStatus = padLine(toneText(this.#statusTone, this.#statusMessage), width);
     const footerHints = padLine(
-      granolaTuiTheme.dim("/ quick open  r refresh  1-4 tabs  PgUp/PgDn scroll  q quit"),
+      granolaTuiTheme.dim("/ quick open  a auth  r refresh  1-4 tabs  PgUp/PgDn scroll  q quit"),
       width,
     );
 

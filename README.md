@@ -280,6 +280,7 @@ The initial terminal workspace includes:
 
 - a meeting list pane with keyboard navigation
 - a detail pane with notes, transcript, metadata, and raw views
+- an auth session overlay for import, refresh, source switching, and sign-out
 - a footer with app state and key hints
 - a quick-open overlay for jumping by title, id, or tag
 
@@ -287,6 +288,7 @@ The main keyboard controls are:
 
 - `j` / `k` or arrow keys to move between meetings
 - `/` or `Ctrl+P` to open quick open
+- `a` to open auth session actions
 - `1`-`4` to switch detail tabs
 - `PageUp` / `PageDown` to scroll the detail pane
 - `r` to refresh from live Granola data

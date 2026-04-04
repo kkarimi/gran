@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import type { GranolaMeetingBundle, MeetingSummaryRecord } from "../src/app/index.ts";
+import type {
+  GranolaAppAuthState,
+  GranolaMeetingBundle,
+  MeetingSummaryRecord,
+} from "../src/app/index.ts";
+import { buildGranolaTuiAuthActions, renderGranolaTuiAuthState } from "../src/tui/auth.ts";
 import { buildGranolaTuiQuickOpenItems, renderGranolaTuiMeetingTab } from "../src/tui/helpers.ts";
 import type { CacheData, GranolaDocument } from "../src/types.ts";
 
@@ -106,6 +111,25 @@ const bundle: GranolaMeetingBundle = {
   },
 };
 
+const storedAuthState: GranolaAppAuthState = {
+  clientId: "client_GranolaMac",
+  mode: "stored-session",
+  refreshAvailable: true,
+  signInMethod: "google-oauth",
+  storedSessionAvailable: true,
+  supabaseAvailable: true,
+  supabasePath: "/tmp/supabase.json",
+};
+
+const supabaseOnlyAuthState: GranolaAppAuthState = {
+  lastError: "refresh failed",
+  mode: "supabase-file",
+  refreshAvailable: false,
+  storedSessionAvailable: false,
+  supabaseAvailable: true,
+  supabasePath: "/tmp/supabase.json",
+};
+
 describe("buildGranolaTuiQuickOpenItems", () => {
   test("prioritises exact and prefix id matches ahead of broad title matches", () => {
     const items = buildGranolaTuiQuickOpenItems(meetings, "doc-alpha");
@@ -135,5 +159,48 @@ describe("renderGranolaTuiMeetingTab", () => {
   test("renders note and raw views", () => {
     expect(renderGranolaTuiMeetingTab(bundle, "notes")).toContain("# Alpha Sync");
     expect(renderGranolaTuiMeetingTab(bundle, "raw")).toContain('"meeting"');
+  });
+});
+
+describe("buildGranolaTuiAuthActions", () => {
+  test("enables the stored-session actions when a stored session exists", () => {
+    const actions = buildGranolaTuiAuthActions(storedAuthState);
+
+    expect(actions.find((action) => action.id === "refresh")).toEqual(
+      expect.objectContaining({
+        disabled: false,
+      }),
+    );
+    expect(actions.find((action) => action.id === "use-stored")).toEqual(
+      expect.objectContaining({
+        disabled: true,
+        disabledReason: "already active",
+      }),
+    );
+  });
+
+  test("disables stored-session actions when only supabase.json is available", () => {
+    const actions = buildGranolaTuiAuthActions(supabaseOnlyAuthState);
+
+    expect(actions.find((action) => action.id === "login")).toEqual(
+      expect.objectContaining({
+        disabled: false,
+      }),
+    );
+    expect(actions.find((action) => action.id === "refresh")).toEqual(
+      expect.objectContaining({
+        disabled: true,
+        disabledReason: "stored session missing",
+      }),
+    );
+  });
+});
+
+describe("renderGranolaTuiAuthState", () => {
+  test("renders the active auth mode and any last error", () => {
+    const rendered = renderGranolaTuiAuthState(supabaseOnlyAuthState);
+
+    expect(rendered).toContain("Active source: supabase.json");
+    expect(rendered).toContain("Last error: refresh failed");
   });
 });
