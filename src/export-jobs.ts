@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 import type { GranolaAppExportJobState } from "./app/types.ts";
+import { defaultGranolaToolkitPersistenceLayout } from "./persistence/layout.ts";
 import { asRecord, parseJsonString, stringValue } from "./utils.ts";
 
 const EXPORT_JOBS_VERSION = 1;
@@ -91,10 +91,7 @@ export function createExportJobId(kind: "notes" | "transcripts"): string {
 }
 
 export function defaultExportJobsFilePath(): string {
-  const home = homedir();
-  return platform() === "darwin"
-    ? join(home, "Library", "Application Support", "granola-toolkit", "export-jobs.json")
-    : join(home, ".config", "granola-toolkit", "export-jobs.json");
+  return defaultGranolaToolkitPersistenceLayout().exportJobsFile;
 }
 
 export class FileExportJobStore implements ExportJobStore {

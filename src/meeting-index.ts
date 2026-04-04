@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import type { MeetingSummaryRecord } from "./app/models.ts";
+import { defaultGranolaToolkitPersistenceLayout } from "./persistence/layout.ts";
 import { parseJsonString } from "./utils.ts";
 
 const MEETING_INDEX_VERSION = 1;
@@ -65,10 +65,7 @@ export class FileMeetingIndexStore implements MeetingIndexStore {
 }
 
 export function defaultMeetingIndexFilePath(): string {
-  const home = homedir();
-  return platform() === "darwin"
-    ? join(home, "Library", "Application Support", "granola-toolkit", "meeting-index.json")
-    : join(home, ".config", "granola-toolkit", "meeting-index.json");
+  return defaultGranolaToolkitPersistenceLayout().meetingIndexFile;
 }
 
 export function createDefaultMeetingIndexStore(): MeetingIndexStore {

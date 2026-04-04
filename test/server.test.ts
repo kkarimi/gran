@@ -9,6 +9,7 @@ import type { GranolaAppAuthState } from "../src/app/index.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
 import { MemoryMeetingIndexStore } from "../src/meeting-index.ts";
 import { startGranolaServer } from "../src/server/http.ts";
+import { GRANOLA_TRANSPORT_PROTOCOL_VERSION } from "../src/transport.ts";
 import type { CacheData, GranolaDocument } from "../src/types.ts";
 
 const documents: GranolaDocument[] = [
@@ -125,6 +126,26 @@ describe("startGranolaServer", () => {
         ui: expect.objectContaining({
           surface: "server",
         }),
+      }),
+    );
+
+    const serverInfo = await fetch(new URL("/server/info", server.url));
+    expect(serverInfo.ok).toBe(true);
+    expect(await serverInfo.json()).toEqual(
+      expect.objectContaining({
+        capabilities: expect.objectContaining({
+          attach: true,
+          auth: true,
+          events: true,
+          webClient: false,
+        }),
+        persistence: expect.objectContaining({
+          exportJobs: true,
+          meetingIndex: true,
+        }),
+        product: "granola-toolkit",
+        protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+        transport: "local-http",
       }),
     );
 

@@ -7,6 +7,12 @@ import {
 import { type AddressInfo } from "node:net";
 
 import type { GranolaApp } from "../app/core.ts";
+import { defaultGranolaToolkitPersistenceLayout } from "../persistence/layout.ts";
+import {
+  granolaTransportPaths,
+  GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+  type GranolaServerInfo,
+} from "../transport.ts";
 import type {
   GranolaAppAuthMode,
   GranolaAppStateEvent,
@@ -245,7 +251,12 @@ function isPasswordAuthenticated(request: IncomingMessage, password: string): bo
 }
 
 function publicRoute(path: string, enableWebClient: boolean): boolean {
-  return path === "/health" || path === "/auth/unlock" || (enableWebClient && path === "/");
+  return (
+    path === granolaTransportPaths.health ||
+    path === granolaTransportPaths.serverInfo ||
+    path === granolaTransportPaths.authUnlock ||
+    (enableWebClient && path === granolaTransportPaths.root)
+  );
 }
 
 export interface GranolaServer {
@@ -276,6 +287,24 @@ export async function startGranolaServer(
     trustedOrigins: (options.security?.trustedOrigins ?? [])
       .map((origin) => origin.trim())
       .filter(Boolean),
+  };
+  const serverInfo: GranolaServerInfo = {
+    capabilities: {
+      attach: true,
+      auth: true,
+      events: true,
+      exports: true,
+      meetingOpen: true,
+      webClient: enableWebClient,
+    },
+    persistence: {
+      exportJobs: true,
+      meetingIndex: true,
+      sessionStore: defaultGranolaToolkitPersistenceLayout().sessionStoreKind,
+    },
+    product: "granola-toolkit",
+    protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+    transport: "local-http",
   };
 
   const server = createServer(async (request, response) => {
@@ -311,7 +340,7 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "GET" && path === "/" && enableWebClient) {
+      if (method === "GET" && path === granolaTransportPaths.root && enableWebClient) {
         sendHtml(
           response,
           renderGranolaWebPage({
@@ -323,7 +352,7 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "GET" && path === "/health") {
+      if (method === "GET" && path === granolaTransportPaths.health) {
         sendJson(
           response,
           {
@@ -336,7 +365,12 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "POST" && path === "/auth/unlock") {
+      if (method === "GET" && path === granolaTransportPaths.serverInfo) {
+        sendJson(response, serverInfo, { headers: originHeaders });
+        return;
+      }
+
+      if (method === "POST" && path === granolaTransportPaths.authUnlock) {
         if (!security.password) {
           sendJson(response, { ok: true, passwordRequired: false }, { headers: originHeaders });
           return;
@@ -389,17 +423,17 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "GET" && path === "/state") {
+      if (method === "GET" && path === granolaTransportPaths.state) {
         sendJson(response, app.getState(), { headers: originHeaders });
         return;
       }
 
-      if (method === "GET" && path === "/auth/status") {
+      if (method === "GET" && path === granolaTransportPaths.authStatus) {
         sendJson(response, await app.inspectAuth(), { headers: originHeaders });
         return;
       }
 
-      if (method === "POST" && path === "/auth/lock") {
+      if (method === "POST" && path === granolaTransportPaths.authLock) {
         sendJson(
           response,
           { ok: true },
@@ -413,7 +447,7 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "GET" && path === "/events") {
+      if (method === "GET" && path === granolaTransportPaths.events) {
         response.writeHead(200, {
           "cache-control": "no-cache, no-transform",
           connection: "keep-alive",
@@ -437,7 +471,7 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "GET" && path === "/meetings") {
+      if (method === "GET" && path === granolaTransportPaths.meetings) {
         const limit = parseInteger(url.searchParams.get("limit"));
         const refresh = url.searchParams.get("refresh") === "true";
         const search = url.searchParams.get("search")?.trim() || undefined;
@@ -468,7 +502,7 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "GET" && path === "/meetings/resolve") {
+      if (method === "GET" && path === granolaTransportPaths.meetingResolve) {
         const query = url.searchParams.get("q")?.trim();
         if (!query) {
           throw new Error("meeting query is required");
@@ -481,8 +515,12 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "GET" && path.startsWith("/meetings/")) {
-        const id = decodeURIComponent(path.slice("/meetings/".length));
+      if (
+        method === "GET" &&
+        path.startsWith(`${granolaTransportPaths.meetings}/`) &&
+        path !== granolaTransportPaths.meetingResolve
+      ) {
+        const id = decodeURIComponent(path.slice(`${granolaTransportPaths.meetings}/`.length));
         if (!id) {
           throw new Error("meeting id is required");
         }
@@ -494,7 +532,7 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "POST" && path === "/auth/login") {
+      if (method === "POST" && path === granolaTransportPaths.authLogin) {
         const body = await readJsonBody(request);
         const supabasePath =
           typeof body.supabasePath === "string" && body.supabasePath.trim()
@@ -504,17 +542,17 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "POST" && path === "/auth/logout") {
+      if (method === "POST" && path === granolaTransportPaths.authLogout) {
         sendJson(response, await app.logoutAuth(), { headers: originHeaders });
         return;
       }
 
-      if (method === "POST" && path === "/auth/refresh") {
+      if (method === "POST" && path === granolaTransportPaths.authRefresh) {
         sendJson(response, await app.refreshAuth(), { headers: originHeaders });
         return;
       }
 
-      if (method === "POST" && path === "/auth/mode") {
+      if (method === "POST" && path === granolaTransportPaths.authMode) {
         const body = await readJsonBody(request);
         sendJson(response, await app.switchAuthMode(parseAuthMode(body.mode)), {
           headers: originHeaders,
@@ -522,22 +560,28 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "POST" && path === "/exports/notes") {
+      if (method === "POST" && path === granolaTransportPaths.exportNotes) {
         const body = await readJsonBody(request);
         const result = await app.exportNotes(noteFormatFromBody(body.format));
         sendJson(response, result, { headers: originHeaders, status: 202 });
         return;
       }
 
-      if (method === "GET" && path === "/exports/jobs") {
+      if (method === "GET" && path === granolaTransportPaths.exportJobs) {
         const limit = parseInteger(url.searchParams.get("limit"));
         const result = await app.listExportJobs({ limit });
         sendJson(response, result, { headers: originHeaders });
         return;
       }
 
-      if (method === "POST" && path.startsWith("/exports/jobs/") && path.endsWith("/rerun")) {
-        const id = decodeURIComponent(path.slice("/exports/jobs/".length, -"/rerun".length));
+      if (
+        method === "POST" &&
+        path.startsWith(`${granolaTransportPaths.exportJobs}/`) &&
+        path.endsWith("/rerun")
+      ) {
+        const id = decodeURIComponent(
+          path.slice(`${granolaTransportPaths.exportJobs}/`.length, -"/rerun".length),
+        );
         if (!id) {
           throw new Error("export job id is required");
         }
@@ -547,7 +591,7 @@ export async function startGranolaServer(
         return;
       }
 
-      if (method === "POST" && path === "/exports/transcripts") {
+      if (method === "POST" && path === granolaTransportPaths.exportTranscripts) {
         const body = await readJsonBody(request);
         const result = await app.exportTranscripts(transcriptFormatFromBody(body.format));
         sendJson(response, result, { headers: originHeaders, status: 202 });

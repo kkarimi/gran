@@ -90,6 +90,7 @@ export const serveCommand: CommandDefinition = {
     }
     console.log("Endpoints:");
     console.log("  GET  /health");
+    console.log("  GET  /server/info");
     console.log("  POST /auth/unlock");
     console.log("  POST /auth/lock");
     console.log("  GET  /auth/status");

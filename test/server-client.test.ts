@@ -4,6 +4,7 @@ import { GranolaApp } from "../src/app/core.ts";
 import type { GranolaAppStateEvent } from "../src/app/index.ts";
 import { createGranolaServerClient } from "../src/server/client.ts";
 import { startGranolaServer } from "../src/server/http.ts";
+import { GRANOLA_TRANSPORT_PROTOCOL_VERSION } from "../src/transport.ts";
 import type { CacheData, GranolaDocument } from "../src/types.ts";
 
 const documents: GranolaDocument[] = [
@@ -124,6 +125,16 @@ describe("GranolaServerClient", () => {
     const client = await createGranolaServerClient(server.url);
     closeClient = async () => await client.close();
 
+    expect(client.info).toEqual(
+      expect.objectContaining({
+        capabilities: expect.objectContaining({
+          attach: true,
+          webClient: false,
+        }),
+        product: "granola-toolkit",
+        protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+      }),
+    );
     expect(client.getState().ui.surface).toBe("server");
 
     const eventPromise = waitForStateUpdate(

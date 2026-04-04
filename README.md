@@ -208,6 +208,7 @@ The machine-readable `export` command includes:
 The initial server API includes:
 
 - `GET /health`
+- `GET /server/info`
 - `POST /auth/unlock` for password-protected servers
 - `POST /auth/lock` to clear the browser/API unlock cookie
 - `GET /auth/status`
@@ -271,6 +272,16 @@ Use it when you want:
 - a password-protected local server to remain the single source of truth
 
 The attach flow uses the existing local HTTP API plus `GET /events` for live state updates.
+
+### Runtime Boundaries
+
+The toolkit now keeps its local persistence and transport contracts explicit:
+
+- one shared local data directory for export jobs, meeting index data, and any file-backed session state
+- one versioned local HTTP transport contract, exposed by `GET /server/info`
+- one remote client handshake that validates the transport protocol before attaching
+
+That keeps the current single-package repo simple, while making a future split into separate server/client packages or remote-hosted clients much less invasive.
 
 ### TUI
 

@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
-import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 
+import { defaultGranolaToolkitPersistenceLayout } from "../persistence/layout.ts";
 import { asRecord, parseJsonString, stringValue } from "../utils.ts";
 
 const execFileAsync = promisify(execFile);
@@ -392,12 +392,11 @@ export async function refreshGranolaSession(
 }
 
 export function defaultSessionFilePath(): string {
-  const home = homedir();
-  return platform() === "darwin"
-    ? join(home, "Library", "Application Support", "granola-toolkit", "session.json")
-    : join(home, ".config", "granola-toolkit", "session.json");
+  return defaultGranolaToolkitPersistenceLayout().sessionFile;
 }
 
 export function createDefaultSessionStore(): SessionStore {
-  return platform() === "darwin" ? new KeychainSessionStore() : new FileSessionStore();
+  return defaultGranolaToolkitPersistenceLayout().sessionStoreKind === "keychain"
+    ? new KeychainSessionStore()
+    : new FileSessionStore();
 }

@@ -15,6 +15,16 @@ import type {
   NoteOutputFormat,
   TranscriptOutputFormat,
 } from "../app/index.ts";
+import {
+  granolaExportJobRerunPath,
+  granolaExportJobsPath,
+  granolaMeetingPath,
+  granolaMeetingResolvePath,
+  granolaMeetingsPath,
+  granolaTransportPaths,
+  GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+  type GranolaServerInfo,
+} from "../transport.ts";
 
 interface GranolaServerClientOptions {
   fetchImpl?: typeof fetch;
@@ -42,21 +52,6 @@ function normaliseServerUrl(serverUrl: string | URL): URL {
   parsed.search = "";
   parsed.hash = "";
   return parsed;
-}
-
-function appendSearchParams(
-  path: string,
-  params: Record<string, boolean | number | string | undefined>,
-): string {
-  const url = new URL(path, "http://localhost");
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === false || value === "") {
-      continue;
-    }
-
-    url.searchParams.set(key, String(value));
-  }
-  return `${url.pathname}${url.search}`;
 }
 
 function mergeHeaders(...values: Array<NonNullable<RequestInit["headers"]> | undefined>): Headers {
@@ -117,14 +112,17 @@ export class GranolaServerClient implements GranolaAppApi {
   readonly #fetchImpl: typeof fetch;
   readonly #password?: string;
   readonly #reconnectDelayMs: number;
+  readonly info: GranolaServerInfo;
   #streamAbortController?: AbortController;
 
   private constructor(
+    info: GranolaServerInfo,
     readonly url: URL,
     initialState: GranolaAppState,
     options: GranolaServerClientOptions = {},
   ) {
     this.#fetchImpl = options.fetchImpl ?? fetch;
+    this.info = cloneValue(info);
     this.#password = options.password?.trim() || undefined;
     this.#reconnectDelayMs = options.reconnectDelayMs ?? 1_000;
     this.#state = cloneValue(initialState);
@@ -136,7 +134,24 @@ export class GranolaServerClient implements GranolaAppApi {
   ): Promise<GranolaServerClient> {
     const url = normaliseServerUrl(serverUrl);
     const fetchImpl = options.fetchImpl ?? fetch;
-    const response = await fetchImpl(new URL("/state", url), {
+    const infoResponse = await fetchImpl(new URL(granolaTransportPaths.serverInfo, url), {
+      headers: mergeHeaders({
+        ...(options.password?.trim() ? { "x-granola-password": options.password.trim() } : {}),
+        accept: "application/json",
+      }),
+    });
+    if (!infoResponse.ok) {
+      throw await responseError(infoResponse);
+    }
+
+    const info = (await infoResponse.json()) as GranolaServerInfo;
+    if (info.protocolVersion !== GRANOLA_TRANSPORT_PROTOCOL_VERSION) {
+      throw new Error(
+        `unsupported Granola transport protocol: expected ${GRANOLA_TRANSPORT_PROTOCOL_VERSION}, got ${info.protocolVersion}`,
+      );
+    }
+
+    const response = await fetchImpl(new URL(granolaTransportPaths.state, url), {
       headers: mergeHeaders({
         ...(options.password?.trim() ? { "x-granola-password": options.password.trim() } : {}),
         accept: "application/json",
@@ -147,7 +162,7 @@ export class GranolaServerClient implements GranolaAppApi {
     }
 
     const initialState = (await response.json()) as GranolaAppState;
-    const client = new GranolaServerClient(url, initialState, options);
+    const client = new GranolaServerClient(info, url, initialState, options);
     client.startEvents();
     return client;
   }
@@ -176,11 +191,11 @@ export class GranolaServerClient implements GranolaAppApi {
   }
 
   async inspectAuth(): Promise<GranolaAppAuthState> {
-    return await this.requestJson("/auth/status");
+    return await this.requestJson(granolaTransportPaths.authStatus);
   }
 
   async loginAuth(options: { supabasePath?: string } = {}): Promise<GranolaAppAuthState> {
-    return await this.requestJson("/auth/login", {
+    return await this.requestJson(granolaTransportPaths.authLogin, {
       body: JSON.stringify(options),
       headers: {
         "content-type": "application/json",
@@ -190,19 +205,19 @@ export class GranolaServerClient implements GranolaAppApi {
   }
 
   async logoutAuth(): Promise<GranolaAppAuthState> {
-    return await this.requestJson("/auth/logout", {
+    return await this.requestJson(granolaTransportPaths.authLogout, {
       method: "POST",
     });
   }
 
   async refreshAuth(): Promise<GranolaAppAuthState> {
-    return await this.requestJson("/auth/refresh", {
+    return await this.requestJson(granolaTransportPaths.authRefresh, {
       method: "POST",
     });
   }
 
   async switchAuthMode(mode: GranolaAppAuthMode): Promise<GranolaAppAuthState> {
-    return await this.requestJson("/auth/mode", {
+    return await this.requestJson(granolaTransportPaths.authMode, {
       body: JSON.stringify({ mode }),
       headers: {
         "content-type": "application/json",
@@ -212,16 +227,7 @@ export class GranolaServerClient implements GranolaAppApi {
   }
 
   async listMeetings(options: GranolaMeetingListOptions = {}): Promise<GranolaMeetingListResult> {
-    return await this.requestJson(
-      appendSearchParams("/meetings", {
-        limit: options.limit,
-        refresh: options.forceRefresh ? "true" : undefined,
-        search: options.search,
-        sort: options.sort,
-        updatedFrom: options.updatedFrom,
-        updatedTo: options.updatedTo,
-      }),
-    );
+    return await this.requestJson(granolaMeetingsPath(options));
   }
 
   async getMeeting(
@@ -229,9 +235,7 @@ export class GranolaServerClient implements GranolaAppApi {
     options: { requireCache?: boolean } = {},
   ): Promise<GranolaMeetingBundle> {
     return await this.requestJson(
-      appendSearchParams(`/meetings/${encodeURIComponent(id)}`, {
-        includeTranscript: options.requireCache ? "true" : undefined,
-      }),
+      `${granolaMeetingPath(id)}${options.requireCache ? "?includeTranscript=true" : ""}`,
     );
   }
 
@@ -240,9 +244,8 @@ export class GranolaServerClient implements GranolaAppApi {
     options: { requireCache?: boolean } = {},
   ): Promise<GranolaMeetingBundle> {
     return await this.requestJson(
-      appendSearchParams("/meetings/resolve", {
-        includeTranscript: options.requireCache ? "true" : undefined,
-        q: query,
+      granolaMeetingResolvePath(query, {
+        includeTranscript: options.requireCache,
       }),
     );
   }
@@ -250,15 +253,11 @@ export class GranolaServerClient implements GranolaAppApi {
   async listExportJobs(
     options: GranolaExportJobsListOptions = {},
   ): Promise<GranolaExportJobsResult> {
-    return await this.requestJson(
-      appendSearchParams("/exports/jobs", {
-        limit: options.limit,
-      }),
-    );
+    return await this.requestJson(granolaExportJobsPath(options));
   }
 
   async exportNotes(format: NoteOutputFormat = "markdown"): Promise<GranolaNotesExportResult> {
-    return await this.requestJson("/exports/notes", {
+    return await this.requestJson(granolaTransportPaths.exportNotes, {
       body: JSON.stringify({ format }),
       headers: {
         "content-type": "application/json",
@@ -270,7 +269,7 @@ export class GranolaServerClient implements GranolaAppApi {
   async exportTranscripts(
     format: TranscriptOutputFormat = "text",
   ): Promise<GranolaTranscriptsExportResult> {
-    return await this.requestJson("/exports/transcripts", {
+    return await this.requestJson(granolaTransportPaths.exportTranscripts, {
       body: JSON.stringify({ format }),
       headers: {
         "content-type": "application/json",
@@ -280,7 +279,7 @@ export class GranolaServerClient implements GranolaAppApi {
   }
 
   async rerunExportJob(id: string): Promise<GranolaExportJobRunResult> {
-    return await this.requestJson(`/exports/jobs/${encodeURIComponent(id)}/rerun`, {
+    return await this.requestJson(granolaExportJobRerunPath(id), {
       method: "POST",
     });
   }
@@ -330,7 +329,7 @@ export class GranolaServerClient implements GranolaAppApi {
       this.#streamAbortController = controller;
 
       try {
-        const response = await this.request("/events", {
+        const response = await this.request(granolaTransportPaths.events, {
           headers: {
             accept: "text/event-stream",
           },
