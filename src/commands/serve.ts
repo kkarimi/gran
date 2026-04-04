@@ -58,11 +58,16 @@ export const serveCommand: CommandDefinition = {
     console.log(`Granola server listening on ${server.url.href}`);
     console.log("Endpoints:");
     console.log("  GET  /health");
+    console.log("  GET  /auth/status");
     console.log("  GET  /state");
     console.log("  GET  /events");
     console.log("  GET  /meetings");
     console.log("  GET  /meetings/:id");
     console.log("  GET  /exports/jobs");
+    console.log("  POST /auth/login");
+    console.log("  POST /auth/logout");
+    console.log("  POST /auth/mode");
+    console.log("  POST /auth/refresh");
     console.log("  POST /exports/notes");
     console.log("  POST /exports/jobs/:id/rerun");
     console.log("  POST /exports/transcripts");

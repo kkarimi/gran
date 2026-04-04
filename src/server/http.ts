@@ -8,6 +8,7 @@ import { type AddressInfo } from "node:net";
 
 import type { GranolaApp } from "../app/core.ts";
 import type {
+  GranolaAppAuthMode,
   GranolaAppStateEvent,
   GranolaMeetingSort,
   NoteOutputFormat,
@@ -48,6 +49,16 @@ function parseMeetingSort(value: string | null): GranolaMeetingSort | undefined 
       return value;
     default:
       throw new Error("invalid sort: expected updated-desc, updated-asc, title-asc, or title-desc");
+  }
+}
+
+function parseAuthMode(value: unknown): GranolaAppAuthMode {
+  switch (value) {
+    case "stored-session":
+    case "supabase-file":
+      return value;
+    default:
+      throw new Error("invalid auth mode: expected stored-session or supabase-file");
   }
 }
 
@@ -178,6 +189,11 @@ export async function startGranolaServer(
         return;
       }
 
+      if (method === "GET" && path === "/auth/status") {
+        sendJson(response, await app.inspectAuth());
+        return;
+      }
+
       if (method === "GET" && path === "/events") {
         response.writeHead(200, {
           "cache-control": "no-cache, no-transform",
@@ -241,6 +257,32 @@ export async function startGranolaServer(
           requireCache: url.searchParams.get("includeTranscript") === "true",
         });
         sendJson(response, meeting);
+        return;
+      }
+
+      if (method === "POST" && path === "/auth/login") {
+        const body = await readJsonBody(request);
+        const supabasePath =
+          typeof body.supabasePath === "string" && body.supabasePath.trim()
+            ? body.supabasePath.trim()
+            : undefined;
+        sendJson(response, await app.loginAuth({ supabasePath }));
+        return;
+      }
+
+      if (method === "POST" && path === "/auth/logout") {
+        sendJson(response, await app.logoutAuth());
+        return;
+      }
+
+      if (method === "POST" && path === "/auth/refresh") {
+        sendJson(response, await app.refreshAuth());
+        return;
+      }
+
+      if (method === "POST" && path === "/auth/mode") {
+        const body = await readJsonBody(request);
+        sendJson(response, await app.switchAuthMode(parseAuthMode(body.mode)));
         return;
       }
 

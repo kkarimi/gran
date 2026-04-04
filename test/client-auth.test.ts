@@ -1,4 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
@@ -11,6 +13,7 @@ import {
   StoredSessionTokenProvider,
   type AccessTokenSource,
 } from "../src/client/auth.ts";
+import { createDefaultGranolaAuthController } from "../src/client/default-auth.ts";
 
 describe("CachedTokenProvider", () => {
   test("caches the token until invalidated", async () => {
@@ -128,6 +131,94 @@ describe("CachedTokenProvider", () => {
       expect.objectContaining({
         accessToken: "token-from-source",
         refreshToken: "refresh-from-source",
+      }),
+    );
+  });
+
+  test("switches between stored and supabase auth modes", async () => {
+    const fixture = await readFile(
+      new URL("./fixtures/granola-supabase.fixture.json", import.meta.url),
+      "utf8",
+    );
+    const supabasePath = join(tmpdir(), `granola-auth-${Date.now()}.json`);
+    await writeFile(supabasePath, fixture, "utf8");
+
+    const controller = createDefaultGranolaAuthController(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: supabasePath,
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        sessionStore: new MemorySessionStore(),
+      },
+    );
+
+    const initial = await controller.inspect();
+    const loggedIn = await controller.login();
+    const switched = await controller.switchMode("supabase-file");
+
+    expect(initial).toEqual(
+      expect.objectContaining({
+        mode: "supabase-file",
+        storedSessionAvailable: false,
+        supabaseAvailable: true,
+      }),
+    );
+    expect(loggedIn).toEqual(
+      expect.objectContaining({
+        clientId: "client_GranolaMac",
+        mode: "stored-session",
+        refreshAvailable: true,
+        storedSessionAvailable: true,
+      }),
+    );
+    expect(switched.mode).toBe("supabase-file");
+  });
+
+  test("records refresh failures in auth state", async () => {
+    const store = new MemorySessionStore();
+    await store.writeSession({
+      accessToken: "token-1",
+      clientId: "client_GranolaMac",
+      refreshToken: "refresh-1",
+    });
+
+    const controller = createDefaultGranolaAuthController(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        fetchImpl: async () =>
+          new Response("bad refresh", { status: 400, statusText: "Bad Request" }),
+        sessionStore: store,
+      },
+    );
+
+    await expect(controller.refresh()).rejects.toThrow(
+      "failed to refresh session: 400 Bad Request",
+    );
+    await expect(controller.inspect()).resolves.toEqual(
+      expect.objectContaining({
+        lastError: "failed to refresh session: 400 Bad Request",
+        mode: "stored-session",
+        storedSessionAvailable: true,
       }),
     );
   });

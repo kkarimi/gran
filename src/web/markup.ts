@@ -52,6 +52,13 @@ export const granolaWebMarkup = String.raw`
       </div>
       <p>Initial beta web client. It speaks to the same local API that future TUI and attach flows will use.</p>
     </section>
+    <section class="auth-panel">
+      <div class="auth-panel__head">
+        <h3>Auth Session</h3>
+        <p>Inspect, refresh, and switch between stored session and <code>supabase.json</code>.</p>
+      </div>
+      <div class="auth-panel__body" data-auth-panel></div>
+    </section>
     <section class="jobs-panel">
       <div class="jobs-panel__head">
         <h3>Recent Export Jobs</h3>

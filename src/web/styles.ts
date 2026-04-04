@@ -204,10 +204,12 @@ body {
   width: min(440px, 100%);
 }
 
+.auth-panel,
 .jobs-panel {
   padding: 0 24px 18px;
 }
 
+.auth-panel__head h3,
 .jobs-panel__head h3 {
   margin: 0;
   font-size: 0.92rem;
@@ -215,10 +217,41 @@ body {
   text-transform: uppercase;
 }
 
+.auth-panel__head p,
 .jobs-panel__head p {
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.auth-panel__body {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.auth-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.auth-card__meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.auth-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auth-card__error {
+  color: var(--error);
 }
 
 .jobs-list {
@@ -326,6 +359,11 @@ body {
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 
 .button--primary {

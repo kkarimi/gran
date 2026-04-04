@@ -193,12 +193,17 @@ The machine-readable `export` command includes:
 The initial server API includes:
 
 - `GET /health`
+- `GET /auth/status`
 - `GET /state`
 - `GET /events` for server-sent state updates
 - `GET /meetings`
 - `GET /meetings/resolve?q=<query>`
 - `GET /meetings/:id`
 - `GET /exports/jobs`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `POST /auth/mode`
+- `POST /auth/refresh`
 - `POST /exports/notes`
 - `POST /exports/jobs/:id/rerun`
 - `POST /exports/transcripts`
@@ -217,6 +222,7 @@ The initial browser client includes:
 - a focused meeting workspace with notes, transcript, metadata, and raw tabs
 - keyboard-first workspace switching with `1`-`4`, `[` and `]`
 - app-state status from the shared core
+- an auth session panel for login, refresh, source switching, and sign-out
 - note and transcript export actions backed by the same local API
 - a recent export-jobs panel with rerun actions
 - stronger empty and error states for list/detail failures
@@ -239,9 +245,22 @@ If you do not want to keep passing `--supabase`, import the desktop app session 
 ```bash
 granola auth login
 granola auth status
+granola auth refresh
+granola auth use stored
+granola auth use supabase
 ```
 
-That stores a reusable Granola session locally and lets `granola notes` use it directly. `granola auth logout` deletes the stored session.
+That stores a reusable Granola session locally and lets `granola notes` use it directly.
+
+`granola auth` now supports:
+
+- `login` to import the desktop app session into the toolkit store
+- `status` to inspect the active source, stored-session availability, refresh support, and any last auth error
+- `refresh` to refresh the stored session explicitly
+- `use stored` or `use supabase` to switch the active auth source
+- `logout` to delete the stored session
+
+The same auth actions are also available from the web workspace.
 
 ### Incremental Writes
 

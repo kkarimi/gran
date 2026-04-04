@@ -83,7 +83,12 @@ export interface MeetingRecord {
 export type GranolaSessionMode = "stored-session" | "supabase-file";
 
 export interface GranolaSessionMetadata {
+  clientId?: string;
+  lastError?: string;
   mode: GranolaSessionMode;
+  refreshAvailable: boolean;
+  signInMethod?: string;
   storedSessionAvailable: boolean;
+  supabaseAvailable: boolean;
   supabasePath?: string;
 }

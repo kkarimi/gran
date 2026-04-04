@@ -13,6 +13,7 @@ export type GranolaMeetingSort = "title-asc" | "title-desc" | "updated-asc" | "u
 export type GranolaExportJobKind = "notes" | "transcripts";
 export type GranolaExportJobStatus = "completed" | "failed" | "running";
 export type GranolaAppView =
+  | "auth"
   | "idle"
   | "exports-history"
   | "meeting-detail"

@@ -6,6 +6,7 @@ import { describe, expect, test, vi } from "vite-plus/test";
 
 import { GranolaApp } from "../src/app/core.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
+import type { GranolaAppAuthState } from "../src/app/index.ts";
 import type { CacheData, GranolaDocument } from "../src/types.ts";
 
 const documents: GranolaDocument[] = [
@@ -75,7 +76,9 @@ describe("GranolaApp", () => {
       {
         auth: {
           mode: "supabase-file",
+          refreshAvailable: false,
           storedSessionAvailable: false,
+          supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
         },
         cacheLoader: loadCache,
@@ -120,7 +123,9 @@ describe("GranolaApp", () => {
       {
         auth: {
           mode: "supabase-file",
+          refreshAvailable: false,
           storedSessionAvailable: false,
+          supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
         },
         cacheLoader: async () => undefined,
@@ -180,7 +185,9 @@ describe("GranolaApp", () => {
       {
         auth: {
           mode: "supabase-file",
+          refreshAvailable: false,
           storedSessionAvailable: false,
+          supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
         },
         cacheLoader: async () => undefined,
@@ -220,7 +227,9 @@ describe("GranolaApp", () => {
       {
         auth: {
           mode: "supabase-file",
+          refreshAvailable: false,
           storedSessionAvailable: false,
+          supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
         },
         cacheLoader: async () => undefined,
@@ -252,5 +261,85 @@ describe("GranolaApp", () => {
         view: "meeting-detail",
       }),
     );
+  });
+
+  test("updates auth state through the shared app controller", async () => {
+    let authState: GranolaAppAuthState = {
+      mode: "stored-session",
+      refreshAvailable: true,
+      storedSessionAvailable: true,
+      supabaseAvailable: true,
+      supabasePath: "/tmp/supabase.json",
+    };
+
+    const app = new GranolaApp(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: authState,
+        authController: {
+          inspect: async () => authState,
+          login: async () => authState,
+          logout: async () => {
+            authState = {
+              ...authState,
+              mode: "supabase-file",
+              refreshAvailable: false,
+              storedSessionAvailable: false,
+            };
+            return authState;
+          },
+          refresh: async () => {
+            authState = {
+              ...authState,
+              lastError: "refresh failed",
+            };
+            throw new Error("refresh failed");
+          },
+          switchMode: async (mode) => {
+            authState = {
+              ...authState,
+              lastError: undefined,
+              mode,
+            };
+            return authState;
+          },
+        },
+        cacheLoader: async () => undefined,
+        createGranolaClient: async (mode) => ({
+          auth: {
+            ...authState,
+            mode: mode ?? authState.mode,
+          },
+          client: {
+            listDocuments: async () => documents,
+          },
+        }),
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+    );
+
+    await app.listDocuments();
+    const switched = await app.switchAuthMode("supabase-file");
+    expect(switched.mode).toBe("supabase-file");
+    expect(app.getState().documents.loaded).toBe(false);
+    expect(app.getState().ui.view).toBe("auth");
+
+    await expect(app.refreshAuth()).rejects.toThrow("refresh failed");
+    expect(app.getState().auth.lastError).toBe("refresh failed");
+
+    const loggedOut = await app.logoutAuth();
+    expect(loggedOut.storedSessionAvailable).toBe(false);
+    expect(app.getState().auth.mode).toBe("supabase-file");
   });
 });

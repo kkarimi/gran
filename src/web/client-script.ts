@@ -17,6 +17,7 @@ const state = {
 
 const els = {
   appState: document.querySelector("[data-app-state]"),
+  authPanel: document.querySelector("[data-auth-panel]"),
   detailBody: document.querySelector("[data-detail-body]"),
   detailMeta: document.querySelector("[data-detail-meta]"),
   empty: document.querySelector("[data-empty]"),
@@ -83,6 +84,7 @@ function renderWorkspaceTabs() {
 function renderAppState() {
   if (!state.appState) {
     els.appState.innerHTML = "<p>Waiting for server state…</p>";
+    els.authPanel.innerHTML = "<p>Waiting for auth state…</p>";
     return;
   }
 
@@ -105,7 +107,73 @@ function renderAppState() {
     "</div>",
   ].join("");
 
+  renderAuthPanel();
   renderExportJobs();
+}
+
+function authActionButton(label, action, disabled) {
+  return (
+    '<button class="button button--secondary" data-auth-action="' +
+    escapeHtml(action) +
+    '"' +
+    (disabled ? " disabled" : "") +
+    ">" +
+    escapeHtml(label) +
+    "</button>"
+  );
+}
+
+function authModeButton(label, mode, disabled) {
+  return (
+    '<button class="button button--secondary" data-auth-mode="' +
+    escapeHtml(mode) +
+    '"' +
+    (disabled ? " disabled" : "") +
+    ">" +
+    escapeHtml(label) +
+    "</button>"
+  );
+}
+
+function renderAuthPanel() {
+  const auth = state.appState?.auth;
+  if (!auth) {
+    els.authPanel.innerHTML = '<div class="auth-card"><div class="auth-card__meta">Auth state unavailable.</div></div>';
+    return;
+  }
+
+  const activeSource = auth.mode === "stored-session" ? "Stored session" : "supabase.json";
+  const lastError = auth.lastError
+    ? '<div class="auth-card__meta auth-card__error">' + escapeHtml(auth.lastError) + "</div>"
+    : "";
+
+  els.authPanel.innerHTML = [
+    '<div class="auth-card">',
+    '<div class="status-grid">',
+    '<div><span class="status-label">Active</span><strong>' + escapeHtml(activeSource) + "</strong></div>",
+    '<div><span class="status-label">Stored</span><strong>' + escapeHtml(auth.storedSessionAvailable ? "available" : "missing") + "</strong></div>",
+    '<div><span class="status-label">supabase.json</span><strong>' + escapeHtml(auth.supabaseAvailable ? "available" : "missing") + "</strong></div>",
+    '<div><span class="status-label">Refresh</span><strong>' + escapeHtml(auth.refreshAvailable ? "available" : "missing") + "</strong></div>",
+    "</div>",
+    auth.clientId
+      ? '<div class="auth-card__meta">Client ID: ' + escapeHtml(auth.clientId) + "</div>"
+      : "",
+    auth.signInMethod
+      ? '<div class="auth-card__meta">Sign-in method: ' + escapeHtml(auth.signInMethod) + "</div>"
+      : "",
+    auth.supabasePath
+      ? '<div class="auth-card__meta">supabase path: ' + escapeHtml(auth.supabasePath) + "</div>"
+      : "",
+    lastError,
+    '<div class="auth-card__actions">',
+    authActionButton("Import desktop session", "login", !auth.supabaseAvailable),
+    authActionButton("Refresh stored session", "refresh", !auth.storedSessionAvailable || !auth.refreshAvailable),
+    authModeButton("Use stored session", "stored-session", !auth.storedSessionAvailable || auth.mode === "stored-session"),
+    authModeButton("Use supabase.json", "supabase-file", !auth.supabaseAvailable || auth.mode === "supabase-file"),
+    authActionButton("Sign out", "logout", !auth.storedSessionAvailable),
+    "</div>",
+    "</div>",
+  ].join("");
 }
 
 function renderMeetingList() {
@@ -362,10 +430,22 @@ async function quickOpenMeeting() {
 
 async function refreshAll() {
   setStatus("Refreshing…", "busy");
-  const [appState] = await Promise.all([fetchJson("/state"), loadMeetings()]);
-  state.appState = appState;
+  const [appState, authState] = await Promise.all([fetchJson("/state"), fetchJson("/auth/status"), loadMeetings()]);
+  state.appState = {
+    ...appState,
+    auth: authState,
+  };
   renderAppState();
   setStatus("Connected", "ok");
+}
+
+async function syncAuthState() {
+  const [appState, authState] = await Promise.all([fetchJson("/state"), fetchJson("/auth/status")]);
+  state.appState = {
+    ...appState,
+    auth: authState,
+  };
+  renderAppState();
 }
 
 async function exportNotes() {
@@ -402,6 +482,62 @@ async function rerunJob(id) {
   }
 }
 
+async function loginAuth() {
+  setStatus("Importing desktop session…", "busy");
+  try {
+    await fetchJson("/auth/login", { method: "POST" });
+    await refreshAll();
+  } catch (error) {
+    await syncAuthState();
+    setStatus("Auth import failed", "error");
+    state.detailError = error instanceof Error ? error.message : String(error);
+    renderMeetingDetail();
+  }
+}
+
+async function logoutAuth() {
+  setStatus("Signing out…", "busy");
+  try {
+    await fetchJson("/auth/logout", { method: "POST" });
+    await refreshAll();
+  } catch (error) {
+    await syncAuthState();
+    setStatus("Sign out failed", "error");
+    state.detailError = error instanceof Error ? error.message : String(error);
+    renderMeetingDetail();
+  }
+}
+
+async function refreshAuth() {
+  setStatus("Refreshing session…", "busy");
+  try {
+    await fetchJson("/auth/refresh", { method: "POST" });
+    await refreshAll();
+  } catch (error) {
+    await syncAuthState();
+    setStatus("Refresh failed", "error");
+    state.detailError = error instanceof Error ? error.message : String(error);
+    renderMeetingDetail();
+  }
+}
+
+async function switchAuthMode(mode) {
+  setStatus("Switching auth source…", "busy");
+  try {
+    await fetchJson("/auth/mode", {
+      body: JSON.stringify({ mode }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    await refreshAll();
+  } catch (error) {
+    await syncAuthState();
+    setStatus("Switch failed", "error");
+    state.detailError = error instanceof Error ? error.message : String(error);
+    renderMeetingDetail();
+  }
+}
+
 els.list.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) {
     return;
@@ -423,6 +559,36 @@ els.jobsList.addEventListener("click", (event) => {
   }
 
   void rerunJob(button.dataset.rerunJobId);
+});
+
+els.authPanel.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
+  const actionButton = event.target.closest("[data-auth-action]");
+  if (actionButton) {
+    switch (actionButton.dataset.authAction) {
+      case "login":
+        void loginAuth();
+        return;
+      case "logout":
+        void logoutAuth();
+        return;
+      case "refresh":
+        void refreshAuth();
+        return;
+      default:
+        return;
+    }
+  }
+
+  const modeButton = event.target.closest("[data-auth-mode]");
+  if (!modeButton) {
+    return;
+  }
+
+  void switchAuthMode(modeButton.dataset.authMode);
 });
 
 els.refreshButton.addEventListener("click", () => {

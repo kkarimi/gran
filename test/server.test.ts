@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vite-plus/test";
 
 import { GranolaApp } from "../src/app/core.ts";
+import type { GranolaAppAuthState } from "../src/app/index.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
 import { startGranolaServer } from "../src/server/http.ts";
 import type { CacheData, GranolaDocument } from "../src/types.ts";
@@ -90,7 +91,9 @@ describe("startGranolaServer", () => {
       {
         auth: {
           mode: "supabase-file",
+          refreshAvailable: false,
           storedSessionAvailable: false,
+          supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
         },
         cacheLoader: async () => cacheData,
@@ -174,7 +177,9 @@ describe("startGranolaServer", () => {
       {
         auth: {
           mode: "supabase-file",
+          refreshAvailable: false,
           storedSessionAvailable: false,
+          supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
         },
         cacheLoader: async () => undefined,
@@ -274,7 +279,9 @@ describe("startGranolaServer", () => {
       {
         auth: {
           mode: "supabase-file",
+          refreshAvailable: false,
           storedSessionAvailable: false,
+          supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
         },
         cacheLoader: async () => cacheData,
@@ -297,9 +304,11 @@ describe("startGranolaServer", () => {
 
     const html = await response.text();
     expect(html).toContain("<title>Granola Toolkit</title>");
+    expect(html).toContain("Auth Session");
     expect(html).toContain("Meeting Workspace");
     expect(html).toContain("Recent Export Jobs");
     expect(html).toContain('new EventSource("/events")');
+    expect(html).toContain("data-auth-panel");
     expect(html).toContain('data-workspace-tab="notes"');
     expect(html).toContain("1-4 switch tabs");
   });
@@ -321,7 +330,9 @@ describe("startGranolaServer", () => {
       {
         auth: {
           mode: "supabase-file",
+          refreshAvailable: false,
           storedSessionAvailable: false,
+          supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
         },
         cacheLoader: async () => cacheData,
@@ -372,6 +383,145 @@ describe("startGranolaServer", () => {
         document: expect.objectContaining({
           id: "doc-charlie-3333",
         }),
+      }),
+    );
+  });
+
+  test("serves auth status and auth actions over HTTP", async () => {
+    let authState: GranolaAppAuthState = {
+      mode: "supabase-file",
+      refreshAvailable: false,
+      storedSessionAvailable: false,
+      supabaseAvailable: true,
+      supabasePath: "/tmp/supabase.json",
+    };
+
+    const app = new GranolaApp(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: authState,
+        authController: {
+          inspect: async () => authState,
+          login: async () => {
+            authState = {
+              ...authState,
+              mode: "stored-session",
+              refreshAvailable: true,
+              storedSessionAvailable: true,
+            };
+            return authState;
+          },
+          logout: async () => {
+            authState = {
+              ...authState,
+              mode: "supabase-file",
+              refreshAvailable: false,
+              storedSessionAvailable: false,
+            };
+            return authState;
+          },
+          refresh: async () => {
+            authState = {
+              ...authState,
+              lastError: "refresh failed",
+            };
+            throw new Error("refresh failed");
+          },
+          switchMode: async (mode) => {
+            authState = {
+              ...authState,
+              lastError: undefined,
+              mode,
+            };
+            return authState;
+          },
+        },
+        cacheLoader: async () => undefined,
+        granolaClient: {
+          listDocuments: async () => documents,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+      { surface: "web" },
+    );
+
+    const server = await startGranolaServer(app, {
+      enableWebClient: true,
+    });
+    closeServer = async () => await server.close();
+
+    const initial = await fetch(new URL("/auth/status", server.url));
+    expect(initial.ok).toBe(true);
+    expect(await initial.json()).toEqual(
+      expect.objectContaining({
+        mode: "supabase-file",
+        storedSessionAvailable: false,
+      }),
+    );
+
+    const login = await fetch(new URL("/auth/login", server.url), {
+      method: "POST",
+    });
+    expect(login.ok).toBe(true);
+    expect(await login.json()).toEqual(
+      expect.objectContaining({
+        mode: "stored-session",
+        refreshAvailable: true,
+      }),
+    );
+
+    const switchMode = await fetch(new URL("/auth/mode", server.url), {
+      body: JSON.stringify({ mode: "supabase-file" }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+    expect(switchMode.ok).toBe(true);
+    expect(await switchMode.json()).toEqual(
+      expect.objectContaining({
+        mode: "supabase-file",
+      }),
+    );
+
+    const refresh = await fetch(new URL("/auth/refresh", server.url), {
+      method: "POST",
+    });
+    expect(refresh.status).toBe(400);
+    expect(await refresh.json()).toEqual(
+      expect.objectContaining({
+        error: "refresh failed",
+      }),
+    );
+
+    const refreshedState = await fetch(new URL("/state", server.url));
+    expect(await refreshedState.json()).toEqual(
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          lastError: "refresh failed",
+        }),
+      }),
+    );
+
+    const logout = await fetch(new URL("/auth/logout", server.url), {
+      method: "POST",
+    });
+    expect(logout.ok).toBe(true);
+    expect(await logout.json()).toEqual(
+      expect.objectContaining({
+        mode: "supabase-file",
+        storedSessionAvailable: false,
       }),
     );
   });

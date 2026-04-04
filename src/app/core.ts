@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
 
 import {
+  createDefaultGranolaAuthController,
   createDefaultGranolaRuntime,
   inspectDefaultGranolaAuth,
   loadOptionalGranolaCache,
+  type DefaultGranolaAuthController,
   type DefaultGranolaAuthInfo,
 } from "../client/default.ts";
 import type { GranolaApiClient } from "../client/granola.ts";
@@ -30,6 +32,7 @@ import type {
 import { granolaCacheCandidates } from "../utils.ts";
 
 import type {
+  GranolaAppAuthMode,
   GranolaAppAuthState,
   GranolaAppExportJobState,
   GranolaAppExportRunState,
@@ -48,8 +51,9 @@ type GranolaDocumentsClient = Pick<GranolaApiClient, "listDocuments">;
 
 interface GranolaAppDependencies {
   auth: GranolaAppAuthState;
+  authController?: DefaultGranolaAuthController;
   cacheLoader: (cacheFile?: string) => Promise<CacheData | undefined>;
-  createGranolaClient?: () => Promise<{
+  createGranolaClient?: (mode?: GranolaAppAuthMode) => Promise<{
     auth: GranolaAppAuthState;
     client: GranolaDocumentsClient;
   }>;
@@ -160,6 +164,37 @@ export class GranolaApp {
     return this.getState();
   }
 
+  private resetDocumentsState(): void {
+    this.#granolaClient = undefined;
+    this.#documents = undefined;
+    this.#state.documents = {
+      count: 0,
+      loaded: false,
+    };
+  }
+
+  private applyAuthState(
+    auth: GranolaAppAuthState,
+    options: {
+      resetDocuments?: boolean;
+      view?: GranolaAppState["ui"]["view"];
+    } = {},
+  ): GranolaAppAuthState {
+    if (options.resetDocuments) {
+      this.resetDocumentsState();
+    }
+
+    this.#state.auth = { ...auth };
+    if (options.view) {
+      this.#state.ui = {
+        ...this.#state.ui,
+        view: options.view,
+      };
+    }
+    this.emitStateUpdate();
+    return { ...auth };
+  }
+
   private nowIso(): string {
     return (this.deps.now ?? (() => new Date()))().toISOString();
   }
@@ -190,10 +225,9 @@ export class GranolaApp {
       throw new Error("Granola API client is not configured");
     }
 
-    const runtime = await this.deps.createGranolaClient();
+    const runtime = await this.deps.createGranolaClient(this.#state.auth.mode);
     this.#granolaClient = runtime.client;
-    this.#state.auth = { ...runtime.auth };
-    this.emitStateUpdate();
+    this.applyAuthState(runtime.auth);
     return this.#granolaClient;
   }
 
@@ -285,6 +319,79 @@ export class GranolaApp {
       completedCount: patch.completedCount,
       written: patch.written,
     });
+  }
+
+  private requireAuthController(): DefaultGranolaAuthController {
+    if (!this.deps.authController) {
+      throw new Error("Granola auth control is not configured");
+    }
+
+    return this.deps.authController;
+  }
+
+  async inspectAuth(): Promise<GranolaAppAuthState> {
+    if (!this.deps.authController) {
+      return { ...this.#state.auth };
+    }
+
+    const auth = await this.deps.authController.inspect();
+    return this.applyAuthState(auth, { view: "auth" });
+  }
+
+  async loginAuth(options: { supabasePath?: string } = {}): Promise<GranolaAppAuthState> {
+    const controller = this.requireAuthController();
+
+    try {
+      const auth = await controller.login(options);
+      return this.applyAuthState(auth, {
+        resetDocuments: true,
+        view: "auth",
+      });
+    } catch (error) {
+      const auth = await controller.inspect();
+      this.applyAuthState(auth, { view: "auth" });
+      throw error;
+    }
+  }
+
+  async logoutAuth(): Promise<GranolaAppAuthState> {
+    const auth = await this.requireAuthController().logout();
+    return this.applyAuthState(auth, {
+      resetDocuments: true,
+      view: "auth",
+    });
+  }
+
+  async refreshAuth(): Promise<GranolaAppAuthState> {
+    const controller = this.requireAuthController();
+
+    try {
+      const auth = await controller.refresh();
+      return this.applyAuthState(auth, {
+        resetDocuments: true,
+        view: "auth",
+      });
+    } catch (error) {
+      const auth = await controller.inspect();
+      this.applyAuthState(auth, { view: "auth" });
+      throw error;
+    }
+  }
+
+  async switchAuthMode(mode: GranolaAppAuthMode): Promise<GranolaAppAuthState> {
+    const controller = this.requireAuthController();
+
+    try {
+      const auth = await controller.switchMode(mode);
+      return this.applyAuthState(auth, {
+        resetDocuments: true,
+        view: "auth",
+      });
+    } catch (error) {
+      const auth = await controller.inspect();
+      this.applyAuthState(auth, { view: "auth" });
+      throw error;
+    }
   }
 
   async listDocuments(): Promise<GranolaDocument[]> {
@@ -585,6 +692,7 @@ export async function createGranolaApp(
   } = {},
 ): Promise<GranolaApp> {
   const auth = await inspectDefaultGranolaAuth(config);
+  const authController = createDefaultGranolaAuthController(config);
   const exportJobStore = createDefaultExportJobStore();
   const exportJobs = await exportJobStore.readJobs();
 
@@ -592,8 +700,12 @@ export async function createGranolaApp(
     config,
     {
       auth,
+      authController,
       cacheLoader: loadOptionalGranolaCache,
-      createGranolaClient: async () => await createDefaultGranolaRuntime(config, options.logger),
+      createGranolaClient: async (mode) =>
+        await createDefaultGranolaRuntime(config, options.logger, {
+          preferredMode: mode,
+        }),
       exportJobs,
       exportJobStore,
       now: options.now,
