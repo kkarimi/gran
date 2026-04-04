@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "vite-plus/test";
 
 import { generatedModule } from "../scripts/build-web-client.mjs";
@@ -12,5 +14,14 @@ describe("web bundle generation", () => {
     expect(generated).not.toContain("String.raw");
     expect(generated).toContain(JSON.stringify(js));
     expect(generated).toContain(JSON.stringify(css));
+  });
+
+  test("pins the generated bundle to production mode", () => {
+    const script = readFileSync(
+      new URL("../scripts/build-web-client.mjs", import.meta.url),
+      "utf8",
+    );
+
+    expect(script).toContain('mode: "production"');
   });
 });

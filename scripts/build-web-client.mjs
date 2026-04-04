@@ -34,6 +34,7 @@ async function buildAssets() {
         target: "es2020",
       },
       configFile: false,
+      mode: "production",
       plugins: [solid()],
       root,
     });
