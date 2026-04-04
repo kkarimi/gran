@@ -17,6 +17,7 @@ const lines = [
   "",
   `- npm: [${packageName}@${version}](https://www.npmjs.com/package/${packageName}/v/${version})`,
   `- install: \`npm install -g ${packageName}@${version}\``,
+  `- standalone binaries: ${repository}/releases/tag/${tag}`,
   `- docs: ${pkg.homepage}`,
   `- compare: ${repository}/compare/${tag}^...${tag}`,
 ];

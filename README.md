@@ -17,6 +17,10 @@ npx granola-toolkit --help
 
 The published package exposes both `granola` and `granola-toolkit` as executable names.
 
+If you do not want to install via npm, each GitHub release also publishes standalone archives for
+macOS arm64, Linux x64, and Windows x64. Extract the archive and run `granola` (or
+`granola.exe` on Windows).
+
 ## Quick Start
 
 ```bash

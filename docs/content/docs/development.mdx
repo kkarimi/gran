@@ -12,6 +12,7 @@ npm run web:check
 vp check
 vp test
 npm run coverage
+npm run standalone:smoke
 vp pack
 npm pack --dry-run
 ```
@@ -22,6 +23,7 @@ What those do:
 - `vp check`: formatting, linting, and type checks
 - `vp test`: unit tests
 - `npm run coverage`: unit tests plus a local coverage report in `coverage/coverage-summary.json`
+- `npm run standalone:smoke`: builds the current-platform standalone binary and runs `--help`
 - `vp pack`: builds the CLI bundle into `dist/cli.js`
 - `npm pack --dry-run`: shows the exact npm package contents without publishing
 
@@ -47,7 +49,8 @@ Normal release flow:
 2. Run toolkit QA plus `npm run docs:check`.
 3. Run `npm run release:patch`, `release:minor`, or `release:major`.
 4. Let GitHub Actions publish the already-bumped version.
-5. GitHub Actions then creates the matching GitHub Release with generated notes plus package metadata.
+5. GitHub Actions then creates the matching GitHub Release with generated notes, package metadata,
+   and standalone release archives.
 
 ## Repo Shape
 

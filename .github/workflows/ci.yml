@@ -34,6 +34,8 @@ jobs:
         run: vp test
       - name: Coverage
         run: npm run coverage
+      - name: Standalone Smoke Build
+        run: npm run standalone:smoke
       - name: Pack
         run: vp pack
       - name: Build Docs
@@ -104,17 +106,60 @@ jobs:
       - name: Publish
         run: npm publish --provenance --access public
 
+  standalone-assets:
+    if: needs.prepare-publish.outputs.should_publish == 'true'
+    needs:
+      - verify
+      - prepare-publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: linux-x64
+          - runner: macos-14
+            target: darwin-arm64
+          - runner: windows-latest
+            target: win32-x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+      - name: Install
+        run: vp install --frozen-lockfile
+      - name: Build standalone archive
+        run: npm run standalone:build -- --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standalone-${{ matrix.target }}
+          path: |
+            dist/release-assets/*.tar.gz
+            dist/release-assets/*.zip
+
   github-release:
     if: needs.prepare-publish.outputs.should_publish == 'true'
     needs:
       - verify
       - prepare-publish
       - publish
+      - standalone-assets
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v5
+        with:
+          merge-multiple: true
+          path: release-assets
+          pattern: standalone-*
+      - name: Build asset checksums
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -123,18 +168,20 @@ jobs:
         run: |
           tag="v${PACKAGE_VERSION}"
           title="${PACKAGE_NAME} v${PACKAGE_VERSION}"
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f | sort)
 
           if gh release view "${tag}" >/dev/null 2>&1; then
-            echo "GitHub Release ${tag} already exists."
-            exit 0
+            echo "GitHub Release ${tag} already exists; uploading refreshed assets."
+          else
+            notes="$(node scripts/release-notes.mjs)"
+            gh release create "${tag}" \
+              --latest \
+              --notes "${notes}" \
+              --generate-notes \
+              --title "${title}"
           fi
 
-          notes="$(node scripts/release-notes.mjs)"
-          gh release create "${tag}" \
-            --latest \
-            --notes "${notes}" \
-            --generate-notes \
-            --title "${title}"
+          gh release upload "${tag}" "${assets[@]}" --clobber
 
   auto-approve-publish:
     if: needs.prepare-publish.outputs.should_publish == 'true'
