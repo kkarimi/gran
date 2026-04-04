@@ -205,10 +205,12 @@ body {
 }
 
 .auth-panel,
+.security-panel,
 .jobs-panel {
   padding: 0 24px 18px;
 }
 
+.security-panel__head h3,
 .auth-panel__head h3,
 .jobs-panel__head h3 {
   margin: 0;
@@ -217,6 +219,7 @@ body {
   text-transform: uppercase;
 }
 
+.security-panel__head p,
 .auth-panel__head p,
 .jobs-panel__head p {
   margin: 6px 0 0;
@@ -224,6 +227,7 @@ body {
   font-size: 0.9rem;
 }
 
+.security-panel__body,
 .auth-panel__body {
   display: grid;
   gap: 12px;

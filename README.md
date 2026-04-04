@@ -103,9 +103,11 @@ Run the local API server:
 granola serve
 granola serve --port 4096
 granola serve --hostname 0.0.0.0 --port 4096
+granola serve --network lan --password "change-me"
 
 granola web
 granola web --open=false --port 4096
+granola web --network lan --password "change-me" --trusted-origins "https://trusted.example"
 ```
 
 ## How It Works
@@ -193,6 +195,8 @@ The machine-readable `export` command includes:
 The initial server API includes:
 
 - `GET /health`
+- `POST /auth/unlock` for password-protected servers
+- `POST /auth/lock` to clear the browser/API unlock cookie
 - `GET /auth/status`
 - `GET /state`
 - `GET /events` for server-sent state updates
@@ -211,6 +215,14 @@ The initial server API includes:
 
 This is the foundation for the future `granola web` client and any attachable TUI flows.
 
+Server hardening now includes:
+
+- `local` network mode by default, which binds to `127.0.0.1`
+- `lan` network mode when you explicitly want other devices to connect
+- optional password protection for API routes and the browser client
+- trusted-origin checks for browser requests, with CORS headers only for allowed origins
+- a warning when you expose the server on `lan` without a password
+
 ### Web
 
 `web` starts the same local server as `serve`, enables the browser client at `/`, and opens that workspace in your default browser unless you pass `--open=false`.
@@ -228,6 +240,7 @@ The initial browser client includes:
 - note and transcript export actions backed by the same local API
 - a recent export-jobs panel with rerun actions
 - stronger empty and error states for list/detail failures
+- a server-access panel that can unlock or lock a password-protected local server
 
 ### Local Meeting Index
 

@@ -307,6 +307,7 @@ describe("startGranolaServer", () => {
     const html = await response.text();
     expect(html).toContain("<title>Granola Toolkit</title>");
     expect(html).toContain("Auth Session");
+    expect(html).toContain('"passwordRequired":false');
     expect(html).toContain("Meeting Workspace");
     expect(html).toContain("Recent Export Jobs");
     expect(html).toContain('new EventSource("/events")');
@@ -598,5 +599,114 @@ describe("startGranolaServer", () => {
         source: "live",
       }),
     );
+  });
+
+  test("protects API routes with a password and trusted origins", async () => {
+    const app = new GranolaApp(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        cacheLoader: async () => undefined,
+        granolaClient: {
+          listDocuments: async () => documents,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+      { surface: "web" },
+    );
+
+    const server = await startGranolaServer(app, {
+      enableWebClient: true,
+      security: {
+        password: "secret-pass",
+        trustedOrigins: ["https://trusted.example"],
+      },
+    });
+    closeServer = async () => await server.close();
+
+    const root = await fetch(new URL("/", server.url));
+    expect(root.ok).toBe(true);
+    expect(await root.text()).toContain('"passwordRequired":true');
+
+    const locked = await fetch(new URL("/state", server.url));
+    expect(locked.status).toBe(401);
+    expect(await locked.json()).toEqual(
+      expect.objectContaining({
+        authRequired: true,
+        error: "server password required",
+      }),
+    );
+
+    const wrongUnlock = await fetch(new URL("/auth/unlock", server.url), {
+      body: JSON.stringify({ password: "wrong-pass" }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+    expect(wrongUnlock.status).toBe(401);
+
+    const unlock = await fetch(new URL("/auth/unlock", server.url), {
+      body: JSON.stringify({ password: "secret-pass" }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+    expect(unlock.ok).toBe(true);
+    const cookie = unlock.headers.get("set-cookie");
+    expect(cookie).toContain("granola_toolkit_password=");
+
+    const unlocked = await fetch(new URL("/state", server.url), {
+      headers: {
+        cookie: cookie ?? "",
+      },
+    });
+    expect(unlocked.ok).toBe(true);
+
+    const trustedPreflight = await fetch(new URL("/state", server.url), {
+      headers: {
+        "access-control-request-method": "GET",
+        origin: "https://trusted.example",
+      },
+      method: "OPTIONS",
+    });
+    expect(trustedPreflight.status).toBe(204);
+    expect(trustedPreflight.headers.get("access-control-allow-origin")).toBe(
+      "https://trusted.example",
+    );
+
+    const untrusted = await fetch(new URL("/state", server.url), {
+      headers: {
+        origin: "https://evil.example",
+      },
+    });
+    expect(untrusted.status).toBe(403);
+
+    const lockedAgain = await fetch(new URL("/auth/lock", server.url), {
+      headers: {
+        cookie: cookie ?? "",
+      },
+      method: "POST",
+    });
+    expect(lockedAgain.ok).toBe(true);
+    expect(lockedAgain.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 });

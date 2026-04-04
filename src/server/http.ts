@@ -17,8 +17,16 @@ import type {
 import { renderGranolaWebPage } from "./web.ts";
 
 interface JsonResponseInit {
+  headers?: Record<string, string>;
   status?: number;
 }
+
+interface GranolaServerSecurityOptions {
+  password?: string;
+  trustedOrigins?: string[];
+}
+
+const PASSWORD_COOKIE_NAME = "granola_toolkit_password";
 
 function parseInteger(value: string | null): number | undefined {
   if (!value?.trim()) {
@@ -67,24 +75,46 @@ function sendJson(response: ServerResponse, body: unknown, init: JsonResponseIni
   response.writeHead(init.status ?? 200, {
     "content-length": Buffer.byteLength(payload),
     "content-type": "application/json; charset=utf-8",
+    ...init.headers,
   });
   response.end(payload);
 }
 
-function sendText(response: ServerResponse, body: string, status = 200): void {
+function sendText(
+  response: ServerResponse,
+  body: string,
+  status = 200,
+  headers: Record<string, string> = {},
+): void {
   response.writeHead(status, {
     "content-length": Buffer.byteLength(body),
     "content-type": "text/plain; charset=utf-8",
+    ...headers,
   });
   response.end(body);
 }
 
-function sendHtml(response: ServerResponse, body: string, status = 200): void {
+function sendHtml(
+  response: ServerResponse,
+  body: string,
+  status = 200,
+  headers: Record<string, string> = {},
+): void {
   response.writeHead(status, {
     "content-length": Buffer.byteLength(body),
     "content-type": "text/html; charset=utf-8",
+    ...headers,
   });
   response.end(body);
+}
+
+function sendNoContent(
+  response: ServerResponse,
+  status = 204,
+  headers: Record<string, string> = {},
+): void {
+  response.writeHead(status, headers);
+  response.end();
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
@@ -141,6 +171,83 @@ function transcriptFormatFromBody(value: unknown): TranscriptOutputFormat {
   }
 }
 
+function parseCookies(request: IncomingMessage): Record<string, string> {
+  const header = request.headers.cookie;
+  if (!header) {
+    return {};
+  }
+
+  const cookies: Record<string, string> = {};
+  for (const chunk of header.split(";")) {
+    const [name, ...valueParts] = chunk.trim().split("=");
+    if (!name) {
+      continue;
+    }
+
+    cookies[name] = decodeURIComponent(valueParts.join("="));
+  }
+
+  return cookies;
+}
+
+function passwordCookieHeader(password: string): string {
+  return `${PASSWORD_COOKIE_NAME}=${encodeURIComponent(password)}; HttpOnly; Path=/; SameSite=Strict`;
+}
+
+function clearPasswordCookieHeader(): string {
+  return `${PASSWORD_COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict`;
+}
+
+function allowedOriginHeaders(origin: string): Record<string, string> {
+  return {
+    "access-control-allow-credentials": "true",
+    "access-control-allow-headers": "content-type, x-granola-password",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-origin": origin,
+    vary: "Origin",
+  };
+}
+
+function isTrustedOrigin(
+  origin: string | undefined,
+  request: IncomingMessage,
+  trustedOrigins: string[],
+): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(origin);
+    const host = request.headers.host;
+    if (host && parsed.host === host) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return trustedOrigins.includes(origin);
+}
+
+function isPasswordAuthenticated(request: IncomingMessage, password: string): boolean {
+  const headerPassword = request.headers["x-granola-password"];
+  if (typeof headerPassword === "string" && headerPassword === password) {
+    return true;
+  }
+
+  const authorization = request.headers.authorization;
+  if (authorization?.startsWith("Bearer ")) {
+    return authorization.slice("Bearer ".length) === password;
+  }
+
+  return parseCookies(request)[PASSWORD_COOKIE_NAME] === password;
+}
+
+function publicRoute(path: string, enableWebClient: boolean): boolean {
+  return path === "/health" || path === "/auth/unlock" || (enableWebClient && path === "/");
+}
+
 export interface GranolaServer {
   app: GranolaApp;
   close(): Promise<void>;
@@ -154,6 +261,7 @@ export interface GranolaServerOptions {
   enableWebClient?: boolean;
   hostname?: string;
   port?: number;
+  security?: GranolaServerSecurityOptions;
 }
 
 export async function startGranolaServer(
@@ -163,34 +271,145 @@ export async function startGranolaServer(
   const enableWebClient = options.enableWebClient ?? false;
   const hostname = options.hostname ?? "127.0.0.1";
   const port = options.port ?? 0;
+  const security = {
+    password: options.security?.password?.trim() || undefined,
+    trustedOrigins: (options.security?.trustedOrigins ?? [])
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  };
 
   const server = createServer(async (request, response) => {
     const method = request.method ?? "GET";
     const url = new URL(request.url ?? "/", `http://${hostname}`);
     const path = url.pathname;
+    const origin = request.headers.origin?.trim();
+    const trustedOrigin = isTrustedOrigin(origin, request, security.trustedOrigins);
+    const originHeaders = origin && trustedOrigin ? allowedOriginHeaders(origin) : {};
 
     try {
+      if (origin && !trustedOrigin) {
+        sendJson(
+          response,
+          { error: `origin not trusted: ${origin}` },
+          { headers: originHeaders, status: 403 },
+        );
+        return;
+      }
+
+      if (method === "OPTIONS") {
+        if (!origin) {
+          sendNoContent(response, 204);
+          return;
+        }
+
+        if (!trustedOrigin) {
+          sendNoContent(response, 403);
+          return;
+        }
+
+        sendNoContent(response, 204, originHeaders);
+        return;
+      }
+
       if (method === "GET" && path === "/" && enableWebClient) {
-        sendHtml(response, renderGranolaWebPage());
+        sendHtml(
+          response,
+          renderGranolaWebPage({
+            serverPasswordRequired: Boolean(security.password),
+          }),
+          200,
+          originHeaders,
+        );
         return;
       }
 
       if (method === "GET" && path === "/health") {
-        sendJson(response, {
-          ok: true,
-          service: "granola-toolkit",
-          version: app.config ? undefined : undefined,
-        });
+        sendJson(
+          response,
+          {
+            ok: true,
+            service: "granola-toolkit",
+            version: app.config ? undefined : undefined,
+          },
+          { headers: originHeaders },
+        );
+        return;
+      }
+
+      if (method === "POST" && path === "/auth/unlock") {
+        if (!security.password) {
+          sendJson(response, { ok: true, passwordRequired: false }, { headers: originHeaders });
+          return;
+        }
+
+        const body = await readJsonBody(request);
+        const password =
+          typeof body.password === "string" && body.password.trim() ? body.password : undefined;
+        if (!password || password !== security.password) {
+          sendJson(
+            response,
+            {
+              authRequired: true,
+              error: "invalid server password",
+            },
+            { headers: originHeaders, status: 401 },
+          );
+          return;
+        }
+
+        sendJson(
+          response,
+          {
+            ok: true,
+            passwordRequired: true,
+          },
+          {
+            headers: {
+              ...originHeaders,
+              "set-cookie": passwordCookieHeader(security.password),
+            },
+          },
+        );
+        return;
+      }
+
+      if (
+        security.password &&
+        !publicRoute(path, enableWebClient) &&
+        !isPasswordAuthenticated(request, security.password)
+      ) {
+        sendJson(
+          response,
+          {
+            authRequired: true,
+            error: "server password required",
+          },
+          { headers: originHeaders, status: 401 },
+        );
         return;
       }
 
       if (method === "GET" && path === "/state") {
-        sendJson(response, app.getState());
+        sendJson(response, app.getState(), { headers: originHeaders });
         return;
       }
 
       if (method === "GET" && path === "/auth/status") {
-        sendJson(response, await app.inspectAuth());
+        sendJson(response, await app.inspectAuth(), { headers: originHeaders });
+        return;
+      }
+
+      if (method === "POST" && path === "/auth/lock") {
+        sendJson(
+          response,
+          { ok: true },
+          {
+            headers: {
+              ...originHeaders,
+              "set-cookie": clearPasswordCookieHeader(),
+            },
+          },
+        );
         return;
       }
 
@@ -199,6 +418,7 @@ export async function startGranolaServer(
           "cache-control": "no-cache, no-transform",
           connection: "keep-alive",
           "content-type": "text/event-stream; charset=utf-8",
+          ...originHeaders,
         });
         response.write(
           formatSseEvent({
@@ -232,15 +452,19 @@ export async function startGranolaServer(
           updatedFrom,
           updatedTo,
         });
-        sendJson(response, {
-          meetings: result.meetings,
-          refresh,
-          search,
-          source: result.source,
-          sort,
-          updatedFrom,
-          updatedTo,
-        });
+        sendJson(
+          response,
+          {
+            meetings: result.meetings,
+            refresh,
+            search,
+            source: result.source,
+            sort,
+            updatedFrom,
+            updatedTo,
+          },
+          { headers: originHeaders },
+        );
         return;
       }
 
@@ -253,7 +477,7 @@ export async function startGranolaServer(
         const meeting = await app.findMeeting(query, {
           requireCache: url.searchParams.get("includeTranscript") === "true",
         });
-        sendJson(response, meeting);
+        sendJson(response, meeting, { headers: originHeaders });
         return;
       }
 
@@ -266,7 +490,7 @@ export async function startGranolaServer(
         const meeting = await app.getMeeting(id, {
           requireCache: url.searchParams.get("includeTranscript") === "true",
         });
-        sendJson(response, meeting);
+        sendJson(response, meeting, { headers: originHeaders });
         return;
       }
 
@@ -276,37 +500,39 @@ export async function startGranolaServer(
           typeof body.supabasePath === "string" && body.supabasePath.trim()
             ? body.supabasePath.trim()
             : undefined;
-        sendJson(response, await app.loginAuth({ supabasePath }));
+        sendJson(response, await app.loginAuth({ supabasePath }), { headers: originHeaders });
         return;
       }
 
       if (method === "POST" && path === "/auth/logout") {
-        sendJson(response, await app.logoutAuth());
+        sendJson(response, await app.logoutAuth(), { headers: originHeaders });
         return;
       }
 
       if (method === "POST" && path === "/auth/refresh") {
-        sendJson(response, await app.refreshAuth());
+        sendJson(response, await app.refreshAuth(), { headers: originHeaders });
         return;
       }
 
       if (method === "POST" && path === "/auth/mode") {
         const body = await readJsonBody(request);
-        sendJson(response, await app.switchAuthMode(parseAuthMode(body.mode)));
+        sendJson(response, await app.switchAuthMode(parseAuthMode(body.mode)), {
+          headers: originHeaders,
+        });
         return;
       }
 
       if (method === "POST" && path === "/exports/notes") {
         const body = await readJsonBody(request);
         const result = await app.exportNotes(noteFormatFromBody(body.format));
-        sendJson(response, result, { status: 202 });
+        sendJson(response, result, { headers: originHeaders, status: 202 });
         return;
       }
 
       if (method === "GET" && path === "/exports/jobs") {
         const limit = parseInteger(url.searchParams.get("limit"));
         const result = await app.listExportJobs({ limit });
-        sendJson(response, result);
+        sendJson(response, result, { headers: originHeaders });
         return;
       }
 
@@ -317,21 +543,21 @@ export async function startGranolaServer(
         }
 
         const result = await app.rerunExportJob(id);
-        sendJson(response, result, { status: 202 });
+        sendJson(response, result, { headers: originHeaders, status: 202 });
         return;
       }
 
       if (method === "POST" && path === "/exports/transcripts") {
         const body = await readJsonBody(request);
         const result = await app.exportTranscripts(transcriptFormatFromBody(body.format));
-        sendJson(response, result, { status: 202 });
+        sendJson(response, result, { headers: originHeaders, status: 202 });
         return;
       }
 
-      sendText(response, "Not found\n", 404);
+      sendText(response, "Not found\n", 404, originHeaders);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      sendJson(response, { error: message }, { status: 400 });
+      sendJson(response, { error: message }, { headers: originHeaders, status: 400 });
     }
   });
 

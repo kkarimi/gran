@@ -1,4 +1,6 @@
 export const granolaWebClientScript = String.raw`
+const serverConfig = window.__GRANOLA_SERVER__ || { passwordRequired: false };
+
 const state = {
   appState: null,
   detailError: "",
@@ -10,6 +12,7 @@ const state = {
   selectedMeetingBundle: null,
   selectedMeetingId: null,
   meetingSource: "live",
+  serverLocked: Boolean(serverConfig.passwordRequired),
   sort: "updated-desc",
   updatedFrom: "",
   updatedTo: "",
@@ -29,9 +32,13 @@ const els = {
   quickOpenButton: document.querySelector("[data-quick-open-button]"),
   refreshButton: document.querySelector("[data-refresh]"),
   search: document.querySelector("[data-search]"),
+  securityPanel: document.querySelector("[data-security-panel]"),
+  serverPassword: document.querySelector("[data-server-password]"),
+  lockServerButton: document.querySelector("[data-lock-server]"),
   sort: document.querySelector("[data-sort]"),
   stateBadge: document.querySelector("[data-state-badge]"),
   transcriptButton: document.querySelector("[data-export-transcripts]"),
+  unlockServerButton: document.querySelector("[data-unlock-server]"),
   updatedFrom: document.querySelector("[data-updated-from]"),
   updatedTo: document.querySelector("[data-updated-to]"),
   workspaceTabs: document.querySelectorAll("[data-workspace-tab]"),
@@ -86,6 +93,7 @@ function renderAppState() {
   if (!state.appState) {
     els.appState.innerHTML = "<p>Waiting for server state…</p>";
     els.authPanel.innerHTML = "<p>Waiting for auth state…</p>";
+    renderSecurityPanel();
     return;
   }
 
@@ -114,8 +122,13 @@ function renderAppState() {
     "</div>",
   ].join("");
 
+  renderSecurityPanel();
   renderAuthPanel();
   renderExportJobs();
+}
+
+function renderSecurityPanel() {
+  els.securityPanel.hidden = !state.serverLocked;
 }
 
 function authActionButton(label, action, disabled) {
@@ -335,7 +348,14 @@ async function fetchJson(path, init) {
   const response = await fetch(path, init);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error || response.statusText || "Request failed");
+    if (payload.authRequired) {
+      state.serverLocked = true;
+      renderSecurityPanel();
+    }
+
+    const error = new Error(payload.error || response.statusText || "Request failed");
+    error.authRequired = Boolean(payload.authRequired);
+    throw error;
   }
   return payload;
 }
@@ -443,17 +463,28 @@ async function quickOpenMeeting() {
 
 async function refreshAll(forceLiveMeetings = false) {
   setStatus("Refreshing…", "busy");
-  const [appState, authState] = await Promise.all([
-    fetchJson("/state"),
-    fetchJson("/auth/status"),
-    loadMeetings({ refresh: forceLiveMeetings }),
-  ]);
-  state.appState = {
-    ...appState,
-    auth: authState,
-  };
-  renderAppState();
-  setStatus(forceLiveMeetings ? "Live data refreshed" : state.meetingSource === "index" ? "Loaded from index" : "Connected", "ok");
+  try {
+    const [appState, authState] = await Promise.all([
+      fetchJson("/state"),
+      fetchJson("/auth/status"),
+      loadMeetings({ refresh: forceLiveMeetings }),
+    ]);
+    state.serverLocked = false;
+    state.appState = {
+      ...appState,
+      auth: authState,
+    };
+    renderAppState();
+    setStatus(forceLiveMeetings ? "Live data refreshed" : state.meetingSource === "index" ? "Loaded from index" : "Connected", "ok");
+  } catch (error) {
+    if (error.authRequired) {
+      setStatus("Server locked", "error");
+      renderSecurityPanel();
+      return;
+    }
+
+    throw error;
+  }
 }
 
 async function syncAuthState() {
@@ -555,6 +586,50 @@ async function switchAuthMode(mode) {
   }
 }
 
+async function unlockServer() {
+  const password = els.serverPassword.value;
+  if (!password.trim()) {
+    setStatus("Enter the server password", "error");
+    return;
+  }
+
+  setStatus("Unlocking server…", "busy");
+  try {
+    await fetchJson("/auth/unlock", {
+      body: JSON.stringify({ password }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    els.serverPassword.value = "";
+    state.serverLocked = false;
+    await refreshAll(true);
+  } catch (error) {
+    setStatus("Unlock failed", "error");
+    state.detailError = error instanceof Error ? error.message : String(error);
+    renderMeetingDetail();
+  }
+}
+
+async function lockServer() {
+  try {
+    await fetchJson("/auth/lock", {
+      method: "POST",
+    });
+  } catch {}
+
+  state.serverLocked = true;
+  state.appState = null;
+  state.meetings = [];
+  state.selectedMeeting = null;
+  state.selectedMeetingBundle = null;
+  state.detailError = "";
+  els.serverPassword.value = "";
+  renderSecurityPanel();
+  renderMeetingList();
+  renderMeetingDetail();
+  setStatus("Server locked", "error");
+}
+
 els.list.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) {
     return;
@@ -606,6 +681,25 @@ els.authPanel.addEventListener("click", (event) => {
   }
 
   void switchAuthMode(modeButton.dataset.authMode);
+});
+
+els.unlockServerButton.addEventListener("click", () => {
+  void unlockServer();
+});
+
+els.lockServerButton.addEventListener("click", () => {
+  void lockServer();
+});
+
+els.serverPassword.addEventListener("keydown", (event) => {
+  if (!(event.target instanceof HTMLInputElement)) {
+    return;
+  }
+
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void unlockServer();
+  }
 });
 
 els.refreshButton.addEventListener("click", () => {
@@ -754,6 +848,7 @@ events.addEventListener("error", () => {
 });
 
 syncFilterInputs();
+renderSecurityPanel();
 
 void refreshAll().catch((error) => {
   setStatus("Error", "error");

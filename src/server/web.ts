@@ -2,7 +2,7 @@ import { granolaWebClientScript } from "../web/client-script.ts";
 import { granolaWebMarkup } from "../web/markup.ts";
 import { granolaWebStyles } from "../web/styles.ts";
 
-export function renderGranolaWebPage(): string {
+export function renderGranolaWebPage(options: { serverPasswordRequired?: boolean } = {}): string {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -16,6 +16,9 @@ ${granolaWebStyles}
   <body>
 ${granolaWebMarkup}
     <script type="module">
+window.__GRANOLA_SERVER__ = ${JSON.stringify({
+    passwordRequired: options.serverPasswordRequired ?? false,
+  })};
 ${granolaWebClientScript}
     </script>
   </body>

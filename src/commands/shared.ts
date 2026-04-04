@@ -25,6 +25,45 @@ export function pickHostname(value: string | boolean | undefined, fallback = "12
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+export type ServerNetworkMode = "lan" | "local";
+
+export function parseNetworkMode(
+  value: string | boolean | undefined,
+  fallback: ServerNetworkMode = "local",
+): ServerNetworkMode {
+  switch (value) {
+    case undefined:
+      return fallback;
+    case "lan":
+    case "local":
+      return value;
+    default:
+      throw new Error("invalid network mode: expected local or lan");
+  }
+}
+
+export function resolveServerHostname(
+  networkMode: ServerNetworkMode,
+  hostnameFlag: string | boolean | undefined,
+): string {
+  if (hostnameFlag !== undefined) {
+    return pickHostname(hostnameFlag, networkMode === "lan" ? "0.0.0.0" : "127.0.0.1");
+  }
+
+  return networkMode === "lan" ? "0.0.0.0" : "127.0.0.1";
+}
+
+export function parseTrustedOrigins(value: string | boolean | undefined): string[] {
+  if (typeof value !== "string" || !value.trim()) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
 export async function waitForShutdown(close: () => Promise<void>): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let closing = false;

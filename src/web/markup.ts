@@ -52,6 +52,19 @@ export const granolaWebMarkup = String.raw`
       </div>
       <p>Initial beta web client. It speaks to the same local API that future TUI and attach flows will use.</p>
     </section>
+    <section class="security-panel" data-security-panel hidden>
+      <div class="security-panel__head">
+        <h3>Server Access</h3>
+        <p>This server is locked with a password. Unlock it to load meetings and live state.</p>
+      </div>
+      <div class="security-panel__body">
+        <input class="field-input" data-server-password type="password" placeholder="Server password" />
+        <div class="toolbar-actions">
+          <button class="button button--primary" data-unlock-server>Unlock</button>
+          <button class="button button--secondary" data-lock-server>Lock</button>
+        </div>
+      </div>
+    </section>
     <section class="auth-panel">
       <div class="auth-panel__head">
         <h3>Auth Session</h3>
