@@ -28,9 +28,13 @@ granola meeting list --folder Team
 `meeting` combines API-backed notes with the local transcript cache so you can inspect one meeting
 at a time.
 
+Once you have run `granola sync`, the toolkit also keeps a local full-text search dataset for
+titles, notes, transcripts, folders, and tags.
+
 Examples:
 
 ```bash
+granola search planning decision
 granola meeting list --limit 10
 granola meeting list --search planning
 granola meeting view 1234abcd
@@ -45,7 +49,9 @@ granola meeting open 1234abcd
 Folders also drive interactive navigation:
 
 - the browser workspace has a dedicated folder pane plus an All meetings scope
+- the browser search box uses the shared local search dataset when it is available
 - the TUI keeps folders inside the navigation flow instead of treating them as an afterthought
+- TUI quick open falls back to the local search dataset when a title or id lookup is not enough
 - URL state and attach flows preserve folder and meeting selection
 
 ## Why This Matters

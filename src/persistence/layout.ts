@@ -11,6 +11,7 @@ export interface GranolaToolkitPersistenceLayout {
   dataDirectory: string;
   exportJobsFile: string;
   meetingIndexFile: string;
+  searchIndexFile: string;
   sessionFile: string;
   sessionStoreKind: GranolaToolkitSessionStoreKind;
   syncEventsFile: string;
@@ -46,6 +47,7 @@ export function defaultGranolaToolkitPersistenceLayout(
     dataDirectory,
     exportJobsFile: join(dataDirectory, "export-jobs.json"),
     meetingIndexFile: join(dataDirectory, "meeting-index.json"),
+    searchIndexFile: join(dataDirectory, "search-index.json"),
     sessionFile: join(dataDirectory, "session.json"),
     sessionStoreKind: targetPlatform === "darwin" ? "keychain" : "file",
     syncEventsFile: join(dataDirectory, "sync-events.jsonl"),

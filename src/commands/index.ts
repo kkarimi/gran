@@ -5,6 +5,7 @@ import { exportsCommand } from "./exports.ts";
 import { folderCommand } from "./folder.ts";
 import { meetingCommand } from "./meeting.ts";
 import { notesCommand } from "./notes.ts";
+import { searchCommand } from "./search.ts";
 import { serveCommand } from "./serve.ts";
 import { syncCommand } from "./sync.ts";
 import { tuiCommand } from "./tui.ts";
@@ -19,6 +20,7 @@ export const commands = [
   folderCommand,
   meetingCommand,
   notesCommand,
+  searchCommand,
   serveCommand,
   syncCommand,
   tuiCommand,

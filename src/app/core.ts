@@ -74,6 +74,14 @@ import {
 } from "../sync-state.ts";
 import { createDefaultSyncEventStore, type SyncEventStore } from "../sync-events.ts";
 import { buildSyncEvents, diffMeetingSummaries } from "../sync.ts";
+import {
+  buildSearchIndex,
+  createDefaultSearchIndexStore,
+  meetingIdsFromSearchResults,
+  searchSearchIndex,
+  type GranolaSearchIndexEntry,
+  type SearchIndexStore,
+} from "../search-index.ts";
 import { writeTranscripts } from "../transcripts.ts";
 import type {
   AppConfig,
@@ -113,6 +121,7 @@ import type {
   GranolaAppSurface,
   GranolaFolderListOptions,
   GranolaFolderListResult,
+  GranolaMeetingSort,
   GranolaMeetingBundle,
   GranolaMeetingListOptions,
   GranolaMeetingListResult,
@@ -144,6 +153,8 @@ interface GranolaAppDependencies {
   meetingIndex?: MeetingSummaryRecord[];
   meetingIndexStore?: MeetingIndexStore;
   now?: () => Date;
+  searchIndex?: GranolaSearchIndexEntry[];
+  searchIndexStore?: SearchIndexStore;
   syncEventStore?: SyncEventStore;
   syncState?: GranolaAppSyncState;
   syncStateStore?: SyncStateStore;
@@ -293,6 +304,7 @@ export class GranolaApp implements GranolaAppApi {
   #granolaClient?: GranolaRemoteClient;
   #documents?: GranolaDocument[];
   #meetingIndex: MeetingSummaryRecord[];
+  #searchIndex: GranolaSearchIndexEntry[];
   #listeners = new Set<(event: GranolaAppStateEvent) => void>();
   #refreshingMeetingIndex?: Promise<void>;
   readonly #state: GranolaAppState;
@@ -329,6 +341,12 @@ export class GranolaApp implements GranolaAppApi {
       runsFile: defaultAutomationRunsFilePath(),
     };
     this.#meetingIndex = (deps.meetingIndex ?? []).map((meeting) => cloneMeetingSummary(meeting));
+    this.#searchIndex = (deps.searchIndex ?? []).map((entry) => ({
+      ...entry,
+      folderIds: [...entry.folderIds],
+      folderNames: [...entry.folderNames],
+      tags: [...entry.tags],
+    }));
     this.#state.index = {
       available: this.#meetingIndex.length > 0,
       filePath: defaultMeetingIndexFilePath(),
@@ -588,6 +606,19 @@ export class GranolaApp implements GranolaAppApi {
     }
 
     this.emitStateUpdate();
+  }
+
+  private async persistSearchIndex(entries: GranolaSearchIndexEntry[]): Promise<void> {
+    this.#searchIndex = entries.map((entry) => ({
+      ...entry,
+      folderIds: [...entry.folderIds],
+      folderNames: [...entry.folderNames],
+      tags: [...entry.tags],
+    }));
+
+    if (this.deps.searchIndexStore) {
+      await this.deps.searchIndexStore.writeIndex(this.#searchIndex);
+    }
   }
 
   private async liveMeetingSnapshot(options: { forceRefresh?: boolean } = {}): Promise<{
@@ -1347,6 +1378,12 @@ export class GranolaApp implements GranolaAppApi {
         forceRefresh: options.forceRefresh ?? true,
       });
       await this.persistMeetingIndex(snapshot.meetings);
+      await this.persistSearchIndex(
+        buildSearchIndex(snapshot.documents, {
+          cacheData: snapshot.cacheData,
+          foldersByDocumentId: this.buildFoldersByDocumentId(snapshot.folders),
+        }),
+      );
       const { changes, summary } = diffMeetingSummaries(
         previousMeetings,
         snapshot.meetings,
@@ -1543,13 +1580,61 @@ export class GranolaApp implements GranolaAppApi {
     return await this.getFolder(summary.id);
   }
 
+  private indexedMeetingsForSearch(options: {
+    folderId?: string;
+    limit?: number;
+    search: string;
+    sort?: GranolaMeetingSort;
+    updatedFrom?: string;
+    updatedTo?: string;
+  }): MeetingSummaryRecord[] {
+    const rankedIds = meetingIdsFromSearchResults(
+      searchSearchIndex(this.#searchIndex, options.search),
+    );
+    const rankById = new Map(rankedIds.map((id, index) => [id, index] as const));
+    const baseMeetings = this.#meetingIndex.filter((meeting) => rankById.has(meeting.id));
+    const rankedMeetings = [...baseMeetings].sort((left, right) => {
+      const leftRank = rankById.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+      const rightRank = rankById.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+
+      return right.updatedAt.localeCompare(left.updatedAt);
+    });
+
+    return filterMeetingSummaries(rankedMeetings, {
+      folderId: options.folderId,
+      limit: options.limit,
+      sort: options.sort,
+      updatedFrom: options.updatedFrom,
+      updatedTo: options.updatedTo,
+    });
+  }
+
   async listMeetings(options: GranolaMeetingListOptions = {}): Promise<GranolaMeetingListResult> {
     const preferIndex =
       options.preferIndex ??
       (this.#state.ui.surface === "web" || this.#state.ui.surface === "server");
+    const canUseSearchIndex =
+      Boolean(options.search?.trim()) && !options.forceRefresh && this.#searchIndex.length > 0;
 
-    if (!options.forceRefresh && preferIndex && !this.#documents && this.#meetingIndex.length > 0) {
-      const meetings = filterMeetingSummaries(this.#meetingIndex, options);
+    if (
+      !options.forceRefresh &&
+      preferIndex &&
+      this.#meetingIndex.length > 0 &&
+      (canUseSearchIndex || !this.#documents)
+    ) {
+      const meetings = canUseSearchIndex
+        ? this.indexedMeetingsForSearch({
+            folderId: options.folderId,
+            limit: options.limit,
+            search: options.search!,
+            sort: options.sort,
+            updatedFrom: options.updatedFrom,
+            updatedTo: options.updatedTo,
+          })
+        : filterMeetingSummaries(this.#meetingIndex, options);
       this.setUiState({
         folderSearch: undefined,
         meetingListSource: "index",
@@ -1667,7 +1752,19 @@ export class GranolaApp implements GranolaAppApi {
     query: string,
     options: { requireCache?: boolean } = {},
   ): Promise<GranolaMeetingBundle> {
-    const bundle = await this.readMeetingBundleByQuery(query, options);
+    let bundle: GranolaMeetingBundle;
+    try {
+      bundle = await this.readMeetingBundleByQuery(query, options);
+    } catch (error) {
+      const fallbackId = meetingIdsFromSearchResults(
+        searchSearchIndex(this.#searchIndex, query),
+      )[0];
+      if (!fallbackId) {
+        throw error;
+      }
+
+      bundle = await this.readMeetingBundleById(fallbackId, options);
+    }
 
     this.setUiState({
       selectedFolderId: bundle.meeting.meeting.folders[0]?.id,
@@ -1959,6 +2056,8 @@ export async function createGranolaApp(
   const exportJobs = await exportJobStore.readJobs();
   const meetingIndexStore = createDefaultMeetingIndexStore();
   const meetingIndex = await meetingIndexStore.readIndex();
+  const searchIndexStore = createDefaultSearchIndexStore();
+  const searchIndex = await searchIndexStore.readIndex();
   const syncEventStore = createDefaultSyncEventStore();
   const syncStateStore = createDefaultSyncStateStore();
   const syncState = await syncStateStore.readState();
@@ -1984,6 +2083,8 @@ export async function createGranolaApp(
       meetingIndex,
       meetingIndexStore,
       now: options.now,
+      searchIndex,
+      searchIndexStore,
       syncEventStore,
       syncState,
       syncStateStore,

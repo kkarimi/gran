@@ -10,6 +10,7 @@ import { MemoryAutomationRunStore } from "../src/automation-runs.ts";
 import { MemoryAutomationRuleStore } from "../src/automation-rules.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
 import { MemoryMeetingIndexStore } from "../src/meeting-index.ts";
+import { MemorySearchIndexStore } from "../src/search-index.ts";
 import { MemorySyncEventStore } from "../src/sync-events.ts";
 import { MemorySyncStateStore } from "../src/sync-state.ts";
 import type { GranolaAppAuthState } from "../src/app/index.ts";
@@ -347,6 +348,97 @@ describe("GranolaApp", () => {
       }),
     );
     expect(app.getState().ui.view).toBe("sync");
+  });
+
+  test("uses the local search index for meeting list search and quick-open fallback", async () => {
+    const meetingIndexStore = new MemoryMeetingIndexStore();
+    const searchIndexStore = new MemorySearchIndexStore();
+    const searchableDocuments: GranolaDocument[] = [
+      {
+        ...documents[0]!,
+        notesPlain: "Customer onboarding timeline and retention risks",
+      },
+      {
+        content: "Other note body",
+        createdAt: "2024-01-02T09:00:00Z",
+        id: "doc-bravo-2222",
+        notes: {
+          content: [
+            {
+              content: [{ text: "Quarterly pipeline review", type: "text" }],
+              type: "paragraph",
+            },
+          ],
+          type: "doc",
+        },
+        notesPlain: "Quarterly pipeline review",
+        tags: ["sales"],
+        title: "Bravo Review",
+        updatedAt: "2024-01-04T10:00:00Z",
+      },
+    ];
+    const searchFolders: GranolaFolder[] = [
+      folders[0]!,
+      {
+        createdAt: "2024-01-02T08:00:00Z",
+        documentIds: ["doc-bravo-2222"],
+        id: "folder-sales-2222",
+        isFavourite: false,
+        name: "Sales",
+        updatedAt: "2024-01-05T10:00:00Z",
+        workspaceId: "workspace-1",
+      },
+    ];
+
+    const app = new GranolaApp(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => searchableDocuments,
+          listFolders: async () => searchFolders,
+        },
+        meetingIndexStore,
+        now: () => new Date("2024-03-01T12:00:00Z"),
+        searchIndexStore,
+      },
+      { surface: "server" },
+    );
+
+    await app.sync();
+    const searchResults = await app.listMeetings({
+      limit: 10,
+      preferIndex: true,
+      search: "customer onboarding",
+    });
+    const meeting = await app.findMeeting("customer onboarding");
+
+    expect(searchResults.source).toBe("index");
+    expect(searchResults.meetings).toEqual([
+      expect.objectContaining({
+        id: "doc-alpha-1111",
+      }),
+    ]);
+    expect(meeting.document.id).toBe("doc-alpha-1111");
+    expect((await searchIndexStore.readIndex())[0]?.id).toBe("doc-bravo-2222");
   });
 
   test("matches automation rules from sync events", async () => {

@@ -7,6 +7,7 @@ import { authCommand } from "../src/commands/auth.ts";
 import { exportsCommand } from "../src/commands/exports.ts";
 import { meetingCommand } from "../src/commands/meeting.ts";
 import { notesCommand } from "../src/commands/notes.ts";
+import { searchCommand } from "../src/commands/search.ts";
 import { serveCommand } from "../src/commands/serve.ts";
 import { syncCommand } from "../src/commands/sync.ts";
 import { tuiCommand } from "../src/commands/tui.ts";
@@ -732,6 +733,60 @@ describe("command execution", () => {
       note: "Approved from CLI",
     });
     expect(log).toHaveBeenCalledWith("Approved Review transcript for Alpha Sync (sync-1:1:review)");
+  });
+
+  test("search command uses the local index-backed meeting search flow", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      findFolder: vi.fn(async () => ({
+        id: "folder-team-1111",
+        name: "Team",
+      })),
+      getState: () => ({
+        auth: {
+          mode: "api-key",
+        },
+      }),
+      listMeetings: vi.fn(async () => ({
+        meetings: [
+          {
+            createdAt: "2024-01-01T09:00:00Z",
+            folders: [],
+            id: "doc-alpha-1111",
+            noteContentSource: "notes",
+            tags: ["team", "customer"],
+            title: "Alpha Sync",
+            transcriptLoaded: true,
+            transcriptSegmentCount: 1,
+            updatedAt: "2024-01-03T10:00:00Z",
+          },
+        ],
+        source: "index" as const,
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await searchCommand.run(
+      makeContext({
+        commandArgs: ["customer", "onboarding"],
+        commandFlags: {
+          folder: "Team",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.findFolder).toHaveBeenCalledWith("Team");
+    expect(app.listMeetings).toHaveBeenCalledWith({
+      folderId: "folder-team-1111",
+      limit: 20,
+      preferIndex: true,
+      search: "customer onboarding",
+    });
+    expect(log).toHaveBeenCalledWith("Searched the local index");
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Alpha Sync"));
   });
 
   test("tui command reuses the background sync loop and stops it on exit", async () => {
