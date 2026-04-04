@@ -3,12 +3,15 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { build } from "vite-plus";
 import solid from "vite-plugin-solid";
 
 const root = resolve(import.meta.dirname, "..");
 const outputFile = resolve(root, "src/web/generated.ts");
+const entryFile = process.argv[1] ? resolve(process.argv[1]) : "";
+const isEntrypoint = entryFile === fileURLToPath(import.meta.url);
 const checkModeIndex = process.argv.indexOf("--check");
 const checkMode = checkModeIndex !== -1;
 if (checkMode) {
@@ -39,7 +42,7 @@ async function buildAssets() {
       },
       configFile: false,
       mode: "production",
-      plugins: [solid()],
+      plugins: [solid({ dev: false })],
       root,
     });
 
@@ -77,9 +80,11 @@ async function main() {
   await writeFile(outputFile, next, "utf8");
 }
 
-try {
-  await main();
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+if (isEntrypoint) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }

@@ -23,6 +23,7 @@ describe("web bundle generation", () => {
     );
 
     expect(script).toContain('mode: "production"');
+    expect(script).toContain("const isEntrypoint = entryFile === fileURLToPath(import.meta.url);");
     expect(script).toContain("process.argv.splice(checkModeIndex, 1);");
   });
 });
