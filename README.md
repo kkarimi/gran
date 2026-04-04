@@ -20,7 +20,7 @@ The published package exposes both `granola` and `granola-toolkit` as executable
 ## Quick Start
 
 ```bash
-granola auth login
+granola auth login --api-key grn_...
 granola sync
 granola sync --watch
 granola folder list
@@ -29,6 +29,9 @@ granola notes --folder Team
 granola web
 granola tui
 ```
+
+If you prefer to reuse the desktop app session instead, `granola auth login` still imports it from
+`supabase.json`.
 
 ## Documentation
 

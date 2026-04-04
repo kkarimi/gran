@@ -259,7 +259,7 @@ export interface GranolaAppApi {
   inspectAuth(): Promise<GranolaAppAuthState>;
   listSyncEvents(options?: { limit?: number }): Promise<GranolaAppSyncEventsResult>;
   inspectSync(): Promise<GranolaAppSyncState>;
-  loginAuth(options?: { supabasePath?: string }): Promise<GranolaAppAuthState>;
+  loginAuth(options?: { apiKey?: string; supabasePath?: string }): Promise<GranolaAppAuthState>;
   logoutAuth(): Promise<GranolaAppAuthState>;
   refreshAuth(): Promise<GranolaAppAuthState>;
   switchAuthMode(mode: GranolaAppAuthMode): Promise<GranolaAppAuthState>;

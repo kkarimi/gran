@@ -36,12 +36,14 @@ export interface LastViewedPanel {
 export interface GranolaDocument {
   content: string;
   createdAt: string;
+  folderMemberships?: GranolaFolderMembership[];
   id: string;
   lastViewedPanel?: LastViewedPanel;
   notes?: ProseMirrorDoc;
   notesPlain: string;
   tags: string[];
   title: string;
+  transcriptSegments?: TranscriptSegment[];
   updatedAt: string;
 }
 
@@ -54,6 +56,11 @@ export interface GranolaFolder {
   name: string;
   updatedAt: string;
   workspaceId?: string;
+}
+
+export interface GranolaFolderMembership {
+  id: string;
+  name: string;
 }
 
 export interface TranscriptSegment {
@@ -105,6 +112,7 @@ export interface TranscriptOptions {
 }
 
 export interface AppConfig {
+  apiKey?: string;
   configFileUsed?: string;
   debug: boolean;
   notes: NotesOptions;

@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Install the toolkit, import auth once, and start from folders or meetings instead of raw files.
+description: Install the toolkit, set up auth once, and start from folders or meetings instead of raw files.
 ---
 
 ## Install
@@ -20,12 +20,15 @@ The package exposes both `granola` and `granola-toolkit` as executable names.
 
 ## First Run
 
-Import the desktop app session once:
+Store a Granola Personal API key once:
 
 ```bash
-granola auth login
+granola auth login --api-key grn_...
 granola auth status
 ```
+
+If you prefer to reuse the desktop app session, `granola auth login` still imports it from
+`supabase.json`.
 
 Then verify that folders and meetings resolve cleanly:
 

@@ -793,6 +793,83 @@ describe("GranolaApp", () => {
     expect(app.getState().auth.mode).toBe("supabase-file");
   });
 
+  test("derives folders and transcript detail from API-key style documents", async () => {
+    const app = new GranolaApp(
+      {
+        apiKey: "grn_test_123",
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          apiKeyAvailable: true,
+          mode: "api-key",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: false,
+        },
+        cacheLoader: async () => undefined,
+        granolaClient: {
+          listDocuments: async () => [
+            {
+              content: "## API Key Meeting",
+              createdAt: "2024-01-01T00:00:00Z",
+              folderMemberships: [
+                {
+                  id: "fol_12345678901234",
+                  name: "Product",
+                },
+              ],
+              id: "not_1d3tmYTlCICgjy",
+              notesPlain: "API Key Meeting",
+              tags: [],
+              title: "API Key Meeting",
+              transcriptSegments: [
+                {
+                  documentId: "not_1d3tmYTlCICgjy",
+                  endTimestamp: "2024-01-01T00:01:00Z",
+                  id: "segment-1",
+                  isFinal: true,
+                  source: "microphone",
+                  startTimestamp: "2024-01-01T00:00:00Z",
+                  text: "Hello from the API key path",
+                },
+              ],
+              updatedAt: "2024-01-02T00:00:00Z",
+            },
+          ],
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+    );
+
+    const folders = await app.listFolders({ limit: 10 });
+    const meeting = await app.getMeeting("not_1d3tmYTlCICgjy");
+
+    expect(folders.folders).toEqual([
+      expect.objectContaining({
+        documentCount: 1,
+        id: "fol_12345678901234",
+        name: "Product",
+      }),
+    ]);
+    expect(meeting.meeting.meeting.folders).toEqual([
+      expect.objectContaining({
+        id: "fol_12345678901234",
+        name: "Product",
+      }),
+    ]);
+    expect(meeting.meeting.transcriptText).toContain("Hello from the API key path");
+    expect(meeting.meeting.meeting.transcriptLoaded).toBe(true);
+  });
+
   test("uses the local meeting index as a fast path for web surfaces", async () => {
     const listDocuments = vi.fn(async () => documents);
     const meetingIndexStore = new MemoryMeetingIndexStore();

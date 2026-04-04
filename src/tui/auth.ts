@@ -11,7 +11,13 @@ import type { GranolaAppAuthState } from "../app/index.ts";
 
 import { granolaTuiTheme } from "./theme.ts";
 
-export type GranolaTuiAuthActionId = "login" | "logout" | "refresh" | "use-stored" | "use-supabase";
+export type GranolaTuiAuthActionId =
+  | "login"
+  | "logout"
+  | "refresh"
+  | "use-api-key"
+  | "use-stored"
+  | "use-supabase";
 
 export interface GranolaTuiAuthAction {
   description: string;
@@ -47,6 +53,11 @@ function actionDisabledReason(auth: GranolaAppAuthState, actionId: GranolaTuiAut
         return "stored session missing";
       }
       return auth.refreshAvailable ? "" : "refresh unavailable";
+    case "use-api-key":
+      if (!auth.apiKeyAvailable) {
+        return "API key missing";
+      }
+      return auth.mode === "api-key" ? "already active" : "";
     case "use-stored":
       if (!auth.storedSessionAvailable) {
         return "stored session missing";
@@ -58,7 +69,7 @@ function actionDisabledReason(auth: GranolaAppAuthState, actionId: GranolaTuiAut
       }
       return auth.mode === "supabase-file" ? "already active" : "";
     case "logout":
-      return auth.storedSessionAvailable ? "" : "stored session missing";
+      return auth.apiKeyAvailable || auth.storedSessionAvailable ? "" : "no stored credentials";
   }
 }
 
@@ -82,21 +93,27 @@ export function buildGranolaTuiAuthActions(auth: GranolaAppAuthState): GranolaTu
       label: "Refresh stored session",
     },
     {
+      description: "Switch the active auth source to the stored API key",
+      id: "use-api-key",
+      key: "3",
+      label: "Use API key",
+    },
+    {
       description: "Switch the active auth source to the stored session",
       id: "use-stored",
-      key: "3",
+      key: "4",
       label: "Use stored session",
     },
     {
       description: "Switch the active auth source to supabase.json",
       id: "use-supabase",
-      key: "4",
+      key: "5",
       label: "Use supabase.json",
     },
     {
-      description: "Delete the stored session and fall back to supabase.json",
+      description: "Delete stored credentials and fall back to configured sources",
       id: "logout",
-      key: "5",
+      key: "6",
       label: "Sign out",
     },
   ];
@@ -112,9 +129,15 @@ export function buildGranolaTuiAuthActions(auth: GranolaAppAuthState): GranolaTu
 }
 
 export function renderGranolaTuiAuthState(auth: GranolaAppAuthState): string {
-  const mode = auth.mode === "stored-session" ? "Stored session" : "supabase.json";
+  const mode =
+    auth.mode === "api-key"
+      ? "API key"
+      : auth.mode === "stored-session"
+        ? "Stored session"
+        : "supabase.json";
   const lines = [
     `Active source: ${mode}`,
+    `API key: ${auth.apiKeyAvailable ? "available" : "missing"}`,
     `Stored session: ${auth.storedSessionAvailable ? "available" : "missing"}`,
     `supabase.json: ${auth.supabaseAvailable ? "available" : "missing"}`,
     `Refresh: ${auth.refreshAvailable ? "available" : "missing"}`,

@@ -215,7 +215,9 @@ export class GranolaServerClient implements GranolaAppApi {
     return await this.requestJson(path);
   }
 
-  async loginAuth(options: { supabasePath?: string } = {}): Promise<GranolaAppAuthState> {
+  async loginAuth(
+    options: { apiKey?: string; supabasePath?: string } = {},
+  ): Promise<GranolaAppAuthState> {
     return await this.requestJson(granolaTransportPaths.authLogin, {
       body: JSON.stringify(options),
       headers: {

@@ -135,7 +135,12 @@ export function buildGranolaTuiSummary(
   state: GranolaAppState,
   meetingSource: MeetingSummarySource,
 ): string {
-  const authMode = state.auth.mode === "stored-session" ? "stored" : "supabase";
+  const authMode =
+    state.auth.mode === "api-key"
+      ? "key"
+      : state.auth.mode === "stored-session"
+        ? "stored"
+        : "supabase";
   const documents = state.documents.loaded ? `${state.documents.count} docs` : "docs pending";
   const folders = state.folders.loaded ? `${state.folders.count} folders` : "folders pending";
   const cache = state.cache.loaded

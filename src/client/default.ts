@@ -7,6 +7,7 @@ import { granolaSupabaseCandidates } from "../utils.ts";
 
 import {
   CachedTokenProvider,
+  createDefaultApiKeyStore,
   createDefaultSessionStore,
   NoopTokenStore,
   StoredSessionTokenProvider,
@@ -20,11 +21,15 @@ import {
   type DefaultGranolaAuthInfo,
 } from "./default-auth.ts";
 import { GranolaApiClient } from "./granola.ts";
+import { GranolaPublicApiClient } from "./granola-public.ts";
 import { AuthenticatedHttpClient } from "./http.ts";
+
+export type DefaultGranolaClient = Pick<GranolaApiClient, "listDocuments"> &
+  Partial<Pick<GranolaApiClient, "listFolders">>;
 
 export interface DefaultGranolaRuntime {
   auth: DefaultGranolaAuthInfo;
-  client: GranolaApiClient;
+  client: DefaultGranolaClient;
 }
 
 export async function createDefaultGranolaRuntime(
@@ -38,14 +43,52 @@ export async function createDefaultGranolaRuntime(
     preferredMode: options.preferredMode,
   });
 
-  if (!auth.storedSessionAvailable && !config.supabase) {
+  if (!auth.apiKeyAvailable && !auth.storedSessionAvailable && !config.supabase) {
     throw new Error(
-      `supabase.json not found. Pass --supabase or create .granola.toml. Expected locations include: ${granolaSupabaseCandidates().join(", ")}`,
+      `Granola credentials not found. Set --api-key or GRANOLA_API_KEY, use granola auth login --api-key, or fall back to --supabase. Expected supabase locations include: ${granolaSupabaseCandidates().join(", ")}`,
     );
   }
 
-  if (!auth.storedSessionAvailable && config.supabase && !existsSync(config.supabase)) {
+  if (
+    config.supabase &&
+    !existsSync(config.supabase) &&
+    !auth.apiKeyAvailable &&
+    !auth.storedSessionAvailable
+  ) {
     throw new Error(`supabase.json not found: ${config.supabase}`);
+  }
+
+  if (
+    auth.mode !== "api-key" &&
+    !auth.storedSessionAvailable &&
+    config.supabase &&
+    !existsSync(config.supabase)
+  ) {
+    throw new Error(`supabase.json not found: ${config.supabase}`);
+  }
+
+  if (auth.mode === "api-key") {
+    const apiKeyStore = createDefaultApiKeyStore();
+    const apiKey = config.apiKey?.trim() || (await apiKeyStore.readApiKey());
+    if (!apiKey) {
+      throw new Error(
+        "Granola API key not found. Set --api-key or GRANOLA_API_KEY, or run granola auth login --api-key <token>.",
+      );
+    }
+
+    return {
+      auth,
+      client: new GranolaPublicApiClient(
+        new AuthenticatedHttpClient({
+          logger,
+          tokenProvider: new CachedTokenProvider({
+            async loadAccessToken() {
+              return apiKey;
+            },
+          }),
+        }),
+      ),
+    };
   }
 
   const sessionStore = createDefaultSessionStore();
@@ -80,7 +123,7 @@ export function createDefaultGranolaAuth(config: AppConfig): DefaultGranolaAuthC
 export async function createDefaultGranolaApiClient(
   config: AppConfig,
   logger: Pick<Console, "warn"> = console,
-): Promise<GranolaApiClient> {
+): Promise<DefaultGranolaClient> {
   return (await createDefaultGranolaRuntime(config, logger)).client;
 }
 

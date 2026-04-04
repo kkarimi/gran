@@ -253,7 +253,7 @@ describe("command execution", () => {
     );
   });
 
-  test("auth command returns a failing exit code when no stored session is available", async () => {
+  test("auth command succeeds when any configured auth source is available", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const app = {
       inspectAuth: vi.fn(async () => ({
@@ -274,9 +274,41 @@ describe("command execution", () => {
       }),
     );
 
-    expect(exitCode).toBe(1);
+    expect(exitCode).toBe(0);
     expect(log).toHaveBeenCalledWith("Active source: supabase.json");
+    expect(log).toHaveBeenCalledWith("API key: missing");
     expect(log).toHaveBeenCalledWith("Stored session: missing");
+  });
+
+  test("auth login forwards an API key to the app layer", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      loginAuth: vi.fn(async () => ({
+        apiKeyAvailable: true,
+        mode: "api-key",
+        refreshAvailable: false,
+        storedSessionAvailable: false,
+        supabaseAvailable: false,
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await authCommand.run(
+      makeContext({
+        commandArgs: ["login"],
+        commandFlags: {
+          "api-key": "grn_test_123",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.loginAuth).toHaveBeenCalledWith({
+      apiKey: "grn_test_123",
+    });
+    expect(log).toHaveBeenCalledWith("Stored Granola API key");
   });
 
   test("meeting command lists meetings inside a resolved folder", async () => {

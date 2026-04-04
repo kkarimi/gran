@@ -7,6 +7,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   CachedTokenProvider,
   getSessionFromSupabaseContents,
+  MemoryApiKeyStore,
   MemorySessionStore,
   MemoryTokenStore,
   SupabaseContentsSessionSource,
@@ -219,6 +220,49 @@ describe("CachedTokenProvider", () => {
         lastError: "failed to refresh session: 400 Bad Request",
         mode: "stored-session",
         storedSessionAvailable: true,
+      }),
+    );
+  });
+
+  test("stores and prefers a Granola API key", async () => {
+    const apiKeyStore = new MemoryApiKeyStore();
+    const controller = createDefaultGranolaAuthController(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        apiKeyStore,
+        sessionStore: new MemorySessionStore(),
+      },
+    );
+
+    const loggedIn = await controller.login({
+      apiKey: "grn_test_123",
+    });
+
+    expect(loggedIn).toEqual(
+      expect.objectContaining({
+        apiKeyAvailable: true,
+        mode: "api-key",
+        storedSessionAvailable: false,
+        supabaseAvailable: false,
+      }),
+    );
+    await expect(apiKeyStore.readApiKey()).resolves.toBe("grn_test_123");
+
+    const loggedOut = await controller.logout();
+    expect(loggedOut).toEqual(
+      expect.objectContaining({
+        apiKeyAvailable: false,
+        mode: "api-key",
       }),
     );
   });

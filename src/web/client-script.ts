@@ -120,7 +120,12 @@ function renderAppState() {
   }
 
   const appState = state.appState;
-  const authMode = appState.auth.mode === "stored-session" ? "Stored session" : "supabase.json";
+  const authMode =
+    appState.auth.mode === "api-key"
+      ? "API key"
+      : appState.auth.mode === "stored-session"
+        ? "Stored session"
+        : "supabase.json";
   const docs = appState.documents.loaded ? String(appState.documents.count) : "not loaded";
   const cache = appState.cache.loaded
     ? appState.cache.transcriptCount + " transcript sets"
@@ -240,7 +245,12 @@ function renderAuthPanel() {
     return;
   }
 
-  const activeSource = auth.mode === "stored-session" ? "Stored session" : "supabase.json";
+  const activeSource =
+    auth.mode === "api-key"
+      ? "API key"
+      : auth.mode === "stored-session"
+        ? "Stored session"
+        : "supabase.json";
   const lastError = auth.lastError
     ? '<div class="auth-card__meta auth-card__error">' + escapeHtml(auth.lastError) + "</div>"
     : "";
@@ -249,6 +259,7 @@ function renderAuthPanel() {
     '<div class="auth-card">',
     '<div class="status-grid">',
     '<div><span class="status-label">Active</span><strong>' + escapeHtml(activeSource) + "</strong></div>",
+    '<div><span class="status-label">API key</span><strong>' + escapeHtml(auth.apiKeyAvailable ? "available" : "missing") + "</strong></div>",
     '<div><span class="status-label">Stored</span><strong>' + escapeHtml(auth.storedSessionAvailable ? "available" : "missing") + "</strong></div>",
     '<div><span class="status-label">supabase.json</span><strong>' + escapeHtml(auth.supabaseAvailable ? "available" : "missing") + "</strong></div>",
     '<div><span class="status-label">Refresh</span><strong>' + escapeHtml(auth.refreshAvailable ? "available" : "missing") + "</strong></div>",
@@ -263,12 +274,16 @@ function renderAuthPanel() {
       ? '<div class="auth-card__meta">supabase path: ' + escapeHtml(auth.supabasePath) + "</div>"
       : "",
     lastError,
+    '<div class="auth-card__meta">Store a Granola Personal API key here or use <code>granola auth login --api-key &lt;token&gt;</code>.</div>',
     '<div class="auth-card__actions">',
+    '<input class="input" type="password" placeholder="grn_..." data-auth-api-key />',
+    authActionButton("Save API key", "login-api-key", false),
     authActionButton("Import desktop session", "login", !auth.supabaseAvailable),
     authActionButton("Refresh stored session", "refresh", !auth.storedSessionAvailable || !auth.refreshAvailable),
+    authModeButton("Use API key", "api-key", !auth.apiKeyAvailable || auth.mode === "api-key"),
     authModeButton("Use stored session", "stored-session", !auth.storedSessionAvailable || auth.mode === "stored-session"),
     authModeButton("Use supabase.json", "supabase-file", !auth.supabaseAvailable || auth.mode === "supabase-file"),
-    authActionButton("Sign out", "logout", !auth.storedSessionAvailable),
+    authActionButton("Sign out", "logout", !auth.apiKeyAvailable && !auth.storedSessionAvailable),
     "</div>",
     "</div>",
   ].join("");
@@ -658,14 +673,19 @@ async function rerunJob(id) {
   }
 }
 
-async function loginAuth() {
-  setStatus("Importing desktop session…", "busy");
+async function loginAuth(apiKey) {
+  setStatus(apiKey ? "Saving API key…" : "Importing desktop session…", "busy");
   try {
-    await fetchJson("/auth/login", { method: "POST" });
+    const body = apiKey ? { apiKey } : undefined;
+    await fetchJson("/auth/login", {
+      body: body ? JSON.stringify(body) : undefined,
+      headers: body ? { "content-type": "application/json" } : undefined,
+      method: "POST",
+    });
     await refreshAll();
   } catch (error) {
     await syncAuthState();
-    setStatus("Auth import failed", "error");
+    setStatus(apiKey ? "API key save failed" : "Auth import failed", "error");
     state.detailError = error instanceof Error ? error.message : String(error);
     renderMeetingDetail();
   }
@@ -812,6 +832,17 @@ els.authPanel.addEventListener("click", (event) => {
   const actionButton = event.target.closest("[data-auth-action]");
   if (actionButton) {
     switch (actionButton.dataset.authAction) {
+      case "login-api-key": {
+        const apiKeyInput = els.authPanel.querySelector("[data-auth-api-key]");
+        const apiKey =
+          apiKeyInput && "value" in apiKeyInput ? String(apiKeyInput.value || "").trim() : "";
+        if (!apiKey) {
+          setStatus("Enter a Granola API key", "error");
+          return;
+        }
+        void loginAuth(apiKey);
+        return;
+      }
       case "login":
         void loginAuth();
         return;

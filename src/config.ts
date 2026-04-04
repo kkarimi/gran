@@ -138,6 +138,11 @@ export async function loadConfig(options: {
     "2m";
 
   return {
+    apiKey:
+      pickString(options.globalFlags["api-key"]) ??
+      pickString(env.GRANOLA_API_KEY) ??
+      pickString(configValues["api-key"]) ??
+      pickString(configValues.apiKey),
     configFileUsed: config.path,
     debug:
       pickBoolean(options.globalFlags.debug) ??

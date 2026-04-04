@@ -12,13 +12,15 @@ Usage:
 
 Subcommands:
   login               Import credentials from the Granola desktop app
+                      Or store a Granola API key with --api-key
   status              Show the current Granola auth state
-  logout              Delete the stored Granola session
+  logout              Delete stored Granola credentials
   refresh             Refresh the stored Granola session
-  use <stored|supabase>
+  use <api-key|stored|supabase>
                       Switch the active auth source for this toolkit instance
 
 Options:
+  --api-key <token>   Store a Granola Personal API key
   --supabase <path>   Path to supabase.json for auth login
   --config <path>     Path to .granola.toml
   --debug             Enable debug logging
@@ -27,11 +29,19 @@ Options:
 }
 
 function formatAuthSource(mode: string): string {
-  return mode === "stored-session" ? "stored session" : "supabase.json";
+  switch (mode) {
+    case "api-key":
+      return "API key";
+    case "stored-session":
+      return "stored session";
+    default:
+      return "supabase.json";
+  }
 }
 
 function printAuthState(state: GranolaAppAuthState): void {
   console.log(`Active source: ${formatAuthSource(state.mode)}`);
+  console.log(`API key: ${state.apiKeyAvailable ? "available" : "missing"}`);
   console.log(`Stored session: ${state.storedSessionAvailable ? "available" : "missing"}`);
   console.log(`supabase.json: ${state.supabaseAvailable ? "available" : "missing"}`);
   if (state.supabasePath) {
@@ -52,11 +62,12 @@ function printAuthState(state: GranolaAppAuthState): void {
 export const authCommand: CommandDefinition = {
   description: "Manage stored Granola sessions",
   flags: {
+    "api-key": { type: "string" },
     help: { type: "boolean" },
   },
   help: authHelp,
   name: "auth",
-  async run({ commandArgs, globalFlags }) {
+  async run({ commandArgs, commandFlags, globalFlags }) {
     const [action, value] = commandArgs;
     const config = await loadConfig({
       globalFlags,
@@ -70,16 +81,20 @@ export const authCommand: CommandDefinition = {
 
     switch (action) {
       case "login": {
-        const state = await app.loginAuth();
+        const state = await app.loginAuth({
+          apiKey: typeof commandFlags["api-key"] === "string" ? commandFlags["api-key"] : undefined,
+        });
         console.log(
-          `Imported Granola session from ${state.supabasePath ?? "desktop app defaults"}`,
+          typeof commandFlags["api-key"] === "string"
+            ? "Stored Granola API key"
+            : `Imported Granola session from ${state.supabasePath ?? "desktop app defaults"}`,
         );
         printAuthState(state);
         return 0;
       }
       case "logout": {
         const state = await app.logoutAuth();
-        console.log("Stored Granola session deleted");
+        console.log("Stored Granola credentials deleted");
         printAuthState(state);
         return 0;
       }
@@ -92,7 +107,9 @@ export const authCommand: CommandDefinition = {
       case "status": {
         const state = await app.inspectAuth();
         printAuthState(state);
-        return state.storedSessionAvailable ? 0 : 1;
+        return state.apiKeyAvailable || state.storedSessionAvailable || state.supabaseAvailable
+          ? 0
+          : 1;
       }
       case "use": {
         const mode = resolveAuthMode(value);
@@ -110,8 +127,13 @@ export const authCommand: CommandDefinition = {
   },
 };
 
-function resolveAuthMode(value: string | undefined): "stored-session" | "supabase-file" {
+function resolveAuthMode(
+  value: string | undefined,
+): "api-key" | "stored-session" | "supabase-file" {
   switch (value) {
+    case "api":
+    case "api-key":
+      return "api-key";
     case "stored":
     case "stored-session":
       return "stored-session";
@@ -119,6 +141,6 @@ function resolveAuthMode(value: string | undefined): "stored-session" | "supabas
     case "supabase-file":
       return "supabase-file";
     default:
-      throw new Error("invalid auth mode: expected stored or supabase");
+      throw new Error("invalid auth mode: expected api-key, stored, or supabase");
   }
 }

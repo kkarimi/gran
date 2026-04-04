@@ -1,11 +1,19 @@
 ---
 title: Auth and Configuration
-description: Reuse desktop auth, switch sources, and configure the toolkit without repeating flags.
+description: Prefer API keys, keep desktop auth as fallback, and configure the toolkit without repeating flags.
 ---
 
 ## Auth
 
-Import the desktop app session once:
+Prefer a Granola Personal API key:
+
+```bash
+granola auth login --api-key grn_...
+granola auth status
+granola auth use api-key
+```
+
+Desktop-session import remains available as a fallback:
 
 ```bash
 granola auth login
@@ -18,11 +26,12 @@ granola auth logout
 
 `granola auth` supports:
 
+- `login --api-key <token>` to store a Granola Personal API key in the toolkit store
 - `login` to import the desktop app session into the toolkit store
-- `status` to inspect the active source, stored-session availability, refresh support, and last auth error
+- `status` to inspect the active source, API-key availability, stored-session availability, refresh support, and last auth error
 - `refresh` to refresh the stored session explicitly
-- `use stored` or `use supabase` to switch the active auth source
-- `logout` to delete the stored session
+- `use api-key`, `use stored`, or `use supabase` to switch the active auth source
+- `logout` to delete stored credentials
 
 The same auth actions are also available from the browser workspace.
 
@@ -38,6 +47,7 @@ The CLI reads configuration in this order:
 ## Config File
 
 ```toml
+api-key = "grn_..."
 debug = true
 supabase = "/Users/yourname/Library/Application Support/Granola/supabase.json"
 output = "./notes"
@@ -49,6 +59,7 @@ transcript-output = "./transcripts"
 ## Environment Variables
 
 - `DEBUG_MODE`
+- `GRANOLA_API_KEY`
 - `SUPABASE_FILE`
 - `OUTPUT`
 - `TIMEOUT`
@@ -56,8 +67,11 @@ transcript-output = "./transcripts"
 - `TRANSCRIPT_OUTPUT`
 - `GRANOLA_CLIENT_VERSION`
 
-## Notes on Live Data
+## Notes on Auth Sources
 
-The preferred auth path is the stored session because it avoids repeatedly passing `--supabase` and
-handles refreshable access more cleanly. The `supabase.json` fallback remains useful when you want a
-stateless one-off run or when the stored session is unavailable.
+The preferred auth path is a Granola Personal API key. It is the cleanest way to authenticate
+scripts, sync loops, and automations without depending on desktop-session extraction.
+
+Stored desktop sessions remain useful when you want refreshable local auth without managing a key.
+The `supabase.json` fallback remains useful for one-off imports or when the stored session is
+unavailable.

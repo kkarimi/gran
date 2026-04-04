@@ -9,13 +9,12 @@ description: Export notes or transcripts, filter by folder, and rely on stable i
 
 The flow is:
 
-1. Read a stored Granola session, or fall back to `supabase.json`.
-2. Extract the WorkOS access token.
-3. Call Granola's paginated documents API.
-4. Normalise each document into a structured note export.
-5. Choose the best available note content.
-6. Render Markdown, JSON, YAML, or raw JSON.
-7. Write one file per document into the output directory.
+1. Resolve credentials, preferring a stored API key, then stored session, then `supabase.json`.
+2. Call the appropriate Granola notes API for the active auth mode.
+3. Normalise each document into a structured note export.
+4. Choose the best available note content.
+5. Render Markdown, JSON, YAML, or raw JSON.
+6. Write one file per document into the output directory.
 
 Content is chosen in this order:
 

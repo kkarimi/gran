@@ -9,6 +9,7 @@ import { asRecord, parseJsonString, stringValue } from "../utils.ts";
 const execFileAsync = promisify(execFile);
 const DEFAULT_CLIENT_ID = "client_GranolaMac";
 const KEYCHAIN_SERVICE_NAME = "com.granola.toolkit";
+const KEYCHAIN_ACCOUNT_NAME_API_KEY = "api-key";
 const KEYCHAIN_ACCOUNT_NAME = "session";
 const WORKOS_AUTH_URL = "https://api.workos.com/user_management/authenticate";
 
@@ -46,6 +47,12 @@ export interface SessionStore {
   clearSession(): Promise<void>;
   readSession(): Promise<GranolaSession | undefined>;
   writeSession(session: GranolaSession): Promise<void>;
+}
+
+export interface ApiKeyStore {
+  clearApiKey(): Promise<void>;
+  readApiKey(): Promise<string | undefined>;
+  writeApiKey(apiKey: string): Promise<void>;
 }
 
 export interface AccessTokenProvider {
@@ -184,6 +191,22 @@ export class MemorySessionStore implements SessionStore {
   }
 }
 
+export class MemoryApiKeyStore implements ApiKeyStore {
+  #apiKey?: string;
+
+  async clearApiKey(): Promise<void> {
+    this.#apiKey = undefined;
+  }
+
+  async readApiKey(): Promise<string | undefined> {
+    return this.#apiKey;
+  }
+
+  async writeApiKey(apiKey: string): Promise<void> {
+    this.#apiKey = apiKey.trim() || undefined;
+  }
+}
+
 export class FileSessionStore implements SessionStore {
   constructor(private readonly filePath: string = defaultSessionFilePath()) {}
 
@@ -206,6 +229,38 @@ export class FileSessionStore implements SessionStore {
   async writeSession(session: GranolaSession): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
     await writeFile(this.filePath, `${JSON.stringify(session, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+  }
+}
+
+export class FileApiKeyStore implements ApiKeyStore {
+  constructor(private readonly filePath: string = defaultApiKeyFilePath()) {}
+
+  async clearApiKey(): Promise<void> {
+    try {
+      await unlink(this.filePath);
+    } catch {}
+  }
+
+  async readApiKey(): Promise<string | undefined> {
+    try {
+      const apiKey = (await readFile(this.filePath, "utf8")).trim();
+      return apiKey || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async writeApiKey(apiKey: string): Promise<void> {
+    const trimmed = apiKey.trim();
+    if (!trimmed) {
+      throw new Error("Granola API key is required");
+    }
+
+    await mkdir(dirname(this.filePath), { recursive: true });
+    await writeFile(this.filePath, `${trimmed}\n`, {
       encoding: "utf8",
       mode: 0o600,
     });
@@ -252,6 +307,55 @@ export class KeychainSessionStore implements SessionStore {
       KEYCHAIN_ACCOUNT_NAME,
       "-w",
       JSON.stringify(session),
+    ]);
+  }
+}
+
+export class KeychainApiKeyStore implements ApiKeyStore {
+  async clearApiKey(): Promise<void> {
+    try {
+      await execFileAsync("security", [
+        "delete-generic-password",
+        "-s",
+        KEYCHAIN_SERVICE_NAME,
+        "-a",
+        KEYCHAIN_ACCOUNT_NAME_API_KEY,
+      ]);
+    } catch {}
+  }
+
+  async readApiKey(): Promise<string | undefined> {
+    try {
+      const { stdout } = await execFileAsync("security", [
+        "find-generic-password",
+        "-s",
+        KEYCHAIN_SERVICE_NAME,
+        "-a",
+        KEYCHAIN_ACCOUNT_NAME_API_KEY,
+        "-w",
+      ]);
+      const apiKey = stdout.trim();
+      return apiKey || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async writeApiKey(apiKey: string): Promise<void> {
+    const trimmed = apiKey.trim();
+    if (!trimmed) {
+      throw new Error("Granola API key is required");
+    }
+
+    await execFileAsync("security", [
+      "add-generic-password",
+      "-U",
+      "-s",
+      KEYCHAIN_SERVICE_NAME,
+      "-a",
+      KEYCHAIN_ACCOUNT_NAME_API_KEY,
+      "-w",
+      trimmed,
     ]);
   }
 }
@@ -395,8 +499,18 @@ export function defaultSessionFilePath(): string {
   return defaultGranolaToolkitPersistenceLayout().sessionFile;
 }
 
+export function defaultApiKeyFilePath(): string {
+  return defaultGranolaToolkitPersistenceLayout().apiKeyFile;
+}
+
 export function createDefaultSessionStore(): SessionStore {
   return defaultGranolaToolkitPersistenceLayout().sessionStoreKind === "keychain"
     ? new KeychainSessionStore()
     : new FileSessionStore();
+}
+
+export function createDefaultApiKeyStore(): ApiKeyStore {
+  return defaultGranolaToolkitPersistenceLayout().sessionStoreKind === "keychain"
+    ? new KeychainApiKeyStore()
+    : new FileApiKeyStore();
 }

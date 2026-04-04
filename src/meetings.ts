@@ -177,7 +177,9 @@ function buildMeetingTranscript(
   transcriptText: string | null;
   transcriptRecord: TranscriptExportRecord | null;
 } {
-  if (!cacheData) {
+  const rawSegments = cacheData?.transcripts[document.id] ?? document.transcriptSegments ?? [];
+  const transcriptAvailable = Boolean(cacheData) || Array.isArray(document.transcriptSegments);
+  if (!transcriptAvailable) {
     return {
       loaded: false,
       segmentCount: 0,
@@ -187,7 +189,6 @@ function buildMeetingTranscript(
     };
   }
 
-  const rawSegments = cacheData.transcripts[document.id] ?? [];
   const normalisedSegments = normaliseTranscriptSegments(rawSegments);
   if (normalisedSegments.length === 0) {
     return {

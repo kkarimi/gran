@@ -558,6 +558,11 @@ export class GranolaTuiWorkspace implements Component {
           await this.app.refreshAuth();
           successMessage = "Stored session refreshed";
           break;
+        case "use-api-key":
+          this.setStatus("Switching to stored API key…");
+          await this.app.switchAuthMode("api-key");
+          successMessage = "Using stored API key";
+          break;
         case "use-stored":
           this.setStatus("Switching to stored session…");
           await this.app.switchAuthMode("stored-session");
@@ -571,7 +576,7 @@ export class GranolaTuiWorkspace implements Component {
         case "logout":
           this.setStatus("Signing out…");
           await this.app.logoutAuth();
-          successMessage = "Stored session removed";
+          successMessage = "Stored credentials removed";
           break;
       }
 

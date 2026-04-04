@@ -68,11 +68,12 @@ function parseMeetingSort(value: string | null): GranolaMeetingSort | undefined 
 
 function parseAuthMode(value: unknown): GranolaAppAuthMode {
   switch (value) {
+    case "api-key":
     case "stored-session":
     case "supabase-file":
       return value;
     default:
-      throw new Error("invalid auth mode: expected stored-session or supabase-file");
+      throw new Error("invalid auth mode: expected api-key, stored-session, or supabase-file");
   }
 }
 
@@ -616,11 +617,15 @@ export async function startGranolaServer(
 
       if (method === "POST" && path === granolaTransportPaths.authLogin) {
         const body = await readJsonBody(request);
+        const apiKey =
+          typeof body.apiKey === "string" && body.apiKey.trim() ? body.apiKey.trim() : undefined;
         const supabasePath =
           typeof body.supabasePath === "string" && body.supabasePath.trim()
             ? body.supabasePath.trim()
             : undefined;
-        sendJson(response, await app.loginAuth({ supabasePath }), { headers: originHeaders });
+        sendJson(response, await app.loginAuth({ apiKey, supabasePath }), {
+          headers: originHeaders,
+        });
         return;
       }
 

@@ -99,9 +99,10 @@ export interface FolderRecord extends FolderSummaryRecord {
   meetings: MeetingSummaryRecord[];
 }
 
-export type GranolaSessionMode = "stored-session" | "supabase-file";
+export type GranolaSessionMode = "api-key" | "stored-session" | "supabase-file";
 
 export interface GranolaSessionMetadata {
+  apiKeyAvailable?: boolean;
   clientId?: string;
   lastError?: string;
   mode: GranolaSessionMode;

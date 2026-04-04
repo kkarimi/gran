@@ -37,6 +37,7 @@ Commands:
 ${commandLines}
 
 Global options:
+  --api-key <token>   Granola Personal API key
   --config <path>     Path to .granola.toml
   --debug             Enable debug logging
   --supabase <path>   Path to supabase.json
@@ -55,6 +56,7 @@ export async function runCli(argv: string[]): Promise<number> {
   try {
     const { command, rest } = splitCommand(argv);
     const global = parseFlags(rest, {
+      "api-key": { type: "string" },
       config: { type: "string" },
       debug: { type: "boolean" },
       help: { type: "boolean" },

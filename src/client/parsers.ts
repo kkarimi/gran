@@ -1,4 +1,11 @@
-import type { GranolaDocument, GranolaFolder, LastViewedPanel, ProseMirrorDoc } from "../types.ts";
+import type {
+  GranolaDocument,
+  GranolaFolder,
+  GranolaFolderMembership,
+  LastViewedPanel,
+  ProseMirrorDoc,
+  TranscriptSegment,
+} from "../types.ts";
 import { asRecord, parseJsonString, stringArray, stringValue } from "../utils.ts";
 
 function parseProseMirrorDoc(
@@ -74,6 +81,102 @@ export function parseDocument(value: unknown): GranolaDocument {
     notesPlain: stringValue(record.notes_plain),
     tags: stringArray(record.tags),
     title: stringValue(record.title),
+    updatedAt: stringValue(record.updated_at),
+  };
+}
+
+function parseFolderMembership(value: unknown): GranolaFolderMembership | undefined {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const id = stringValue(record.id);
+  const name = stringValue(record.name);
+  if (!id || !name) {
+    return undefined;
+  }
+
+  return { id, name };
+}
+
+function parsePublicTranscriptSegment(
+  documentId: string,
+  value: unknown,
+  index: number,
+): TranscriptSegment | undefined {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const text = stringValue(record.text);
+  const startTimestamp = stringValue(record.start_time);
+  const endTimestamp = stringValue(record.end_time) || startTimestamp;
+  if (!text || !startTimestamp) {
+    return undefined;
+  }
+
+  const speaker = asRecord(record.speaker);
+  return {
+    documentId,
+    endTimestamp,
+    id: stringValue(record.id) || `${documentId}:transcript:${index + 1}`,
+    isFinal: true,
+    source: stringValue(speaker?.name) || stringValue(speaker?.source) || "unknown",
+    startTimestamp,
+    text,
+  };
+}
+
+export interface PublicNoteSummary {
+  createdAt: string;
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+export function parsePublicNoteSummary(value: unknown): PublicNoteSummary {
+  const record = asRecord(value);
+  if (!record) {
+    throw new Error("public note payload is not an object");
+  }
+
+  return {
+    createdAt: stringValue(record.created_at),
+    id: stringValue(record.id),
+    title: stringValue(record.title),
+    updatedAt: stringValue(record.updated_at),
+  };
+}
+
+export function parsePublicNote(value: unknown): GranolaDocument {
+  const record = asRecord(value);
+  if (!record) {
+    throw new Error("public note payload is not an object");
+  }
+
+  const id = stringValue(record.id);
+  const summaryMarkdown = stringValue(record.summary_markdown);
+  const summaryText = stringValue(record.summary_text);
+
+  return {
+    content: summaryMarkdown || summaryText,
+    createdAt: stringValue(record.created_at),
+    folderMemberships: Array.isArray(record.folder_membership)
+      ? record.folder_membership
+          .map(parseFolderMembership)
+          .filter((membership): membership is GranolaFolderMembership => Boolean(membership))
+      : [],
+    id,
+    notesPlain: summaryText,
+    tags: [],
+    title: stringValue(record.title),
+    transcriptSegments: Array.isArray(record.transcript)
+      ? record.transcript
+          .map((segment, index) => parsePublicTranscriptSegment(id, segment, index))
+          .filter((segment): segment is TranscriptSegment => Boolean(segment))
+      : [],
     updatedAt: stringValue(record.updated_at),
   };
 }

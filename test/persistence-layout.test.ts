@@ -27,6 +27,7 @@ describe("defaultGranolaToolkitPersistenceLayout", () => {
         platform: "linux",
       }),
     ).toEqual({
+      apiKeyFile: "/home/nima/.config/granola-toolkit/api-key.txt",
       dataDirectory: "/home/nima/.config/granola-toolkit",
       exportJobsFile: "/home/nima/.config/granola-toolkit/export-jobs.json",
       meetingIndexFile: "/home/nima/.config/granola-toolkit/meeting-index.json",

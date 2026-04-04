@@ -4,6 +4,7 @@ import { join } from "node:path";
 export type GranolaToolkitSessionStoreKind = "file" | "keychain";
 
 export interface GranolaToolkitPersistenceLayout {
+  apiKeyFile: string;
   dataDirectory: string;
   exportJobsFile: string;
   meetingIndexFile: string;
@@ -35,6 +36,7 @@ export function defaultGranolaToolkitPersistenceLayout(
   );
 
   return {
+    apiKeyFile: join(dataDirectory, "api-key.txt"),
     dataDirectory,
     exportJobsFile: join(dataDirectory, "export-jobs.json"),
     meetingIndexFile: join(dataDirectory, "meeting-index.json"),

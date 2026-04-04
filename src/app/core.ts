@@ -490,6 +490,42 @@ export class GranolaApp implements GranolaAppApi {
     return byDocumentId;
   }
 
+  private deriveFoldersFromDocuments(documents: GranolaDocument[]): GranolaFolder[] | undefined {
+    const byFolderId = new Map<string, GranolaFolder>();
+
+    for (const document of documents) {
+      for (const membership of document.folderMemberships ?? []) {
+        const existing = byFolderId.get(membership.id);
+        if (existing) {
+          existing.documentIds = [...new Set([...existing.documentIds, document.id])];
+          existing.updatedAt =
+            existing.updatedAt.localeCompare(document.updatedAt) >= 0
+              ? existing.updatedAt
+              : document.updatedAt;
+          if (!existing.createdAt || existing.createdAt.localeCompare(document.createdAt) > 0) {
+            existing.createdAt = document.createdAt;
+          }
+          continue;
+        }
+
+        byFolderId.set(membership.id, {
+          createdAt: document.createdAt,
+          documentIds: [document.id],
+          id: membership.id,
+          isFavourite: false,
+          name: membership.name,
+          updatedAt: document.updatedAt,
+        });
+      }
+    }
+
+    if (byFolderId.size === 0) {
+      return undefined;
+    }
+
+    return [...byFolderId.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }
+
   async loadFolders(
     options: {
       forceRefresh?: boolean;
@@ -510,6 +546,27 @@ export class GranolaApp implements GranolaAppApi {
 
     const client = await this.getGranolaClient();
     if (!client.listFolders) {
+      const documents = await this.listDocuments({
+        forceRefresh: options.forceRefresh,
+      });
+      const folders = this.deriveFoldersFromDocuments(documents);
+      if (folders) {
+        this.#folders = folders.map((folder) => ({
+          ...folder,
+          documentIds: [...folder.documentIds],
+        }));
+        this.#state.folders = {
+          count: folders.length,
+          loaded: true,
+          loadedAt: this.nowIso(),
+        };
+        this.emitStateUpdate();
+        return this.#folders.map((folder) => ({
+          ...folder,
+          documentIds: [...folder.documentIds],
+        }));
+      }
+
       if (options.required) {
         throw new Error("Granola folder API is not configured");
       }
@@ -667,7 +724,9 @@ export class GranolaApp implements GranolaAppApi {
     };
   }
 
-  async loginAuth(options: { supabasePath?: string } = {}): Promise<GranolaAppAuthState> {
+  async loginAuth(
+    options: { apiKey?: string; supabasePath?: string } = {},
+  ): Promise<GranolaAppAuthState> {
     const controller = this.requireAuthController();
 
     try {
