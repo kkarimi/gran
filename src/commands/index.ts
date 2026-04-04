@@ -1,6 +1,7 @@
 import { attachCommand } from "./attach.ts";
 import { authCommand } from "./auth.ts";
 import { exportsCommand } from "./exports.ts";
+import { folderCommand } from "./folder.ts";
 import { meetingCommand } from "./meeting.ts";
 import { notesCommand } from "./notes.ts";
 import { serveCommand } from "./serve.ts";
@@ -12,6 +13,7 @@ export const commands = [
   attachCommand,
   authCommand,
   exportsCommand,
+  folderCommand,
   meetingCommand,
   notesCommand,
   serveCommand,

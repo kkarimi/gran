@@ -10,7 +10,7 @@ import { MemoryExportJobStore } from "../src/export-jobs.ts";
 import { MemoryMeetingIndexStore } from "../src/meeting-index.ts";
 import { startGranolaServer } from "../src/server/http.ts";
 import { GRANOLA_TRANSPORT_PROTOCOL_VERSION } from "../src/transport.ts";
-import type { CacheData, GranolaDocument } from "../src/types.ts";
+import type { CacheData, GranolaDocument, GranolaFolder } from "../src/types.ts";
 
 const documents: GranolaDocument[] = [
   {
@@ -57,6 +57,18 @@ const cacheData: CacheData = {
   },
 };
 
+const folders: GranolaFolder[] = [
+  {
+    createdAt: "2024-01-01T08:00:00Z",
+    documentIds: ["doc-alpha-1111"],
+    id: "folder-team-1111",
+    isFavourite: true,
+    name: "Team",
+    updatedAt: "2024-01-04T10:00:00Z",
+    workspaceId: "workspace-1",
+  },
+];
+
 const decoder = new TextDecoder();
 
 async function readSseChunk(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<string> {
@@ -101,6 +113,7 @@ describe("startGranolaServer", () => {
         cacheLoader: async () => cacheData,
         granolaClient: {
           listDocuments: async () => documents,
+          listFolders: async () => folders,
         },
         now: () => new Date("2024-03-01T12:00:00Z"),
       },
@@ -137,6 +150,7 @@ describe("startGranolaServer", () => {
           attach: true,
           auth: true,
           events: true,
+          folders: true,
           webClient: false,
         }),
         persistence: expect.objectContaining({
@@ -161,6 +175,24 @@ describe("startGranolaServer", () => {
         ],
         search: "alpha",
         source: "live",
+      }),
+    );
+
+    const folderList = await fetch(new URL("/folders?search=team&limit=5", server.url));
+    expect(folderList.ok).toBe(true);
+    expect(await folderList.json()).toEqual(
+      expect.objectContaining({
+        folders: [expect.objectContaining({ id: "folder-team-1111", name: "Team" })],
+        search: "team",
+      }),
+    );
+
+    const folder = await fetch(new URL("/folders/folder-team-1111", server.url));
+    expect(folder.ok).toBe(true);
+    expect(await folder.json()).toEqual(
+      expect.objectContaining({
+        id: "folder-team-1111",
+        meetings: [expect.objectContaining({ id: "doc-alpha-1111" })],
       }),
     );
 
@@ -557,6 +589,7 @@ describe("startGranolaServer", () => {
     await meetingIndexStore.writeIndex([
       {
         createdAt: "2024-01-01T09:00:00Z",
+        folders: [],
         id: "doc-alpha-1111",
         noteContentSource: "notes",
         tags: ["team", "alpha"],

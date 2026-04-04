@@ -14,6 +14,7 @@ describe("FileMeetingIndexStore", () => {
     await store.writeIndex([
       {
         createdAt: "2024-01-01T09:00:00Z",
+        folders: [],
         id: "doc-alpha-1111",
         noteContentSource: "notes",
         tags: ["team", "alpha"],
@@ -32,7 +33,8 @@ describe("FileMeetingIndexStore", () => {
     ]);
 
     const persisted = await readFile(filePath, "utf8");
-    expect(persisted).toContain('"version": 1');
+    expect(persisted).toContain('"version": 2');
+    expect(persisted).toContain('"folders": []');
     expect(persisted).toContain('"title": "Alpha Sync"');
   });
 });

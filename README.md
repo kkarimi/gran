@@ -35,6 +35,7 @@ granola --help
 granola attach --help
 granola auth login
 granola exports --help
+granola folder --help
 granola meeting --help
 granola notes --help
 granola serve --help
@@ -52,6 +53,7 @@ vp pack
 node dist/cli.js --help
 node dist/cli.js attach --help
 node dist/cli.js exports --help
+node dist/cli.js folder --help
 node dist/cli.js meeting --help
 node dist/cli.js notes --help
 node dist/cli.js serve --help
@@ -94,8 +96,11 @@ node dist/cli.js transcripts --format yaml --output ./transcripts-yaml
 Inspect individual meetings:
 
 ```bash
+granola folder list
+granola folder view Team
 granola meeting list --limit 10
 granola meeting list --search planning
+granola meeting list --folder Team
 granola meeting view 1234abcd
 granola meeting notes 1234abcd
 granola meeting transcript 1234abcd --format json
@@ -201,6 +206,24 @@ The machine-readable `export` command includes:
 - structured note data plus rendered Markdown
 - structured transcript data plus rendered transcript text when available
 
+### Folders
+
+`folder` exposes Granola document lists as a first-class concept instead of leaving meetings in one flat global list.
+
+The flow is:
+
+1. reuse the shared auth path that `notes` and `meeting` already use
+2. call Granola's document-list API, with `v2` first and `v1` fallback
+3. normalise folder metadata and document membership into shared folder records
+4. attach folder membership to meetings in the shared app core
+5. let folder commands and meeting filters resolve folders by id, prefix, or unique name
+
+The current CLI surface includes:
+
+- `folder list`
+- `folder view <id|name>`
+- `meeting list --folder <id|name>`
+
 ### Server
 
 `serve` starts a long-lived local `Granola Toolkit` server on one shared app instance.
@@ -214,7 +237,11 @@ The initial server API includes:
 - `GET /auth/status`
 - `GET /state`
 - `GET /events` for server-sent state updates
+- `GET /folders`
+- `GET /folders/resolve?q=<query>`
+- `GET /folders/:id`
 - `GET /meetings`
+- `GET /meetings?folderId=<id>` for folder-scoped meeting lists
 - `GET /meetings?refresh=true` to bypass the local meeting index and force a live refresh
 - `GET /meetings/resolve?q=<query>`
 - `GET /meetings/:id`

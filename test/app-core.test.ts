@@ -8,7 +8,7 @@ import { GranolaApp } from "../src/app/core.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
 import { MemoryMeetingIndexStore } from "../src/meeting-index.ts";
 import type { GranolaAppAuthState } from "../src/app/index.ts";
-import type { CacheData, GranolaDocument } from "../src/types.ts";
+import type { CacheData, GranolaDocument, GranolaFolder } from "../src/types.ts";
 
 const documents: GranolaDocument[] = [
   {
@@ -54,6 +54,18 @@ const cacheData: CacheData = {
     ],
   },
 };
+
+const folders: GranolaFolder[] = [
+  {
+    createdAt: "2024-01-01T08:00:00Z",
+    documentIds: ["doc-alpha-1111"],
+    id: "folder-team-1111",
+    isFavourite: true,
+    name: "Team",
+    updatedAt: "2024-01-04T10:00:00Z",
+    workspaceId: "workspace-1",
+  },
+];
 
 describe("GranolaApp", () => {
   test("reuses loaded documents and cache across meeting operations", async () => {
@@ -104,6 +116,57 @@ describe("GranolaApp", () => {
         view: "meeting-detail",
       }),
     );
+  });
+
+  test("lists folders, resolves folder queries, and filters meetings by folder", async () => {
+    const listDocuments = vi.fn(async () => documents);
+    const listFolders = vi.fn(async () => folders);
+    const app = new GranolaApp(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        cacheLoader: async () => cacheData,
+        granolaClient: { listDocuments, listFolders },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+    );
+
+    const folderList = await app.listFolders({ limit: 10, search: "team" });
+    const folder = await app.findFolder("Team");
+    const meetings = await app.listMeetings({ folderId: folder.id, limit: 10 });
+    const meeting = await app.getMeeting("doc-alpha-1111");
+
+    expect(folderList.folders).toEqual([
+      expect.objectContaining({
+        id: "folder-team-1111",
+        name: "Team",
+      }),
+    ]);
+    expect(folder.meetings).toEqual([
+      expect.objectContaining({
+        id: "doc-alpha-1111",
+      }),
+    ]);
+    expect(meetings.meetings).toHaveLength(1);
+    expect(meeting.meeting.meeting.folders[0]?.id).toBe("folder-team-1111");
+    expect(listFolders).toHaveBeenCalledTimes(1);
   });
 
   test("tracks note exports in application state", async () => {
@@ -352,6 +415,7 @@ describe("GranolaApp", () => {
     await meetingIndexStore.writeIndex([
       {
         createdAt: "2024-01-01T09:00:00Z",
+        folders: [],
         id: "doc-alpha-1111",
         noteContentSource: "notes",
         tags: ["team", "alpha"],

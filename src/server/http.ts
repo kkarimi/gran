@@ -294,6 +294,7 @@ export async function startGranolaServer(
       auth: true,
       events: true,
       exports: true,
+      folders: true,
       meetingOpen: true,
       webClient: enableWebClient,
     },
@@ -472,6 +473,7 @@ export async function startGranolaServer(
       }
 
       if (method === "GET" && path === granolaTransportPaths.meetings) {
+        const folderId = url.searchParams.get("folderId")?.trim() || undefined;
         const limit = parseInteger(url.searchParams.get("limit"));
         const refresh = url.searchParams.get("refresh") === "true";
         const search = url.searchParams.get("search")?.trim() || undefined;
@@ -479,6 +481,7 @@ export async function startGranolaServer(
         const updatedFrom = url.searchParams.get("updatedFrom")?.trim() || undefined;
         const updatedTo = url.searchParams.get("updatedTo")?.trim() || undefined;
         const result = await app.listMeetings({
+          folderId,
           forceRefresh: refresh,
           limit,
           search,
@@ -489,6 +492,7 @@ export async function startGranolaServer(
         sendJson(
           response,
           {
+            folderId,
             meetings: result.meetings,
             refresh,
             search,
@@ -502,6 +506,38 @@ export async function startGranolaServer(
         return;
       }
 
+      if (method === "GET" && path === granolaTransportPaths.folders) {
+        const limit = parseInteger(url.searchParams.get("limit"));
+        const refresh = url.searchParams.get("refresh") === "true";
+        const search = url.searchParams.get("search")?.trim() || undefined;
+        const result = await app.listFolders({
+          forceRefresh: refresh,
+          limit,
+          search,
+        });
+        sendJson(
+          response,
+          {
+            folders: result.folders,
+            refresh,
+            search,
+          },
+          { headers: originHeaders },
+        );
+        return;
+      }
+
+      if (method === "GET" && path === granolaTransportPaths.folderResolve) {
+        const query = url.searchParams.get("q")?.trim();
+        if (!query) {
+          throw new Error("folder query is required");
+        }
+
+        const folder = await app.findFolder(query);
+        sendJson(response, folder, { headers: originHeaders });
+        return;
+      }
+
       if (method === "GET" && path === granolaTransportPaths.meetingResolve) {
         const query = url.searchParams.get("q")?.trim();
         if (!query) {
@@ -512,6 +548,21 @@ export async function startGranolaServer(
           requireCache: url.searchParams.get("includeTranscript") === "true",
         });
         sendJson(response, meeting, { headers: originHeaders });
+        return;
+      }
+
+      if (
+        method === "GET" &&
+        path.startsWith(`${granolaTransportPaths.folders}/`) &&
+        path !== granolaTransportPaths.folderResolve
+      ) {
+        const id = decodeURIComponent(path.slice(`${granolaTransportPaths.folders}/`.length));
+        if (!id) {
+          throw new Error("folder id is required");
+        }
+
+        const folder = await app.getFolder(id);
+        sendJson(response, folder, { headers: originHeaders });
         return;
       }
 

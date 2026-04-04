@@ -12,6 +12,7 @@ import {
   resolveMeetingQuery,
 } from "../src/meetings.ts";
 import type { CacheData, GranolaDocument } from "../src/types.ts";
+import type { FolderSummaryRecord } from "../src/app/models.ts";
 
 const documents: GranolaDocument[] = [
   {
@@ -76,6 +77,35 @@ const cacheData: CacheData = {
   },
 };
 
+const foldersByDocumentId = new Map<string, FolderSummaryRecord[]>([
+  [
+    "doc-alpha-1111",
+    [
+      {
+        createdAt: "2024-01-01T00:00:00Z",
+        documentCount: 2,
+        id: "folder-team-1111",
+        isFavourite: true,
+        name: "Team",
+        updatedAt: "2024-02-05T12:00:00Z",
+      },
+    ],
+  ],
+  [
+    "doc-charlie-3333",
+    [
+      {
+        createdAt: "2024-01-01T00:00:00Z",
+        documentCount: 2,
+        id: "folder-sales-2222",
+        isFavourite: false,
+        name: "Sales",
+        updatedAt: "2024-02-05T12:00:00Z",
+      },
+    ],
+  ],
+]);
+
 describe("listMeetings", () => {
   test("sorts meetings by latest update and filters by search", () => {
     const meetings = listMeetings(documents, {
@@ -96,6 +126,18 @@ describe("listMeetings", () => {
     });
 
     expect(meetings.map((meeting) => meeting.id)).toEqual(["doc-charlie-3333", "doc-bravo-2222"]);
+  });
+
+  test("supports folder filtering and carries folder metadata into summaries", () => {
+    const meetings = listMeetings(documents, {
+      folderId: "folder-sales-2222",
+      foldersByDocumentId,
+      limit: 5,
+    });
+
+    expect(meetings).toHaveLength(1);
+    expect(meetings[0]?.id).toBe("doc-charlie-3333");
+    expect(meetings[0]?.folders[0]?.name).toBe("Sales");
   });
 });
 
@@ -129,10 +171,15 @@ describe("resolveMeetingQuery", () => {
 
 describe("meeting rendering", () => {
   test("builds a meeting record with transcript details when cache data is available", () => {
-    const record = buildMeetingRecord(documents[0]!, cacheData);
+    const record = buildMeetingRecord(
+      documents[0]!,
+      cacheData,
+      foldersByDocumentId.get("doc-alpha-1111"),
+    );
 
     expect(record.meeting.transcriptLoaded).toBe(true);
     expect(record.meeting.transcriptSegmentCount).toBe(1);
+    expect(record.meeting.folders[0]?.name).toBe("Team");
     expect(record.note.contentSource).toBe("notes");
     expect(record.transcriptText).toContain("[09:00:01] You: Hello team");
   });
@@ -140,14 +187,20 @@ describe("meeting rendering", () => {
   test("renders meeting list and view text output", () => {
     const summary = listMeetings(documents, {
       cacheData,
+      foldersByDocumentId,
       limit: 3,
     });
     const listText = renderMeetingList(summary, "text");
-    const viewText = renderMeetingView(buildMeetingRecord(documents[0]!, cacheData), "text");
+    const viewText = renderMeetingView(
+      buildMeetingRecord(documents[0]!, cacheData, foldersByDocumentId.get("doc-alpha-1111")),
+      "text",
+    );
 
     expect(listText).toContain("TITLE");
+    expect(listText).toContain("FOLDERS");
     expect(listText).toContain("Alpha Sync");
     expect(viewText).toContain("# Alpha Sync");
+    expect(viewText).toContain("Folders: Team");
     expect(viewText).toContain("## Notes");
     expect(viewText).toContain("Alpha notes");
     expect(viewText).toContain("## Transcript");

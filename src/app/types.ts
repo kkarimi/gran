@@ -1,4 +1,6 @@
 import type {
+  FolderRecord,
+  FolderSummaryRecord,
   GranolaSessionMetadata,
   MeetingRecord,
   MeetingSummarySource,
@@ -15,6 +17,8 @@ export type GranolaExportJobKind = "notes" | "transcripts";
 export type GranolaExportJobStatus = "completed" | "failed" | "running";
 export type GranolaAppView =
   | "auth"
+  | "folder-detail"
+  | "folder-list"
   | "idle"
   | "exports-history"
   | "meeting-detail"
@@ -25,6 +29,12 @@ export type GranolaAppView =
 export interface GranolaAppAuthState extends GranolaSessionMetadata {}
 
 export interface GranolaAppDocumentsState {
+  count: number;
+  loaded: boolean;
+  loadedAt?: string;
+}
+
+export interface GranolaAppFoldersState {
   count: number;
   loaded: boolean;
   loadedAt?: string;
@@ -71,11 +81,13 @@ export interface GranolaAppExportJobState {
 }
 
 export interface GranolaAppUIState {
+  folderSearch?: string;
   meetingSearch?: string;
   meetingListSource?: MeetingSummarySource;
   meetingSort?: GranolaMeetingSort;
   meetingUpdatedFrom?: string;
   meetingUpdatedTo?: string;
+  selectedFolderId?: string;
   selectedMeetingId?: string;
   surface: GranolaAppSurface;
   view: GranolaAppView;
@@ -86,6 +98,7 @@ export interface GranolaAppState {
   cache: GranolaAppCacheState;
   config: AppConfig;
   documents: GranolaAppDocumentsState;
+  folders: GranolaAppFoldersState;
   exports: {
     jobs: GranolaAppExportJobState[];
     notes?: GranolaAppExportRunState;
@@ -102,6 +115,7 @@ export interface GranolaMeetingBundle {
 }
 
 export interface GranolaMeetingListOptions {
+  folderId?: string;
   forceRefresh?: boolean;
   limit?: number;
   preferIndex?: boolean;
@@ -109,6 +123,12 @@ export interface GranolaMeetingListOptions {
   sort?: GranolaMeetingSort;
   updatedFrom?: string;
   updatedTo?: string;
+}
+
+export interface GranolaFolderListOptions {
+  forceRefresh?: boolean;
+  limit?: number;
+  search?: string;
 }
 
 export interface GranolaNotesExportResult {
@@ -132,6 +152,10 @@ export interface GranolaTranscriptsExportResult {
 export interface GranolaMeetingListResult {
   meetings: MeetingSummaryRecord[];
   source: MeetingSummarySource;
+}
+
+export interface GranolaFolderListResult {
+  folders: FolderSummaryRecord[];
 }
 
 export interface GranolaExportJobsListOptions {
@@ -158,6 +182,9 @@ export interface GranolaAppApi {
   logoutAuth(): Promise<GranolaAppAuthState>;
   refreshAuth(): Promise<GranolaAppAuthState>;
   switchAuthMode(mode: GranolaAppAuthMode): Promise<GranolaAppAuthState>;
+  listFolders(options?: GranolaFolderListOptions): Promise<GranolaFolderListResult>;
+  getFolder(id: string): Promise<FolderRecord>;
+  findFolder(query: string): Promise<FolderRecord>;
   listMeetings(options?: GranolaMeetingListOptions): Promise<GranolaMeetingListResult>;
   getMeeting(id: string, options?: { requireCache?: boolean }): Promise<GranolaMeetingBundle>;
   findMeeting(query: string, options?: { requireCache?: boolean }): Promise<GranolaMeetingBundle>;

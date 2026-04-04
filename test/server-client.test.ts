@@ -5,7 +5,7 @@ import type { GranolaAppStateEvent } from "../src/app/index.ts";
 import { createGranolaServerClient } from "../src/server/client.ts";
 import { startGranolaServer } from "../src/server/http.ts";
 import { GRANOLA_TRANSPORT_PROTOCOL_VERSION } from "../src/transport.ts";
-import type { CacheData, GranolaDocument } from "../src/types.ts";
+import type { CacheData, GranolaDocument, GranolaFolder } from "../src/types.ts";
 
 const documents: GranolaDocument[] = [
   {
@@ -52,6 +52,18 @@ const cacheData: CacheData = {
   },
 };
 
+const folders: GranolaFolder[] = [
+  {
+    createdAt: "2024-01-01T08:00:00Z",
+    documentIds: ["doc-alpha-1111"],
+    id: "folder-team-1111",
+    isFavourite: true,
+    name: "Team",
+    updatedAt: "2024-01-04T10:00:00Z",
+    workspaceId: "workspace-1",
+  },
+];
+
 function createTestApp(): GranolaApp {
   return new GranolaApp(
     {
@@ -77,6 +89,7 @@ function createTestApp(): GranolaApp {
       cacheLoader: async () => cacheData,
       granolaClient: {
         listDocuments: async () => documents,
+        listFolders: async () => folders,
       },
       now: () => new Date("2024-03-01T12:00:00Z"),
     },
@@ -129,6 +142,7 @@ describe("GranolaServerClient", () => {
       expect.objectContaining({
         capabilities: expect.objectContaining({
           attach: true,
+          folders: true,
           webClient: false,
         }),
         product: "granola-toolkit",
@@ -143,6 +157,7 @@ describe("GranolaServerClient", () => {
     );
 
     const meetings = await client.listMeetings({
+      folderId: "folder-team-1111",
       limit: 5,
       search: "alpha",
     });
@@ -152,6 +167,17 @@ describe("GranolaServerClient", () => {
         source: "live",
       }),
     );
+
+    const folderList = await client.listFolders({ limit: 10 });
+    expect(folderList.folders[0]).toEqual(
+      expect.objectContaining({
+        id: "folder-team-1111",
+        name: "Team",
+      }),
+    );
+
+    const folder = await client.findFolder("Team");
+    expect(folder.meetings[0]?.id).toBe("doc-alpha-1111");
 
     const event = await eventPromise;
     expect(event.state.ui.view).toBe("meeting-list");

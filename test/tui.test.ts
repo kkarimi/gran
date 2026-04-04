@@ -12,6 +12,7 @@ import type { CacheData, GranolaDocument } from "../src/types.ts";
 const meetings: MeetingSummaryRecord[] = [
   {
     createdAt: "2024-01-01T09:00:00Z",
+    folders: [],
     id: "doc-alpha-1111",
     noteContentSource: "notes",
     tags: ["team", "alpha"],
@@ -22,6 +23,7 @@ const meetings: MeetingSummaryRecord[] = [
   },
   {
     createdAt: "2024-02-01T09:00:00Z",
+    folders: [],
     id: "doc-bravo-2222",
     noteContentSource: "content",
     tags: ["sales"],

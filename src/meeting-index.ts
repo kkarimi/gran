@@ -5,7 +5,7 @@ import type { MeetingSummaryRecord } from "./app/models.ts";
 import { defaultGranolaToolkitPersistenceLayout } from "./persistence/layout.ts";
 import { parseJsonString } from "./utils.ts";
 
-const MEETING_INDEX_VERSION = 1;
+const MEETING_INDEX_VERSION = 2;
 
 interface MeetingIndexFile {
   meetings: MeetingSummaryRecord[];
@@ -22,11 +22,23 @@ export class MemoryMeetingIndexStore implements MeetingIndexStore {
   #meetings: MeetingSummaryRecord[] = [];
 
   async readIndex(): Promise<MeetingSummaryRecord[]> {
-    return this.#meetings.map((meeting) => ({ ...meeting, tags: [...meeting.tags] }));
+    return this.#meetings.map((meeting) => ({
+      ...meeting,
+      folders: Array.isArray(meeting.folders)
+        ? meeting.folders.map((folder) => ({ ...folder }))
+        : [],
+      tags: [...meeting.tags],
+    }));
   }
 
   async writeIndex(meetings: MeetingSummaryRecord[]): Promise<void> {
-    this.#meetings = meetings.map((meeting) => ({ ...meeting, tags: [...meeting.tags] }));
+    this.#meetings = meetings.map((meeting) => ({
+      ...meeting,
+      folders: Array.isArray(meeting.folders)
+        ? meeting.folders.map((folder) => ({ ...folder }))
+        : [],
+      tags: [...meeting.tags],
+    }));
   }
 }
 
@@ -43,6 +55,9 @@ export class FileMeetingIndexStore implements MeetingIndexStore {
 
       return parsed.meetings.map((meeting) => ({
         ...meeting,
+        folders: Array.isArray(meeting.folders)
+          ? meeting.folders.map((folder) => ({ ...folder }))
+          : [],
         tags: [...meeting.tags],
       }));
     } catch {
@@ -53,7 +68,13 @@ export class FileMeetingIndexStore implements MeetingIndexStore {
   async writeIndex(meetings: MeetingSummaryRecord[]): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
     const payload: MeetingIndexFile = {
-      meetings: meetings.map((meeting) => ({ ...meeting, tags: [...meeting.tags] })),
+      meetings: meetings.map((meeting) => ({
+        ...meeting,
+        folders: Array.isArray(meeting.folders)
+          ? meeting.folders.map((folder) => ({ ...folder }))
+          : [],
+        tags: [...meeting.tags],
+      })),
       updatedAt: new Date().toISOString(),
       version: MEETING_INDEX_VERSION,
     };

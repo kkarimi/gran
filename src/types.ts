@@ -45,6 +45,17 @@ export interface GranolaDocument {
   updatedAt: string;
 }
 
+export interface GranolaFolder {
+  createdAt: string;
+  description?: string;
+  documentIds: string[];
+  id: string;
+  isFavourite: boolean;
+  name: string;
+  updatedAt: string;
+  workspaceId?: string;
+}
+
 export interface TranscriptSegment {
   documentId: string;
   endTimestamp: string;

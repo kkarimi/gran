@@ -1,4 +1,5 @@
 import type {
+  FolderRecord,
   GranolaAppApi,
   GranolaAppAuthMode,
   GranolaAppAuthState,
@@ -7,6 +8,8 @@ import type {
   GranolaAppStateEvent,
   GranolaExportJobsListOptions,
   GranolaExportJobsResult,
+  GranolaFolderListOptions,
+  GranolaFolderListResult,
   GranolaMeetingBundle,
   GranolaMeetingListOptions,
   GranolaMeetingListResult,
@@ -18,6 +21,9 @@ import type {
 import {
   granolaExportJobRerunPath,
   granolaExportJobsPath,
+  granolaFolderPath,
+  granolaFolderResolvePath,
+  granolaFoldersPath,
   granolaMeetingPath,
   granolaMeetingResolvePath,
   granolaMeetingsPath,
@@ -224,6 +230,18 @@ export class GranolaServerClient implements GranolaAppApi {
       },
       method: "POST",
     });
+  }
+
+  async listFolders(options: GranolaFolderListOptions = {}): Promise<GranolaFolderListResult> {
+    return await this.requestJson(granolaFoldersPath(options));
+  }
+
+  async getFolder(id: string): Promise<FolderRecord> {
+    return await this.requestJson(granolaFolderPath(id));
+  }
+
+  async findFolder(query: string): Promise<FolderRecord> {
+    return await this.requestJson(granolaFolderResolvePath(query));
   }
 
   async listMeetings(options: GranolaMeetingListOptions = {}): Promise<GranolaMeetingListResult> {

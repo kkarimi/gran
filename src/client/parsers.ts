@@ -1,4 +1,4 @@
-import type { GranolaDocument, LastViewedPanel, ProseMirrorDoc } from "../types.ts";
+import type { GranolaDocument, GranolaFolder, LastViewedPanel, ProseMirrorDoc } from "../types.ts";
 import { asRecord, parseJsonString, stringArray, stringValue } from "../utils.ts";
 
 function parseProseMirrorDoc(
@@ -75,5 +75,51 @@ export function parseDocument(value: unknown): GranolaDocument {
     tags: stringArray(record.tags),
     title: stringValue(record.title),
     updatedAt: stringValue(record.updated_at),
+  };
+}
+
+function parseFolderDocumentIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (typeof item === "string") {
+        return item;
+      }
+
+      const record = asRecord(item);
+      if (!record) {
+        return "";
+      }
+
+      return stringValue(record.id) || stringValue(record.document_id);
+    })
+    .filter(Boolean);
+}
+
+export function parseFolder(value: unknown): GranolaFolder {
+  const record = asRecord(value);
+  if (!record) {
+    throw new Error("folder payload is not an object");
+  }
+
+  const createdAt = stringValue(record.created_at);
+  const updatedAt = stringValue(record.updated_at) || createdAt;
+  const name = stringValue(record.name) || stringValue(record.title);
+  const documents = parseFolderDocumentIds(record.documents);
+  const documentIds =
+    documents.length > 0 ? documents : parseFolderDocumentIds(record.document_ids);
+
+  return {
+    createdAt,
+    description: stringValue(record.description) || undefined,
+    documentIds,
+    id: stringValue(record.id),
+    isFavourite: Boolean(record.is_favourite),
+    name,
+    updatedAt,
+    workspaceId: stringValue(record.workspace_id) || undefined,
   };
 }

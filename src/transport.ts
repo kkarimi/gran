@@ -1,7 +1,11 @@
-import type { GranolaExportJobsListOptions, GranolaMeetingListOptions } from "./app/index.ts";
+import type {
+  GranolaExportJobsListOptions,
+  GranolaFolderListOptions,
+  GranolaMeetingListOptions,
+} from "./app/index.ts";
 import type { GranolaToolkitSessionStoreKind } from "./persistence/layout.ts";
 
-export const GRANOLA_TRANSPORT_PROTOCOL_VERSION = 1;
+export const GRANOLA_TRANSPORT_PROTOCOL_VERSION = 2;
 
 export interface GranolaServerInfo {
   capabilities: {
@@ -9,6 +13,7 @@ export interface GranolaServerInfo {
     auth: boolean;
     events: boolean;
     exports: boolean;
+    folders: boolean;
     meetingOpen: boolean;
     webClient: boolean;
   };
@@ -34,6 +39,8 @@ export const granolaTransportPaths = {
   exportJobs: "/exports/jobs",
   exportNotes: "/exports/notes",
   exportTranscripts: "/exports/transcripts",
+  folderResolve: "/folders/resolve",
+  folders: "/folders",
   health: "/health",
   meetingResolve: "/meetings/resolve",
   meetings: "/meetings",
@@ -73,12 +80,31 @@ export function granolaMeetingResolvePath(
 
 export function granolaMeetingsPath(options: GranolaMeetingListOptions = {}): string {
   return appendSearchParams(granolaTransportPaths.meetings, {
+    folderId: options.folderId,
     limit: options.limit,
     refresh: options.forceRefresh ? "true" : undefined,
     search: options.search,
     sort: options.sort,
     updatedFrom: options.updatedFrom,
     updatedTo: options.updatedTo,
+  });
+}
+
+export function granolaFolderPath(id: string): string {
+  return `${granolaTransportPaths.folders}/${encodeURIComponent(id)}`;
+}
+
+export function granolaFolderResolvePath(query: string): string {
+  return appendSearchParams(granolaTransportPaths.folderResolve, {
+    q: query,
+  });
+}
+
+export function granolaFoldersPath(options: GranolaFolderListOptions = {}): string {
+  return appendSearchParams(granolaTransportPaths.folders, {
+    limit: options.limit,
+    refresh: options.forceRefresh ? "true" : undefined,
+    search: options.search,
   });
 }
 

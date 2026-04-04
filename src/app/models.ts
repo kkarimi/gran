@@ -43,8 +43,20 @@ export interface TranscriptExportRecord {
   updatedAt: string;
 }
 
+export interface FolderSummaryRecord {
+  createdAt: string;
+  description?: string;
+  documentCount: number;
+  id: string;
+  isFavourite: boolean;
+  name: string;
+  updatedAt: string;
+  workspaceId?: string;
+}
+
 export interface MeetingSummaryRecord {
   createdAt: string;
+  folders: FolderSummaryRecord[];
   id: string;
   noteContentSource: NoteContentSource;
   tags: string[];
@@ -80,6 +92,11 @@ export interface MeetingRecord {
   noteMarkdown: string;
   transcript: MeetingTranscriptRecord | null;
   transcriptText: string | null;
+}
+
+export interface FolderRecord extends FolderSummaryRecord {
+  documentIds: string[];
+  meetings: MeetingSummaryRecord[];
 }
 
 export type GranolaSessionMode = "stored-session" | "supabase-file";

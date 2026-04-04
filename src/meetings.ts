@@ -1,4 +1,5 @@
 import type {
+  FolderSummaryRecord,
   MeetingNoteRecord,
   MeetingRecord,
   MeetingSummaryRecord,
@@ -224,6 +225,18 @@ function matchesMeetingSearch(document: GranolaDocument, search: string): boolea
   );
 }
 
+function matchesMeetingFolders(
+  documentId: string,
+  folderId: string | undefined,
+  foldersByDocumentId?: Map<string, FolderSummaryRecord[]>,
+): boolean {
+  if (!folderId) {
+    return true;
+  }
+
+  return (foldersByDocumentId?.get(documentId) ?? []).some((folder) => folder.id === folderId);
+}
+
 function matchesMeetingSummarySearch(meeting: MeetingSummaryRecord, search: string): boolean {
   const query = search.trim().toLowerCase();
   if (!query) {
@@ -233,6 +246,10 @@ function matchesMeetingSummarySearch(meeting: MeetingSummaryRecord, search: stri
   return [meeting.id, meeting.title, ...meeting.tags].some((value) =>
     value.toLowerCase().includes(query),
   );
+}
+
+function meetingFolders(meeting: MeetingSummaryRecord): FolderSummaryRecord[] {
+  return Array.isArray(meeting.folders) ? meeting.folders : [];
 }
 
 function parseDateFilter(
@@ -341,12 +358,14 @@ function formatTranscriptLines(transcript: MeetingTranscriptRecord | null): stri
 export function buildMeetingSummary(
   document: GranolaDocument,
   cacheData?: CacheData,
+  folders: FolderSummaryRecord[] = [],
 ): MeetingSummaryRecord {
   const note = buildNoteExport(document);
   const transcript = buildMeetingTranscript(document, cacheData);
 
   return {
     createdAt: document.createdAt,
+    folders: folders.map((folder) => ({ ...folder })),
     id: document.id,
     noteContentSource: note.contentSource,
     tags: [...document.tags],
@@ -360,6 +379,7 @@ export function buildMeetingSummary(
 export function buildMeetingRecord(
   document: GranolaDocument,
   cacheData?: CacheData,
+  folders: FolderSummaryRecord[] = [],
 ): MeetingRecord {
   const note = buildNoteExport(document);
   const transcript = buildMeetingTranscript(document, cacheData);
@@ -367,6 +387,7 @@ export function buildMeetingRecord(
   return {
     meeting: {
       createdAt: document.createdAt,
+      folders: folders.map((folder) => ({ ...folder })),
       id: document.id,
       noteContentSource: note.contentSource,
       tags: [...document.tags],
@@ -386,6 +407,8 @@ export function listMeetings(
   documents: GranolaDocument[],
   options: {
     cacheData?: CacheData;
+    folderId?: string;
+    foldersByDocumentId?: Map<string, FolderSummaryRecord[]>;
     limit?: number;
     search?: string;
     sort?: GranolaMeetingSort;
@@ -397,16 +420,22 @@ export function listMeetings(
   const sort = options.sort ?? "updated-desc";
   const filtered = documents
     .filter((document) => (options.search ? matchesMeetingSearch(document, options.search) : true))
+    .filter((document) =>
+      matchesMeetingFolders(document.id, options.folderId, options.foldersByDocumentId),
+    )
     .filter((document) => matchesUpdatedRange(document, options.updatedFrom, options.updatedTo))
     .sort((left, right) => compareMeetingDocumentsBySort(left, right, sort))
     .slice(0, limit);
 
-  return filtered.map((document) => buildMeetingSummary(document, options.cacheData));
+  return filtered.map((document) =>
+    buildMeetingSummary(document, options.cacheData, options.foldersByDocumentId?.get(document.id)),
+  );
 }
 
 export function filterMeetingSummaries(
   meetings: MeetingSummaryRecord[],
   options: {
+    folderId?: string;
     limit?: number;
     search?: string;
     sort?: GranolaMeetingSort;
@@ -419,6 +448,11 @@ export function filterMeetingSummaries(
 
   return meetings
     .filter((meeting) =>
+      options.folderId
+        ? meetingFolders(meeting).some((folder) => folder.id === options.folderId)
+        : true,
+    )
+    .filter((meeting) =>
       options.search ? matchesMeetingSummarySearch(meeting, options.search) : true,
     )
     .filter((meeting) =>
@@ -426,7 +460,11 @@ export function filterMeetingSummaries(
     )
     .sort((left, right) => compareMeetingSummariesBySort(left, right, sort))
     .slice(0, limit)
-    .map((meeting) => ({ ...meeting, tags: [...meeting.tags] }));
+    .map((meeting) => ({
+      ...meeting,
+      folders: meetingFolders(meeting).map((folder) => ({ ...folder })),
+      tags: [...meeting.tags],
+    }));
 }
 
 export function resolveMeetingQuery(documents: GranolaDocument[], query: string): GranolaDocument {
@@ -505,16 +543,23 @@ export function renderMeetingList(
   }
 
   const lines = [
-    `${"ID".padEnd(10)} ${"DATE".padEnd(10)} ${"TITLE".padEnd(42)} ${"NOTE".padEnd(18)} TRANSCRIPT`,
-    `${"-".repeat(10)} ${"-".repeat(10)} ${"-".repeat(42)} ${"-".repeat(18)} ${"-".repeat(10)}`,
+    `${"ID".padEnd(10)} ${"DATE".padEnd(10)} ${"TITLE".padEnd(34)} ${"FOLDERS".padEnd(18)} ${"NOTE".padEnd(18)} TRANSCRIPT`,
+    `${"-".repeat(10)} ${"-".repeat(10)} ${"-".repeat(34)} ${"-".repeat(18)} ${"-".repeat(18)} ${"-".repeat(10)}`,
   ];
 
   for (const meeting of meetings) {
+    const folderLabel =
+      meetingFolders(meeting).length === 0
+        ? "-"
+        : meetingFolders(meeting).length === 1
+          ? meetingFolders(meeting)[0]!.name
+          : `${meetingFolders(meeting)[0]!.name} +${meetingFolders(meeting).length - 1}`;
     lines.push(
       [
         meeting.id.slice(0, 8).padEnd(10),
         formatMeetingDate(meeting.updatedAt || meeting.createdAt).padEnd(10),
-        truncate(meeting.title || meeting.id, 42),
+        truncate(meeting.title || meeting.id, 34),
+        truncate(folderLabel, 18),
         truncate(meeting.noteContentSource, 18),
         formatTranscriptStatus(meeting),
       ].join(" "),
@@ -538,6 +583,12 @@ export function renderMeetingView(
   }
 
   const tags = record.meeting.tags.length > 0 ? record.meeting.tags.join(", ") : "(none)";
+  const folders =
+    meetingFolders(record.meeting).length > 0
+      ? meetingFolders(record.meeting)
+          .map((folder) => folder.name)
+          .join(", ")
+      : "(none)";
   const transcriptStatus = !record.meeting.transcriptLoaded
     ? "cache not loaded"
     : record.meeting.transcriptSegmentCount === 0
@@ -551,6 +602,7 @@ export function renderMeetingView(
     `Created: ${record.meeting.createdAt || "-"}`,
     `Updated: ${record.meeting.updatedAt || "-"}`,
     `Tags: ${tags}`,
+    `Folders: ${folders}`,
     `Note source: ${record.meeting.noteContentSource}`,
     `Transcript: ${transcriptStatus}`,
     "",

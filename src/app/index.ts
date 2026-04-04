@@ -1,5 +1,7 @@
 export { GranolaApp, createGranolaApp } from "./core.ts";
 export type {
+  FolderRecord,
+  FolderSummaryRecord,
   GranolaSessionMetadata,
   GranolaSessionMode,
   MeetingNoteRecord,
@@ -23,11 +25,14 @@ export type {
   GranolaExportJobRunResult,
   GranolaAppDocumentsState,
   GranolaAppExportRunState,
+  GranolaAppFoldersState,
   GranolaAppIndexState,
   GranolaExportJobKind,
   GranolaExportJobStatus,
   GranolaExportJobsListOptions,
   GranolaExportJobsResult,
+  GranolaFolderListOptions,
+  GranolaFolderListResult,
   GranolaMeetingSort,
   GranolaAppStateEvent,
   GranolaAppState,

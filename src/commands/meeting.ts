@@ -33,6 +33,7 @@ Subcommands:
 
 Options:
   --cache <path>      Path to Granola cache JSON for transcript data
+  --folder <query>    Filter list to one folder id or name
   --format <value>    list/view: text, json, yaml; export: json, yaml; notes: markdown, json, yaml, raw; transcript: text, json, yaml, raw
   --network <mode>    open: local or lan (default: local)
   --hostname <value>  open: hostname to bind (overrides network default)
@@ -139,6 +140,7 @@ export const meetingCommand: CommandDefinition = {
   description: "Inspect and export individual Granola meetings",
   flags: {
     cache: { type: "string" },
+    folder: { type: "string" },
     format: { type: "string" },
     help: { type: "boolean" },
     hostname: { type: "string" },
@@ -201,6 +203,7 @@ async function list(
 ): Promise<number> {
   const format = resolveListFormat(commandFlags.format);
   const limit = parseLimit(commandFlags.limit);
+  const folderQuery = typeof commandFlags.folder === "string" ? commandFlags.folder : undefined;
   const search = typeof commandFlags.search === "string" ? commandFlags.search : undefined;
 
   const config = await loadConfig({
@@ -215,12 +218,17 @@ async function list(
   debug(config.debug, "authMode", app.getState().auth.mode);
 
   console.log("Loading meetings...");
-  const result = await app.listMeetings({ limit, search });
+  const folder = folderQuery ? await app.findFolder(folderQuery) : undefined;
+  const folderId = folder?.id;
+  const result = await app.listMeetings({ folderId, limit, search });
   console.log(
     result.source === "index"
       ? "Loaded meetings from the local index"
       : "Fetched meetings from Granola API",
   );
+  if (folder) {
+    console.log(`Folder: ${folder.name} (${folder.id})`);
+  }
 
   console.log(renderMeetingList(result.meetings, format).trimEnd());
   return 0;

@@ -1,10 +1,14 @@
-import type { GranolaDocument } from "../types.ts";
+import type { GranolaDocument, GranolaFolder } from "../types.ts";
 
-import { parseDocument } from "./parsers.ts";
+import { parseDocument, parseFolder } from "./parsers.ts";
 import type { AuthenticatedHttpClient } from "./http.ts";
 
 const DEFAULT_CLIENT_VERSION = "5.354.0";
 const DOCUMENTS_URL = "https://api.granola.ai/v2/get-documents";
+const FOLDERS_URLS = [
+  "https://api.granola.ai/v2/get-document-lists",
+  "https://api.granola.ai/v1/get-document-lists",
+] as const;
 
 function resolveClientVersion(value?: string): string {
   return value?.trim() || process.env.GRANOLA_CLIENT_VERSION?.trim() || DEFAULT_CLIENT_VERSION;
@@ -73,5 +77,48 @@ export class GranolaApiClient {
     }
 
     return documents;
+  }
+
+  async listFolders(options: { timeoutMs: number }): Promise<GranolaFolder[]> {
+    let lastError: Error | undefined;
+
+    for (const foldersUrl of FOLDERS_URLS) {
+      const response = await this.httpClient.postJson(
+        foldersUrl,
+        {},
+        {
+          headers: {
+            "User-Agent": `Granola/${this.clientVersion}`,
+            "X-Client-Version": this.clientVersion,
+          },
+          timeoutMs: options.timeoutMs,
+        },
+      );
+
+      if (response.status === 404) {
+        lastError = new Error(`failed to get folders: ${response.status} ${response.statusText}`);
+        continue;
+      }
+
+      if (!response.ok) {
+        const body = (await response.text()).slice(0, 500);
+        throw new Error(
+          `failed to get folders: ${response.status} ${response.statusText}${body ? `: ${body}` : ""}`,
+        );
+      }
+
+      const payload = (await response.json()) as unknown;
+      const folders = Array.isArray(payload)
+        ? payload
+        : Array.isArray((payload as { lists?: unknown[] }).lists)
+          ? (payload as { lists: unknown[] }).lists
+          : Array.isArray((payload as { document_lists?: unknown[] }).document_lists)
+            ? (payload as { document_lists: unknown[] }).document_lists
+            : [];
+
+      return folders.map(parseFolder);
+    }
+
+    throw lastError ?? new Error("failed to get folders");
   }
 }
