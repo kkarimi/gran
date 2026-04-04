@@ -97,15 +97,25 @@ jobs:
         run: npm publish --provenance --access public
 
   auto-approve-publish:
-    if: |
-      needs.prepare-publish.outputs.should_publish == 'true' &&
-      secrets.GH_RELEASE_APPROVER_TOKEN != ''
+    if: needs.prepare-publish.outputs.should_publish == 'true'
     needs:
       - verify
       - prepare-publish
     runs-on: ubuntu-latest
     steps:
+      - id: approver
+        name: Check auto-approver configuration
+        env:
+          GH_RELEASE_APPROVER_TOKEN: ${{ secrets.GH_RELEASE_APPROVER_TOKEN }}
+        run: |
+          if [ -n "${GH_RELEASE_APPROVER_TOKEN}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No GH_RELEASE_APPROVER_TOKEN secret configured; leaving the publish gate manual."
+          fi
       - uses: actions/github-script@v8
+        if: steps.approver.outputs.configured == 'true'
         env:
           TARGET_ENVIRONMENT: production
         with:
