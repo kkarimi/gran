@@ -5,10 +5,13 @@ const workspaceTabs = ["notes", "transcript", "metadata", "raw"];
 const state = {
   appState: null,
   detailError: "",
+  folderError: "",
+  folders: [],
   listError: "",
   meetings: [],
   quickOpen: "",
   search: "",
+  selectedFolderId: null,
   selectedMeeting: null,
   selectedMeetingBundle: null,
   selectedMeetingId: null,
@@ -26,6 +29,7 @@ const els = {
   detailBody: document.querySelector("[data-detail-body]"),
   detailMeta: document.querySelector("[data-detail-meta]"),
   empty: document.querySelector("[data-empty]"),
+  folderList: document.querySelector("[data-folder-list]"),
   jobsList: document.querySelector("[data-jobs-list]"),
   list: document.querySelector("[data-meeting-list]"),
   noteButton: document.querySelector("[data-export-notes]"),
@@ -52,6 +56,7 @@ function parseWorkspaceTab(value) {
 function startupSelection() {
   const params = new URLSearchParams(window.location.search);
   return {
+    folderId: params.get("folder")?.trim() || "",
     meetingId: params.get("meeting")?.trim() || "",
     workspaceTab: parseWorkspaceTab(params.get("tab")),
   };
@@ -59,6 +64,12 @@ function startupSelection() {
 
 function syncBrowserUrl() {
   const url = new URL(window.location.href);
+
+  if (state.selectedFolderId) {
+    url.searchParams.set("folder", state.selectedFolderId);
+  } else {
+    url.searchParams.delete("folder");
+  }
 
   if (state.selectedMeetingId) {
     url.searchParams.set("meeting", state.selectedMeetingId);
@@ -103,6 +114,11 @@ function syncFilterInputs() {
 function currentFilterSummary() {
   const parts = [];
 
+  if (state.selectedFolderId) {
+    const folder = state.folders.find((candidate) => candidate.id === state.selectedFolderId);
+    parts.push("folder " + (folder ? '"' + folder.name + '"' : '"' + state.selectedFolderId + '"'));
+  }
+
   if (state.search) {
     parts.push('search "' + state.search + '"');
   }
@@ -145,6 +161,9 @@ function renderAppState() {
     : appState.index.available
       ? "available"
       : "not built";
+  const folderStatus = appState.folders.loaded
+    ? appState.folders.count + " folders"
+    : "not loaded";
 
   els.appState.innerHTML = [
     '<div class="status-grid">',
@@ -152,6 +171,7 @@ function renderAppState() {
     '<div><span class="status-label">View</span><strong>' + escapeHtml(appState.ui.view) + "</strong></div>",
     '<div><span class="status-label">Auth</span><strong>' + escapeHtml(authMode) + "</strong></div>",
     '<div><span class="status-label">Documents</span><strong>' + escapeHtml(docs) + "</strong></div>",
+    '<div><span class="status-label">Folders</span><strong>' + escapeHtml(folderStatus) + "</strong></div>",
     '<div><span class="status-label">Cache</span><strong>' + escapeHtml(cache) + "</strong></div>",
     '<div><span class="status-label">Index</span><strong>' + escapeHtml(indexStatus) + "</strong></div>",
     "</div>",
@@ -160,6 +180,50 @@ function renderAppState() {
   renderSecurityPanel();
   renderAuthPanel();
   renderExportJobs();
+}
+
+function renderFolderList() {
+  if (state.folderError) {
+    els.folderList.innerHTML =
+      '<div class="folder-empty folder-empty--error">' + escapeHtml(state.folderError) + "</div>";
+    return;
+  }
+
+  const buttons = [
+    [
+      '<button class="folder-row"' +
+        (state.selectedFolderId ? "" : ' data-selected="true"') +
+        ' data-folder-id="">',
+      '<span class="folder-row__title">All meetings</span>',
+      '<span class="folder-row__meta">Browse the full meeting list.</span>',
+      "</button>",
+    ].join(""),
+  ];
+
+  for (const folder of state.folders) {
+    buttons.push(
+      [
+        '<button class="folder-row"' +
+          (folder.id === state.selectedFolderId ? ' data-selected="true"' : "") +
+          ' data-folder-id="' +
+          escapeHtml(folder.id) +
+          '">',
+        '<span class="folder-row__title">' +
+          escapeHtml((folder.isFavourite ? "★ " : "") + (folder.name || folder.id)) +
+          "</span>",
+        '<span class="folder-row__meta">' +
+          escapeHtml(String(folder.documentCount) + " meetings") +
+          "</span>",
+        "</button>",
+      ].join(""),
+    );
+  }
+
+  if (buttons.length === 1) {
+    buttons.push('<div class="folder-empty">No folders found.</div>');
+  }
+
+  els.folderList.innerHTML = buttons.join("");
 }
 
 function renderSecurityPanel() {
@@ -305,6 +369,7 @@ function renderMeetingDetail() {
     "Title: " + (record.meeting.title || record.meeting.id),
     "Created: " + record.meeting.createdAt,
     "Updated: " + record.meeting.updatedAt,
+    "Folders: " + (record.meeting.folders.length ? record.meeting.folders.map((folder) => folder.name).join(", ") : "none"),
     "Tags: " + (record.meeting.tags.length ? record.meeting.tags.join(", ") : "none"),
     "Transcript loaded: " + (record.meeting.transcriptLoaded ? "yes" : "no"),
   ].join("\n");
@@ -414,11 +479,48 @@ function buildMeetingsQuery(limit = 100, refresh = false) {
     params.set("updatedTo", state.updatedTo);
   }
 
+  if (state.selectedFolderId) {
+    params.set("folderId", state.selectedFolderId);
+  }
+
   if (refresh) {
     params.set("refresh", "true");
   }
 
   return "?" + params.toString();
+}
+
+async function loadFolders(options = {}) {
+  const refresh = options.refresh === true;
+
+  try {
+    state.folderError = "";
+    const params = new URLSearchParams();
+    params.set("limit", "100");
+    if (refresh) {
+      params.set("refresh", "true");
+    }
+
+    const payload = await fetchJson("/folders?" + params.toString());
+    state.folders = payload.folders || [];
+    if (
+      state.selectedFolderId &&
+      !state.folders.some((folder) => folder.id === state.selectedFolderId)
+    ) {
+      state.selectedFolderId = null;
+    }
+  } catch (error) {
+    if (error.authRequired) {
+      throw error;
+    }
+
+    state.folderError = error instanceof Error ? error.message : String(error);
+    state.folders = [];
+    state.selectedFolderId = null;
+  }
+
+  renderFolderList();
+  syncBrowserUrl();
 }
 
 async function loadMeetings(options = {}) {
@@ -484,10 +586,12 @@ async function quickOpenMeeting() {
   try {
     state.quickOpen = query;
     const payload = await fetchJson("/meetings/resolve?q=" + encodeURIComponent(query));
+    state.selectedFolderId = payload.meeting?.meeting?.folders?.[0]?.id || null;
     state.search = "";
     state.updatedFrom = "";
     state.updatedTo = "";
     syncFilterInputs();
+    renderFolderList();
     await loadMeetings({
       preferredMeetingId: payload.document.id,
     });
@@ -502,11 +606,9 @@ async function quickOpenMeeting() {
 async function refreshAll(forceLiveMeetings = false) {
   setStatus("Refreshing…", "busy");
   try {
-    const [appState, authState] = await Promise.all([
-      fetchJson("/state"),
-      fetchJson("/auth/status"),
-      loadMeetings({ refresh: forceLiveMeetings }),
-    ]);
+    await loadFolders({ refresh: forceLiveMeetings });
+    const [appState, authState] = await Promise.all([fetchJson("/state"), fetchJson("/auth/status")]);
+    await loadMeetings({ refresh: forceLiveMeetings });
     state.serverLocked = false;
     state.appState = {
       ...appState,
@@ -657,16 +759,39 @@ async function lockServer() {
 
   state.serverLocked = true;
   state.appState = null;
+  state.folders = [];
   state.meetings = [];
+  state.selectedFolderId = null;
   state.selectedMeeting = null;
   state.selectedMeetingBundle = null;
   state.detailError = "";
+  state.folderError = "";
   els.serverPassword.value = "";
   renderSecurityPanel();
+  renderFolderList();
   renderMeetingList();
   renderMeetingDetail();
   setStatus("Server locked", "error");
 }
+
+els.folderList.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
+  const button = event.target.closest("[data-folder-id]");
+  if (!button) {
+    return;
+  }
+
+  const nextFolderId = button.dataset.folderId || null;
+  state.selectedFolderId = nextFolderId;
+  state.selectedMeetingId = null;
+  state.selectedMeeting = null;
+  state.selectedMeetingBundle = null;
+  renderFolderList();
+  void loadMeetings();
+});
 
 els.list.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) {
@@ -872,6 +997,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 const initialSelection = startupSelection();
+state.selectedFolderId = initialSelection.folderId || null;
 state.selectedMeetingId = initialSelection.meetingId || null;
 state.workspaceTab = initialSelection.workspaceTab;
 
@@ -887,9 +1013,12 @@ events.addEventListener("state.updated", (event) => {
     payload.state.documents?.loadedAt &&
     payload.state.documents.loadedAt !== previousLoadedAt
   ) {
-    void loadMeetings({
-      preferredMeetingId: state.selectedMeetingId,
-    });
+    void (async () => {
+      await loadFolders();
+      await loadMeetings({
+        preferredMeetingId: state.selectedMeetingId,
+      });
+    })();
   }
 });
 events.addEventListener("error", () => {
@@ -898,6 +1027,7 @@ events.addEventListener("error", () => {
 
 syncFilterInputs();
 renderSecurityPanel();
+renderFolderList();
 
 void refreshAll().catch((error) => {
   setStatus("Error", "error");

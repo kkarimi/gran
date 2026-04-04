@@ -275,10 +275,13 @@ You can deep-link into a specific meeting with either:
 
 The initial browser client includes:
 
+- a dedicated folder pane with an explicit All meetings scope
 - a searchable meeting list
+- folder-aware meeting browsing with one-click scope changes
 - a fast local-index warm start for meeting browsing before live documents finish loading
 - sort and updated-date filters
 - quick open by meeting id or title
+- browser URL state that preserves the selected folder, meeting, and tab
 - a focused meeting workspace with notes, transcript, metadata, and raw tabs
 - keyboard-first workspace switching with `1`-`4`, `[` and `]`
 - app-state status from the shared core

@@ -3,7 +3,7 @@ export const granolaWebMarkup = String.raw`
   <aside class="pane sidebar">
     <section class="hero">
       <h1>Granola Toolkit</h1>
-      <p>Browser workspace for meetings, notes, transcripts, and export flows on top of one local server instance.</p>
+      <p>Browser workspace for folders, meetings, notes, transcripts, and export flows on top of one local server instance.</p>
       <input class="search" data-search placeholder="Search meetings, ids, or tags" />
       <div class="field-row field-row--inline">
         <label>
@@ -24,6 +24,13 @@ export const granolaWebMarkup = String.raw`
         <span class="field-label">Updated To</span>
         <input class="field-input" data-updated-to type="date" />
       </label>
+    </section>
+    <section class="folder-panel">
+      <div class="folder-panel__head">
+        <h2>Folders</h2>
+        <p>Pick a folder to scope the meeting browser, or stay on All meetings.</p>
+      </div>
+      <div class="folder-list" data-folder-list></div>
     </section>
     <section class="toolbar">
       <div>

@@ -49,11 +49,11 @@ body {
 
 .sidebar {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   overflow: hidden;
 }
 
-.hero, .toolbar, .detail-head {
+.hero, .toolbar, .detail-head, .folder-panel {
   padding: 22px 24px;
   border-bottom: 1px solid var(--line);
 }
@@ -108,6 +108,68 @@ body {
 .meeting-list {
   padding: 14px;
   overflow: auto;
+}
+
+.folder-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.folder-panel__head h2 {
+  margin: 0;
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.folder-panel__head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.folder-list {
+  display: grid;
+  gap: 10px;
+}
+
+.folder-row {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: inherit;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.folder-row:hover,
+.folder-row[data-selected="true"] {
+  transform: translateY(-1px);
+  border-color: rgba(163, 79, 47, 0.26);
+  background: var(--panel-strong);
+}
+
+.folder-row__title {
+  font-weight: 700;
+}
+
+.folder-row__meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.folder-empty {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.folder-empty--error {
+  color: var(--error);
 }
 
 .meeting-row {

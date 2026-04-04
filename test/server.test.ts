@@ -342,6 +342,7 @@ describe("startGranolaServer", () => {
         cacheLoader: async () => cacheData,
         granolaClient: {
           listDocuments: async () => documents,
+          listFolders: async () => folders,
         },
         now: () => new Date("2024-03-01T12:00:00Z"),
       },
@@ -360,11 +361,13 @@ describe("startGranolaServer", () => {
     const html = await response.text();
     expect(html).toContain("<title>Granola Toolkit</title>");
     expect(html).toContain("Auth Session");
+    expect(html).toContain(">Folders<");
     expect(html).toContain('"passwordRequired":false');
     expect(html).toContain("Meeting Workspace");
     expect(html).toContain("Recent Export Jobs");
     expect(html).toContain('new EventSource("/events")');
     expect(html).toContain("data-auth-panel");
+    expect(html).toContain("data-folder-list");
     expect(html).toContain('data-workspace-tab="notes"');
     expect(html).toContain("1-4 switch tabs");
   });

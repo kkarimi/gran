@@ -56,7 +56,11 @@ function printWebRoutes(): void {
   console.log("  GET  /auth/status");
   console.log("  GET  /state");
   console.log("  GET  /events");
+  console.log("  GET  /folders");
+  console.log("  GET  /folders/resolve?q=<query>");
+  console.log("  GET  /folders/:id");
   console.log("  GET  /meetings");
+  console.log("  GET  /meetings?folderId=<id>");
   console.log("  GET  /meetings/:id");
   console.log("  GET  /exports/jobs");
   console.log("  POST /auth/login");
