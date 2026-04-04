@@ -230,7 +230,7 @@ class GranolaTuiWorkspace implements Component {
 
   private async loadMeeting(
     meetingId: string,
-    options: { ensureMeetingVisible?: boolean } = {},
+    options: { ensureMeetingVisible?: boolean; resolveQuery?: boolean } = {},
   ): Promise<void> {
     const token = ++this.#detailToken;
     this.#loadingDetail = true;
@@ -240,7 +240,9 @@ class GranolaTuiWorkspace implements Component {
     this.setStatus(`Opening ${meetingId}…`);
 
     try {
-      const bundle = await this.app.getMeeting(meetingId);
+      const bundle = options.resolveQuery
+        ? await this.app.findMeeting(meetingId)
+        : await this.app.getMeeting(meetingId);
       if (token !== this.#detailToken) {
         return;
       }
@@ -373,6 +375,7 @@ class GranolaTuiWorkspace implements Component {
         closeOverlay();
         await this.loadMeeting(query, {
           ensureMeetingVisible: true,
+          resolveQuery: true,
         });
       },
     });
