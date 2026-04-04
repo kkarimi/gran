@@ -10,10 +10,12 @@ function syncHelp(): string {
 
 Usage:
   granola sync [options]
+  granola sync events [options]
 
 Options:
   --watch             Keep syncing in the background until interrupted
   --interval <value>  Poll interval for --watch, e.g. 60s or 5m (default: 60s)
+  --limit <value>     Event count for sync events output (default: 20)
   --cache <path>      Path to Granola cache JSON
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
@@ -53,12 +55,13 @@ export const syncCommand: CommandDefinition = {
     cache: { type: "string" },
     help: { type: "boolean" },
     interval: { type: "string" },
+    limit: { type: "string" },
     timeout: { type: "string" },
     watch: { type: "boolean" },
   },
   help: syncHelp,
   name: "sync",
-  async run({ commandFlags, globalFlags }) {
+  async run({ commandArgs, commandFlags, globalFlags }) {
     const config = await loadConfig({
       globalFlags,
       subcommandFlags: commandFlags,
@@ -71,6 +74,26 @@ export const syncCommand: CommandDefinition = {
 
     const app = await createGranolaApp(config);
     debug(config.debug, "authMode", app.getState().auth.mode);
+
+    if (commandArgs[0] === "events") {
+      const limit =
+        typeof commandFlags.limit === "string" && /^\d+$/.test(commandFlags.limit)
+          ? Number(commandFlags.limit)
+          : 20;
+      const result = await app.listSyncEvents({ limit });
+      if (result.events.length === 0) {
+        console.log("No sync events yet.");
+        return 0;
+      }
+
+      for (const event of result.events) {
+        console.log(
+          `${event.occurredAt} ${event.kind.padEnd(18)} ${event.title} (${event.meetingId})`,
+        );
+      }
+      return 0;
+    }
+
     const result = await app.sync();
     printSyncResult(result);
     if (result.state.lastCompletedAt) {

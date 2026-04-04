@@ -8,6 +8,7 @@ import { GranolaApp } from "../src/app/core.ts";
 import type { GranolaAppAuthState } from "../src/app/index.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
 import { MemoryMeetingIndexStore } from "../src/meeting-index.ts";
+import { MemorySyncEventStore } from "../src/sync-events.ts";
 import { startGranolaServer } from "../src/server/http.ts";
 import { GRANOLA_TRANSPORT_PROTOCOL_VERSION } from "../src/transport.ts";
 import type { CacheData, GranolaDocument, GranolaFolder } from "../src/types.ts";
@@ -116,6 +117,7 @@ describe("startGranolaServer", () => {
           listFolders: async () => folders,
         },
         now: () => new Date("2024-03-01T12:00:00Z"),
+        syncEventStore: new MemorySyncEventStore(),
       },
       { surface: "server" },
     );
@@ -156,6 +158,7 @@ describe("startGranolaServer", () => {
         persistence: expect.objectContaining({
           exportJobs: true,
           meetingIndex: true,
+          syncEvents: true,
           syncState: true,
         }),
         product: "granola-toolkit",
@@ -212,6 +215,55 @@ describe("startGranolaServer", () => {
 
     const root = await fetch(new URL("/", server.url));
     expect(root.status).toBe(404);
+  });
+
+  test("serves persisted sync events", async () => {
+    const app = new GranolaApp(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+        syncEventStore: new MemorySyncEventStore(),
+      },
+      { surface: "server" },
+    );
+    await app.sync();
+
+    const server = await startGranolaServer(app);
+    closeServer = async () => await server.close();
+
+    const response = await fetch(new URL("/sync/events?limit=5", server.url));
+    expect(response.ok).toBe(true);
+    expect(await response.json()).toEqual({
+      events: expect.arrayContaining([
+        expect.objectContaining({
+          kind: "meeting.created",
+          meetingId: "doc-alpha-1111",
+        }),
+      ]),
+    });
   });
 
   test("streams state updates and handles export requests", async () => {

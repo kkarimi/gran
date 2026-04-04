@@ -13,6 +13,9 @@ describe("createGranolaSyncLoop", () => {
     const sync = vi.fn(async () => ({
       changes: [],
       state: {
+        eventCount: 0,
+        eventsFile: "/tmp/sync-events.jsonl",
+        filePath: "/tmp/sync-state.json",
         lastChanges: [],
         running: false,
       },

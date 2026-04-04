@@ -1,5 +1,9 @@
 import type { MeetingSummaryRecord } from "./app/models.ts";
-import type { GranolaAppSyncChange, GranolaAppSyncSummary } from "./app/types.ts";
+import type {
+  GranolaAppSyncChange,
+  GranolaAppSyncEvent,
+  GranolaAppSyncSummary,
+} from "./app/types.ts";
 
 function normaliseMeeting(meeting: MeetingSummaryRecord): Record<string, unknown> {
   return {
@@ -115,4 +119,28 @@ export function diffMeetingSummaries(
       transcriptReadyCount,
     },
   };
+}
+
+export function buildSyncEvents(
+  runId: string,
+  occurredAt: string,
+  changes: GranolaAppSyncChange[],
+): GranolaAppSyncEvent[] {
+  return changes.map((change, index) => ({
+    id: `${runId}:${index + 1}`,
+    kind:
+      change.kind === "created"
+        ? "meeting.created"
+        : change.kind === "changed"
+          ? "meeting.changed"
+          : change.kind === "removed"
+            ? "meeting.removed"
+            : "transcript.ready",
+    meetingId: change.meetingId,
+    occurredAt,
+    previousUpdatedAt: change.previousUpdatedAt,
+    runId,
+    title: change.title,
+    updatedAt: change.updatedAt,
+  }));
 }

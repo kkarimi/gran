@@ -327,6 +327,8 @@ function createAppState(): GranolaAppState {
       meetingCount: 2,
     },
     sync: {
+      eventCount: 0,
+      eventsFile: "/tmp/sync-events.jsonl",
       filePath: "/tmp/sync-state.json",
       lastChanges: [],
       lastCompletedAt: "2024-03-01T12:00:00Z",
@@ -423,6 +425,7 @@ function createWorkspaceHarness(options: { failNextRefresh?: boolean } = {}) {
     listExportJobs: vi.fn(async () => ({ jobs: [] })),
     listFolders,
     listMeetings,
+    listSyncEvents: vi.fn(async () => ({ events: [] })),
     loginAuth: vi.fn(async () => state.auth),
     logoutAuth: vi.fn(async () => state.auth),
     refreshAuth: vi.fn(async () => state.auth),

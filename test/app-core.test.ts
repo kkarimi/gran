@@ -7,6 +7,7 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { GranolaApp } from "../src/app/core.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
 import { MemoryMeetingIndexStore } from "../src/meeting-index.ts";
+import { MemorySyncEventStore } from "../src/sync-events.ts";
 import { MemorySyncStateStore } from "../src/sync-state.ts";
 import type { GranolaAppAuthState } from "../src/app/index.ts";
 import type { CacheData, GranolaDocument, GranolaFolder } from "../src/types.ts";
@@ -172,6 +173,7 @@ describe("GranolaApp", () => {
 
   test("syncs the local meeting index and persists structured sync state", async () => {
     const meetingIndexStore = new MemoryMeetingIndexStore();
+    const syncEventStore = new MemorySyncEventStore();
     const syncStateStore = new MemorySyncStateStore({
       filePath: "/tmp/granola-sync-state.json",
     });
@@ -281,6 +283,7 @@ describe("GranolaApp", () => {
         meetingIndex: await meetingIndexStore.readIndex(),
         meetingIndexStore,
         now: () => new Date("2024-03-01T12:00:00Z"),
+        syncEventStore,
         syncState: await syncStateStore.readState(),
         syncStateStore,
       },
@@ -288,6 +291,7 @@ describe("GranolaApp", () => {
     );
 
     const result = await app.sync();
+    const syncEvents = await app.listSyncEvents({ limit: 10 });
     const persistedIndex = await meetingIndexStore.readIndex();
     const persistedSyncState = await syncStateStore.readState();
 
@@ -317,9 +321,23 @@ describe("GranolaApp", () => {
     );
     expect(persistedIndex).toHaveLength(2);
     expect(persistedSyncState.summary).toEqual(result.summary);
+    expect(persistedSyncState.eventCount).toBe(syncEvents.events.length);
     expect(persistedSyncState.lastCompletedAt).toBe("2024-03-01T12:00:00.000Z");
+    expect(syncEvents.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "meeting.created",
+          meetingId: "doc-beta-2222",
+        }),
+        expect.objectContaining({
+          kind: "transcript.ready",
+          meetingId: "doc-alpha-1111",
+        }),
+      ]),
+    );
     expect(app.getState().sync).toEqual(
       expect.objectContaining({
+        eventCount: syncEvents.events.length,
         lastCompletedAt: "2024-03-01T12:00:00.000Z",
         running: false,
         summary: result.summary,

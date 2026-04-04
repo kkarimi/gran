@@ -224,6 +224,8 @@ describe("buildGranolaTuiSummary", () => {
           meetingCount: 2,
         },
         sync: {
+          eventCount: 0,
+          eventsFile: "/tmp/sync-events.jsonl",
           filePath: "/tmp/sync-state.json",
           lastChanges: [],
           lastCompletedAt: "2024-03-01T12:00:00Z",

@@ -522,6 +522,48 @@ describe("command execution", () => {
     );
   });
 
+  test("sync events prints the recent event log", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      listSyncEvents: vi.fn(async () => ({
+        events: [
+          {
+            id: "sync-1:1",
+            kind: "meeting.created",
+            meetingId: "doc-alpha-1111",
+            occurredAt: "2024-03-01T12:00:00.000Z",
+            runId: "sync-1",
+            title: "Alpha Sync",
+            updatedAt: "2024-01-03T10:00:00Z",
+          },
+        ],
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await syncCommand.run(
+      makeContext({
+        commandArgs: ["events"],
+        commandFlags: {
+          limit: "10",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.listSyncEvents).toHaveBeenCalledWith({ limit: 10 });
+    expect(log).toHaveBeenCalledWith(
+      "2024-03-01T12:00:00.000Z meeting.created    Alpha Sync (doc-alpha-1111)",
+    );
+  });
+
   test("tui command reuses the background sync loop and stops it on exit", async () => {
     const app = {
       getState: () => ({

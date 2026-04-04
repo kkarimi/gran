@@ -22,6 +22,7 @@ export interface GranolaServerInfo {
     exportJobs: boolean;
     meetingIndex: boolean;
     sessionStore: GranolaToolkitSessionStoreKind;
+    syncEvents: boolean;
     syncState: boolean;
   };
   product: "granola-toolkit";
@@ -49,6 +50,7 @@ export const granolaTransportPaths = {
   root: "/",
   serverInfo: "/server/info",
   syncRun: "/sync",
+  syncEvents: "/sync/events",
   state: "/state",
 } as const;
 

@@ -12,6 +12,8 @@ describe("FileSyncStateStore", () => {
     const store = new FileSyncStateStore(filePath);
 
     await store.writeState({
+      eventCount: 1,
+      eventsFile: "/tmp/sync-events.jsonl",
       filePath,
       lastChanges: [
         {
@@ -22,6 +24,7 @@ describe("FileSyncStateStore", () => {
         },
       ],
       lastCompletedAt: "2024-03-01T12:00:00.000Z",
+      lastRunId: "sync-20240301120000",
       lastStartedAt: "2024-03-01T11:59:59.000Z",
       running: true,
       summary: {
@@ -35,6 +38,8 @@ describe("FileSyncStateStore", () => {
     });
 
     expect(await store.readState()).toEqual({
+      eventCount: 1,
+      eventsFile: "/tmp/sync-events.jsonl",
       filePath,
       lastChanges: [
         {
@@ -45,6 +50,7 @@ describe("FileSyncStateStore", () => {
         },
       ],
       lastCompletedAt: "2024-03-01T12:00:00.000Z",
+      lastRunId: "sync-20240301120000",
       lastStartedAt: "2024-03-01T11:59:59.000Z",
       running: false,
       summary: {

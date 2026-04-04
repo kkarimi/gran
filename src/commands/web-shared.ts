@@ -79,6 +79,7 @@ function printWebRoutes(): void {
   console.log("  POST /exports/notes");
   console.log("  POST /exports/jobs/:id/rerun");
   console.log("  POST /exports/transcripts");
+  console.log("  GET  /sync/events");
   console.log("  POST /sync");
 }
 

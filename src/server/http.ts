@@ -307,6 +307,7 @@ export async function startGranolaServer(
       exportJobs: true,
       meetingIndex: true,
       sessionStore: defaultGranolaToolkitPersistenceLayout().sessionStoreKind,
+      syncEvents: true,
       syncState: true,
     },
     product: "granola-toolkit",
@@ -447,6 +448,17 @@ export async function startGranolaServer(
           await app.sync({
             foreground: typeof body.foreground === "boolean" ? body.foreground : undefined,
             forceRefresh: typeof body.forceRefresh === "boolean" ? body.forceRefresh : undefined,
+          }),
+          { headers: originHeaders },
+        );
+        return;
+      }
+
+      if (method === "GET" && path === granolaTransportPaths.syncEvents) {
+        sendJson(
+          response,
+          await app.listSyncEvents({
+            limit: parseInteger(url.searchParams.get("limit")) ?? 20,
           }),
           { headers: originHeaders },
         );

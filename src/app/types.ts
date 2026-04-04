@@ -16,6 +16,11 @@ export type GranolaMeetingSort = "title-asc" | "title-desc" | "updated-asc" | "u
 export type GranolaExportJobKind = "notes" | "transcripts";
 export type GranolaExportJobStatus = "completed" | "failed" | "running";
 export type GranolaSyncChangeKind = "changed" | "created" | "removed" | "transcript-ready";
+export type GranolaSyncEventKind =
+  | "meeting.changed"
+  | "meeting.created"
+  | "meeting.removed"
+  | "transcript.ready";
 export type GranolaExportScope =
   | {
       mode: "all";
@@ -86,14 +91,28 @@ export interface GranolaAppSyncSummary {
 }
 
 export interface GranolaAppSyncState {
+  eventCount: number;
+  eventsFile?: string;
   filePath?: string;
   lastChanges: GranolaAppSyncChange[];
   lastCompletedAt?: string;
   lastError?: string;
   lastFailedAt?: string;
+  lastRunId?: string;
   lastStartedAt?: string;
   running: boolean;
   summary?: GranolaAppSyncSummary;
+}
+
+export interface GranolaAppSyncEvent {
+  id: string;
+  kind: GranolaSyncEventKind;
+  meetingId: string;
+  occurredAt: string;
+  previousUpdatedAt?: string;
+  runId: string;
+  title: string;
+  updatedAt?: string;
 }
 
 export interface GranolaAppExportRunState {
@@ -222,6 +241,10 @@ export interface GranolaAppSyncResult {
   summary: GranolaAppSyncSummary;
 }
 
+export interface GranolaAppSyncEventsResult {
+  events: GranolaAppSyncEvent[];
+}
+
 export interface GranolaAppStateEvent {
   state: GranolaAppState;
   timestamp: string;
@@ -234,6 +257,7 @@ export interface GranolaAppApi {
   getState(): GranolaAppState;
   subscribe(listener: (event: GranolaAppStateEvent) => void): () => void;
   inspectAuth(): Promise<GranolaAppAuthState>;
+  listSyncEvents(options?: { limit?: number }): Promise<GranolaAppSyncEventsResult>;
   inspectSync(): Promise<GranolaAppSyncState>;
   loginAuth(options?: { supabasePath?: string }): Promise<GranolaAppAuthState>;
   logoutAuth(): Promise<GranolaAppAuthState>;

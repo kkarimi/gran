@@ -42,11 +42,13 @@ import {
 } from "../meeting-index.ts";
 import { writeNotes } from "../notes.ts";
 import {
+  defaultSyncEventsFilePath,
   createDefaultSyncStateStore,
   defaultSyncStateFilePath,
   type SyncStateStore,
 } from "../sync-state.ts";
-import { diffMeetingSummaries } from "../sync.ts";
+import { createDefaultSyncEventStore, type SyncEventStore } from "../sync-events.ts";
+import { buildSyncEvents, diffMeetingSummaries } from "../sync.ts";
 import { writeTranscripts } from "../transcripts.ts";
 import type {
   AppConfig,
@@ -64,6 +66,8 @@ import type {
   GranolaAppExportJobState,
   GranolaAppExportRunState,
   GranolaAppSyncChange,
+  GranolaAppSyncEvent,
+  GranolaAppSyncEventsResult,
   GranolaAppSyncResult,
   GranolaAppSyncState,
   GranolaExportRunOptions,
@@ -100,6 +104,7 @@ interface GranolaAppDependencies {
   meetingIndex?: MeetingSummaryRecord[];
   meetingIndexStore?: MeetingIndexStore;
   now?: () => Date;
+  syncEventStore?: SyncEventStore;
   syncState?: GranolaAppSyncState;
   syncStateStore?: SyncStateStore;
 }
@@ -138,6 +143,10 @@ function cloneSyncState(state: GranolaAppSyncState): GranolaAppSyncState {
     lastChanges: state.lastChanges.map(cloneSyncChange),
     summary: state.summary ? { ...state.summary } : undefined,
   };
+}
+
+function cloneSyncEvent(event: GranolaAppSyncEvent): GranolaAppSyncEvent {
+  return { ...event };
 }
 
 function cloneMeetingSummary(meeting: MeetingSummaryRecord): MeetingSummaryRecord {
@@ -209,6 +218,8 @@ function defaultState(
       meetingCount: 0,
     },
     sync: {
+      eventCount: 0,
+      eventsFile: defaultSyncEventsFilePath(),
       filePath: defaultSyncStateFilePath(),
       lastChanges: [],
       running: false,
@@ -250,6 +261,8 @@ export class GranolaApp implements GranolaAppApi {
       ...this.#state.sync,
       ...cloneSyncState(
         deps.syncState ?? {
+          eventCount: 0,
+          eventsFile: defaultSyncEventsFilePath(),
           filePath: defaultSyncStateFilePath(),
           lastChanges: [],
           running: false,
@@ -320,6 +333,10 @@ export class GranolaApp implements GranolaAppApi {
     }
 
     await this.deps.syncStateStore.writeState(this.#state.sync);
+  }
+
+  private createSyncRunId(): string {
+    return `sync-${this.nowIso().replaceAll(/[-:.]/g, "").replace("T", "").replace("Z", "")}`;
   }
 
   private applyAuthState(
@@ -638,6 +655,18 @@ export class GranolaApp implements GranolaAppApi {
     return cloneSyncState(this.#state.sync);
   }
 
+  async listSyncEvents(options: { limit?: number } = {}): Promise<GranolaAppSyncEventsResult> {
+    if (!this.deps.syncEventStore) {
+      return {
+        events: [],
+      };
+    }
+
+    return {
+      events: (await this.deps.syncEventStore.readEvents(options.limit)).map(cloneSyncEvent),
+    };
+  }
+
   async loginAuth(options: { supabasePath?: string } = {}): Promise<GranolaAppAuthState> {
     const controller = this.requireAuthController();
 
@@ -721,11 +750,19 @@ export class GranolaApp implements GranolaAppApi {
         snapshot.meetings,
         snapshot.folders?.length ?? 0,
       );
+      const completedAt = this.nowIso();
+      const runId = this.createSyncRunId();
+      const events = buildSyncEvents(runId, completedAt, changes);
+      if (events.length > 0 && this.deps.syncEventStore) {
+        await this.deps.syncEventStore.appendEvents(events);
+      }
       this.#state.sync = {
         ...this.#state.sync,
+        eventCount: this.#state.sync.eventCount + events.length,
         lastChanges: changes.slice(0, 50).map(cloneSyncChange),
-        lastCompletedAt: this.nowIso(),
+        lastCompletedAt: completedAt,
         lastError: undefined,
+        lastRunId: runId,
         running: false,
         summary: { ...summary },
       };
@@ -1272,6 +1309,7 @@ export async function createGranolaApp(
   const exportJobs = await exportJobStore.readJobs();
   const meetingIndexStore = createDefaultMeetingIndexStore();
   const meetingIndex = await meetingIndexStore.readIndex();
+  const syncEventStore = createDefaultSyncEventStore();
   const syncStateStore = createDefaultSyncStateStore();
   const syncState = await syncStateStore.readState();
 
@@ -1290,6 +1328,7 @@ export async function createGranolaApp(
       meetingIndex,
       meetingIndexStore,
       now: options.now,
+      syncEventStore,
       syncState,
       syncStateStore,
     },

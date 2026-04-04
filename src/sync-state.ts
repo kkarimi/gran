@@ -13,10 +13,13 @@ const SYNC_STATE_VERSION = 1;
 const MAX_STORED_CHANGES = 50;
 
 interface SyncStateFile {
+  eventCount?: number;
+  eventsFile?: string;
   lastChanges?: GranolaAppSyncChange[];
   lastCompletedAt?: string;
   lastError?: string;
   lastFailedAt?: string;
+  lastRunId?: string;
   lastStartedAt?: string;
   summary?: GranolaAppSyncSummary;
   version: number;
@@ -41,14 +44,17 @@ function cloneSyncState(state: GranolaAppSyncState): GranolaAppSyncState {
 
 function normaliseSyncState(filePath: string, file?: SyncStateFile): GranolaAppSyncState {
   return {
+    eventCount: file?.eventCount ?? 0,
+    eventsFile: file?.eventsFile ?? defaultSyncEventsFilePath(),
     filePath,
     lastChanges: (file?.lastChanges ?? []).slice(0, MAX_STORED_CHANGES).map(cloneSyncChange),
-    lastCompletedAt: file?.lastCompletedAt,
-    lastError: file?.lastError,
-    lastFailedAt: file?.lastFailedAt,
-    lastStartedAt: file?.lastStartedAt,
     running: false,
-    summary: cloneSyncSummary(file?.summary),
+    ...(file?.lastCompletedAt ? { lastCompletedAt: file.lastCompletedAt } : {}),
+    ...(file?.lastError ? { lastError: file.lastError } : {}),
+    ...(file?.lastFailedAt ? { lastFailedAt: file.lastFailedAt } : {}),
+    ...(file?.lastRunId ? { lastRunId: file.lastRunId } : {}),
+    ...(file?.lastStartedAt ? { lastStartedAt: file.lastStartedAt } : {}),
+    ...(file?.summary ? { summary: cloneSyncSummary(file.summary) } : {}),
   };
 }
 
@@ -63,10 +69,13 @@ export class MemorySyncStateStore implements SyncStateStore {
   constructor(initialState: Partial<GranolaAppSyncState> = {}) {
     this.#state = {
       filePath: initialState.filePath ?? defaultSyncStateFilePath(),
+      eventCount: initialState.eventCount ?? 0,
+      eventsFile: initialState.eventsFile ?? defaultSyncEventsFilePath(),
       lastChanges: (initialState.lastChanges ?? []).map(cloneSyncChange),
       lastCompletedAt: initialState.lastCompletedAt,
       lastError: initialState.lastError,
       lastFailedAt: initialState.lastFailedAt,
+      lastRunId: initialState.lastRunId,
       lastStartedAt: initialState.lastStartedAt,
       running: false,
       summary: cloneSyncSummary(initialState.summary),
@@ -102,10 +111,13 @@ export class FileSyncStateStore implements SyncStateStore {
   async writeState(state: GranolaAppSyncState): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
     const payload: SyncStateFile = {
+      eventCount: state.eventCount,
+      eventsFile: state.eventsFile,
       lastChanges: state.lastChanges.slice(0, MAX_STORED_CHANGES).map(cloneSyncChange),
       lastCompletedAt: state.lastCompletedAt,
       lastError: state.lastError,
       lastFailedAt: state.lastFailedAt,
+      lastRunId: state.lastRunId,
       lastStartedAt: state.lastStartedAt,
       summary: cloneSyncSummary(state.summary),
       version: SYNC_STATE_VERSION,
@@ -119,6 +131,10 @@ export class FileSyncStateStore implements SyncStateStore {
 
 export function defaultSyncStateFilePath(): string {
   return defaultGranolaToolkitPersistenceLayout().syncStateFile;
+}
+
+export function defaultSyncEventsFilePath(): string {
+  return defaultGranolaToolkitPersistenceLayout().syncEventsFile;
 }
 
 export function createDefaultSyncStateStore(): SyncStateStore {

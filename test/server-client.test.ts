@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "vite-plus/test";
 
 import { GranolaApp } from "../src/app/core.ts";
 import type { GranolaAppStateEvent } from "../src/app/index.ts";
+import { MemorySyncEventStore } from "../src/sync-events.ts";
 import { createGranolaServerClient } from "../src/server/client.ts";
 import { startGranolaServer } from "../src/server/http.ts";
 import { GRANOLA_TRANSPORT_PROTOCOL_VERSION } from "../src/transport.ts";
@@ -64,37 +65,48 @@ const folders: GranolaFolder[] = [
   },
 ];
 
-function createTestApp(): GranolaApp {
-  return new GranolaApp(
-    {
-      debug: false,
-      notes: {
-        output: "/tmp/notes",
-        timeoutMs: 120_000,
+function createTestApp(): {
+  app: GranolaApp;
+  setDocuments: (nextDocuments: GranolaDocument[]) => void;
+} {
+  let currentDocuments = documents;
+
+  return {
+    app: new GranolaApp(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
       },
-      supabase: "/tmp/supabase.json",
-      transcripts: {
-        cacheFile: "",
-        output: "/tmp/transcripts",
+      {
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => currentDocuments,
+          listFolders: async () => folders,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+        syncEventStore: new MemorySyncEventStore(),
       },
+      { surface: "server" },
+    ),
+    setDocuments(nextDocuments) {
+      currentDocuments = nextDocuments;
     },
-    {
-      auth: {
-        mode: "supabase-file",
-        refreshAvailable: false,
-        storedSessionAvailable: false,
-        supabaseAvailable: true,
-        supabasePath: "/tmp/supabase.json",
-      },
-      cacheLoader: async () => cacheData,
-      granolaClient: {
-        listDocuments: async () => documents,
-        listFolders: async () => folders,
-      },
-      now: () => new Date("2024-03-01T12:00:00Z"),
-    },
-    { surface: "server" },
-  );
+  };
 }
 
 function waitForStateUpdate(
@@ -131,7 +143,7 @@ describe("GranolaServerClient", () => {
   });
 
   test("attaches to the shared server state and receives live updates", async () => {
-    const app = createTestApp();
+    const { app, setDocuments } = createTestApp();
     const server = await startGranolaServer(app);
     closeServer = async () => await server.close();
 
@@ -182,6 +194,38 @@ describe("GranolaServerClient", () => {
     const event = await eventPromise;
     expect(event.state.ui.view).toBe("meeting-list");
 
+    setDocuments([
+      ...documents,
+      {
+        content: "Beta note body",
+        createdAt: "2024-01-05T09:00:00Z",
+        id: "doc-beta-2222",
+        notes: {
+          content: [
+            {
+              content: [{ text: "Beta notes", type: "text" }],
+              type: "paragraph",
+            },
+          ],
+          type: "doc",
+        },
+        notesPlain: "",
+        tags: ["ops"],
+        title: "Beta Review",
+        updatedAt: "2024-01-06T10:00:00Z",
+      },
+    ]);
+    await app.sync();
+    const syncEvents = await client.listSyncEvents({ limit: 5 });
+    expect(syncEvents.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "meeting.created",
+          meetingId: "doc-beta-2222",
+        }),
+      ]),
+    );
+
     const meeting = await client.findMeeting("Alpha Sync");
     expect(meeting).toEqual(
       expect.objectContaining({
@@ -196,7 +240,7 @@ describe("GranolaServerClient", () => {
   });
 
   test("supports password-protected attach flows", async () => {
-    const app = createTestApp();
+    const { app } = createTestApp();
     const server = await startGranolaServer(app, {
       security: {
         password: "secret-pass",

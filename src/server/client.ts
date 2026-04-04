@@ -3,6 +3,7 @@ import type {
   GranolaAppApi,
   GranolaAppAuthMode,
   GranolaAppAuthState,
+  GranolaAppSyncEventsResult,
   GranolaAppSyncResult,
   GranolaAppSyncState,
   GranolaExportJobRunResult,
@@ -205,6 +206,13 @@ export class GranolaServerClient implements GranolaAppApi {
 
   async inspectSync(): Promise<GranolaAppSyncState> {
     return cloneValue(this.#state.sync);
+  }
+
+  async listSyncEvents(options: { limit?: number } = {}): Promise<GranolaAppSyncEventsResult> {
+    const path = options.limit
+      ? `${granolaTransportPaths.syncEvents}?limit=${encodeURIComponent(String(options.limit))}`
+      : granolaTransportPaths.syncEvents;
+    return await this.requestJson(path);
   }
 
   async loginAuth(options: { supabasePath?: string } = {}): Promise<GranolaAppAuthState> {
