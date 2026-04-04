@@ -9,7 +9,11 @@ import solid from "vite-plugin-solid";
 
 const root = resolve(import.meta.dirname, "..");
 const outputFile = resolve(root, "src/web/generated.ts");
-const checkMode = process.argv.includes("--check");
+const checkModeIndex = process.argv.indexOf("--check");
+const checkMode = checkModeIndex !== -1;
+if (checkMode) {
+  process.argv.splice(checkModeIndex, 1);
+}
 
 async function buildAssets() {
   const tempDir = await mkdtemp(join(tmpdir(), "granola-web-build-"));

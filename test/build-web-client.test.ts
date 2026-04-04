@@ -16,12 +16,13 @@ describe("web bundle generation", () => {
     expect(generated).toContain(JSON.stringify(css));
   });
 
-  test("pins the generated bundle to production mode", () => {
+  test("pins the generated bundle to deterministic build settings", () => {
     const script = readFileSync(
       new URL("../scripts/build-web-client.mjs", import.meta.url),
       "utf8",
     );
 
     expect(script).toContain('mode: "production"');
+    expect(script).toContain("process.argv.splice(checkModeIndex, 1);");
   });
 });
