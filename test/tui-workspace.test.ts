@@ -288,6 +288,7 @@ function createAppState(): GranolaAppState {
   return {
     auth: authState,
     automation: {
+      artefactCount: 0,
       loaded: true,
       pendingRunCount: 0,
       matchCount: 0,
@@ -445,6 +446,7 @@ function createWorkspaceHarness(
     finishedAt: "2024-03-01T12:01:00.000Z",
     folders: [],
     id,
+    matchId: "sync-1:team-transcript",
     matchedAt: "2024-03-01T12:00:00.000Z",
     meetingId: "doc-alpha-1111",
     result: "Approved from test",
@@ -467,6 +469,7 @@ function createWorkspaceHarness(
     getState: () => state,
     inspectAuth: vi.fn(async () => state.auth),
     inspectSync: vi.fn(async () => state.sync),
+    listAutomationArtefacts: vi.fn(async () => ({ artefacts: [] })),
     listAutomationMatches: vi.fn(async () => ({ matches: [] })),
     listAutomationRuns: vi.fn(async () => ({
       runs: (options.automationRuns ?? []).map((run) => ({
@@ -475,6 +478,7 @@ function createWorkspaceHarness(
         folders: [],
         matchedAt: "2024-03-01T12:00:00.000Z",
         meetingId: "doc-alpha-1111",
+        matchId: "sync-1:team-transcript",
         ruleId: "team-transcript",
         ruleName: "Team transcript ready",
         startedAt: "2024-03-01T12:00:00.000Z",
@@ -492,6 +496,7 @@ function createWorkspaceHarness(
     logoutAuth: vi.fn(async () => state.auth),
     refreshAuth: vi.fn(async () => state.auth),
     resolveAutomationRun,
+    rerunAutomationArtefact: vi.fn(),
     rerunExportJob: vi.fn(),
     sync: vi.fn(async () => ({
       changes: [],

@@ -1,4 +1,7 @@
 import type {
+  GranolaAutomationArtefact,
+  GranolaAutomationArtefactKind,
+  GranolaAutomationArtefactStatus,
   FolderRecord,
   GranolaAppApi,
   GranolaAutomationActionRun,
@@ -26,6 +29,8 @@ import type {
   TranscriptOutputFormat,
 } from "../app/index.ts";
 import {
+  granolaAutomationArtefactRerunPath,
+  granolaAutomationArtefactsPath,
   granolaAutomationRunDecisionPath,
   granolaAutomationRunsPath,
   granolaExportJobRerunPath,
@@ -209,6 +214,17 @@ export class GranolaServerClient implements GranolaAppApi {
     return await this.requestJson(granolaTransportPaths.authStatus);
   }
 
+  async listAutomationArtefacts(
+    options: {
+      kind?: GranolaAutomationArtefactKind;
+      limit?: number;
+      meetingId?: string;
+      status?: GranolaAutomationArtefactStatus;
+    } = {},
+  ): Promise<{ artefacts: GranolaAutomationArtefact[] }> {
+    return await this.requestJson(granolaAutomationArtefactsPath(options));
+  }
+
   async listAutomationRules(): Promise<import("../app/index.ts").GranolaAutomationRulesResult> {
     return await this.requestJson(granolaTransportPaths.automationRules);
   }
@@ -238,6 +254,12 @@ export class GranolaServerClient implements GranolaAppApi {
       headers: {
         "content-type": "application/json",
       },
+      method: "POST",
+    });
+  }
+
+  async rerunAutomationArtefact(id: string): Promise<GranolaAutomationArtefact> {
+    return await this.requestJson(granolaAutomationArtefactRerunPath(id), {
       method: "POST",
     });
   }

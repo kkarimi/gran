@@ -6,6 +6,7 @@ import { describe, expect, test, vi } from "vite-plus/test";
 
 import { GranolaApp } from "../src/app/core.ts";
 import { MemoryAgentHarnessStore } from "../src/agent-harnesses.ts";
+import { MemoryAutomationArtefactStore } from "../src/automation-artefacts.ts";
 import { MemoryAutomationMatchStore } from "../src/automation-matches.ts";
 import { MemoryAutomationRunStore } from "../src/automation-runs.ts";
 import { MemoryAutomationRuleStore } from "../src/automation-rules.ts";
@@ -911,6 +912,220 @@ describe("GranolaApp", () => {
         provider: "openrouter",
       }),
     );
+  });
+
+  test("stores pipeline artefacts, uses fallback harnesses, and supports reruns", async () => {
+    const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-cache-")), "cache.json");
+    await writeFile(cacheFile, "{}\n", "utf8");
+    const meetingIndexStore = new MemoryMeetingIndexStore();
+    const artefactStore = new MemoryAutomationArtefactStore();
+    const runStore = new MemoryAutomationRunStore();
+    const runAgent = vi.fn(
+      async (request: GranolaAutomationAgentRequest): Promise<GranolaAutomationAgentResult> => {
+        if (request.provider === "openrouter") {
+          throw new Error("rate limited");
+        }
+
+        return {
+          dryRun: false,
+          model: request.model ?? "gpt-5-codex",
+          output: JSON.stringify({
+            actionItems: [{ owner: "Nima", title: "Send the recap" }],
+            decisions: ["Ship the new pipeline"],
+            followUps: ["Confirm launch date"],
+            highlights: ["Fallback harness succeeded"],
+            markdown:
+              "# Alpha Sync Notes\n\n## Summary\n\nFallback provider completed the notes pipeline.",
+            metadata: { source: "fallback" },
+            sections: [
+              {
+                body: "Fallback provider completed the notes pipeline.",
+                title: "Summary",
+              },
+            ],
+            summary: "Fallback provider completed the notes pipeline.",
+            title: "Alpha Sync Notes",
+          }),
+          prompt: request.prompt,
+          provider: request.provider ?? "codex",
+        };
+      },
+    );
+
+    await meetingIndexStore.writeIndex([
+      {
+        createdAt: "2024-01-01T09:00:00Z",
+        folders: [
+          {
+            createdAt: "2024-01-01T08:00:00Z",
+            documentCount: 1,
+            id: "folder-team-1111",
+            isFavourite: true,
+            name: "Team",
+            updatedAt: "2024-01-04T10:00:00Z",
+          },
+        ],
+        id: "doc-alpha-1111",
+        noteContentSource: "notes",
+        tags: ["team"],
+        title: "Alpha Sync",
+        transcriptLoaded: false,
+        transcriptSegmentCount: 0,
+        updatedAt: "2024-01-03T10:00:00Z",
+      },
+    ]);
+
+    const app = new GranolaApp(
+      {
+        agents: {
+          codexCommand: "codex",
+          defaultProvider: "codex",
+          dryRun: false,
+          harnessesFile: "/tmp/agent-harnesses.json",
+          maxRetries: 2,
+          openaiBaseUrl: "https://api.openai.com/v1",
+          openrouterBaseUrl: "https://openrouter.ai/api/v1",
+          timeoutMs: 30_000,
+        },
+        automation: {
+          artefactsFile: "/tmp/automation-artefacts.json",
+          rulesFile: "/tmp/automation-rules.json",
+        },
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile,
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        agentHarnessStore: new MemoryAgentHarnessStore([
+          {
+            id: "primary-notes",
+            name: "Primary notes",
+            prompt: "Write crisp notes for recurring team meetings.",
+            provider: "openrouter",
+          },
+          {
+            id: "fallback-notes",
+            name: "Fallback notes",
+            prompt: "Retry and keep the output compact and decision-focused.",
+            provider: "codex",
+          },
+        ]),
+        agentRunner: {
+          run: runAgent,
+        },
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        automationArtefactStore: artefactStore,
+        automationMatchStore: new MemoryAutomationMatchStore(),
+        automationRuleStore: new MemoryAutomationRuleStore([
+          {
+            actions: [
+              {
+                fallbackHarnessIds: ["fallback-notes"],
+                harnessId: "primary-notes",
+                id: "pipeline-notes",
+                kind: "agent",
+                pipeline: {
+                  kind: "notes",
+                },
+              },
+            ],
+            id: "team-transcript",
+            name: "Team transcript ready",
+            when: {
+              eventKinds: ["transcript.ready"],
+              folderNames: ["Team"],
+              tags: ["team"],
+              transcriptLoaded: true,
+            },
+          },
+        ]),
+        automationRunStore: runStore,
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        meetingIndex: await meetingIndexStore.readIndex(),
+        meetingIndexStore,
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+      { surface: "server" },
+    );
+
+    await app.sync();
+
+    const firstArtefacts = await app.listAutomationArtefacts({ kind: "notes", limit: 10 });
+    expect(firstArtefacts.artefacts).toHaveLength(1);
+    expect(firstArtefacts.artefacts[0]).toEqual(
+      expect.objectContaining({
+        attempts: [
+          expect.objectContaining({
+            error: "rate limited",
+            harnessId: "primary-notes",
+            provider: "openrouter",
+          }),
+          expect.objectContaining({
+            harnessId: "fallback-notes",
+            provider: "codex",
+          }),
+        ],
+        kind: "notes",
+        provider: "codex",
+        status: "generated",
+        structured: expect.objectContaining({
+          summary: "Fallback provider completed the notes pipeline.",
+          title: "Alpha Sync Notes",
+        }),
+      }),
+    );
+
+    const firstRuns = await app.listAutomationRuns({ limit: 10 });
+    expect(firstRuns.runs[0]).toEqual(
+      expect.objectContaining({
+        actionId: "pipeline-notes",
+        artefactIds: [firstArtefacts.artefacts[0]!.id],
+        result: "Fallback provider completed the notes pipeline.",
+      }),
+    );
+
+    const rerun = await app.rerunAutomationArtefact(firstArtefacts.artefacts[0]!.id);
+    expect(rerun).toEqual(
+      expect.objectContaining({
+        kind: "notes",
+        rerunOfId: firstArtefacts.artefacts[0]!.id,
+        status: "generated",
+      }),
+    );
+
+    const afterRerun = await app.listAutomationArtefacts({ kind: "notes", limit: 10 });
+    expect(afterRerun.artefacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: firstArtefacts.artefacts[0]!.id,
+          status: "superseded",
+          supersededById: rerun.id,
+        }),
+        expect.objectContaining({
+          id: rerun.id,
+          rerunOfId: firstArtefacts.artefacts[0]!.id,
+        }),
+      ]),
+    );
+    expect(app.getState().automation.artefactCount).toBe(2);
+    expect(runAgent).toHaveBeenCalledTimes(4);
   });
 
   test("exports folder-scoped notes into a stable folder output and reruns with the same scope", async () => {

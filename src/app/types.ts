@@ -16,6 +16,8 @@ export type GranolaMeetingSort = "title-asc" | "title-desc" | "updated-asc" | "u
 export type GranolaExportJobKind = "notes" | "transcripts";
 export type GranolaExportJobStatus = "completed" | "failed" | "running";
 export type GranolaSyncChangeKind = "changed" | "created" | "removed" | "transcript-ready";
+export type GranolaAutomationArtefactKind = "enrichment" | "notes";
+export type GranolaAutomationArtefactStatus = "approved" | "generated" | "rejected" | "superseded";
 export type GranolaSyncEventKind =
   | "meeting.changed"
   | "meeting.created"
@@ -154,11 +156,13 @@ export interface GranolaAutomationAgentAction {
   cwd?: string;
   dryRun?: boolean;
   enabled?: boolean;
+  fallbackHarnessIds?: string[];
   harnessId?: string;
   id: string;
   kind: "agent";
   model?: string;
   name?: string;
+  pipeline?: GranolaAutomationPipelineConfig;
   prompt?: string;
   promptFile?: string;
   provider?: GranolaAgentProviderKind;
@@ -166,6 +170,10 @@ export interface GranolaAutomationAgentAction {
   systemPrompt?: string;
   systemPromptFile?: string;
   timeoutMs?: number;
+}
+
+export interface GranolaAutomationPipelineConfig {
+  kind: GranolaAutomationArtefactKind;
 }
 
 export interface GranolaAutomationCommandAction {
@@ -234,17 +242,20 @@ export interface GranolaAutomationActionRun {
   actionId: string;
   actionKind: GranolaAutomationActionKind;
   actionName: string;
+  artefactIds?: string[];
   error?: string;
   eventId: string;
   eventKind: GranolaSyncEventKind;
   folders: FolderSummaryRecord[];
   finishedAt?: string;
   id: string;
+  matchId: string;
   matchedAt: string;
   meetingId: string;
   meta?: Record<string, unknown>;
   prompt?: string;
   result?: string;
+  rerunOfId?: string;
   ruleId: string;
   ruleName: string;
   startedAt: string;
@@ -254,7 +265,64 @@ export interface GranolaAutomationActionRun {
   transcriptLoaded: boolean;
 }
 
+export interface GranolaAutomationArtefactSection {
+  body: string;
+  title: string;
+}
+
+export interface GranolaAutomationArtefactActionItem {
+  dueDate?: string;
+  owner?: string;
+  title: string;
+}
+
+export interface GranolaAutomationArtefactStructuredOutput {
+  actionItems: GranolaAutomationArtefactActionItem[];
+  decisions: string[];
+  followUps: string[];
+  highlights: string[];
+  markdown: string;
+  metadata?: Record<string, unknown>;
+  sections: GranolaAutomationArtefactSection[];
+  summary?: string;
+  title: string;
+}
+
+export interface GranolaAutomationArtefactAttempt {
+  error?: string;
+  harnessId?: string;
+  model?: string;
+  provider?: GranolaAgentProviderKind;
+}
+
+export interface GranolaAutomationArtefact {
+  actionId: string;
+  actionName: string;
+  attempts: GranolaAutomationArtefactAttempt[];
+  createdAt: string;
+  eventId: string;
+  id: string;
+  kind: GranolaAutomationArtefactKind;
+  matchId: string;
+  meetingId: string;
+  model: string;
+  parseMode: "json" | "markdown-fallback";
+  prompt: string;
+  provider: GranolaAgentProviderKind;
+  rawOutput: string;
+  rerunOfId?: string;
+  ruleId: string;
+  ruleName: string;
+  runId: string;
+  status: GranolaAutomationArtefactStatus;
+  structured: GranolaAutomationArtefactStructuredOutput;
+  supersededById?: string;
+  updatedAt: string;
+}
+
 export interface GranolaAppAutomationState {
+  artefactCount: number;
+  artefactsFile?: string;
   lastRunAt?: string;
   lastMatchedAt?: string;
   loaded: boolean;
@@ -410,6 +478,17 @@ export interface GranolaAutomationRunsResult {
   runs: GranolaAutomationActionRun[];
 }
 
+export interface GranolaAutomationArtefactsResult {
+  artefacts: GranolaAutomationArtefact[];
+}
+
+export interface GranolaAutomationArtefactListOptions {
+  kind?: GranolaAutomationArtefactKind;
+  limit?: number;
+  meetingId?: string;
+  status?: GranolaAutomationArtefactStatus;
+}
+
 export interface GranolaAppStateEvent {
   state: GranolaAppState;
   timestamp: string;
@@ -422,6 +501,9 @@ export interface GranolaAppApi {
   getState(): GranolaAppState;
   subscribe(listener: (event: GranolaAppStateEvent) => void): () => void;
   inspectAuth(): Promise<GranolaAppAuthState>;
+  listAutomationArtefacts(
+    options?: GranolaAutomationArtefactListOptions,
+  ): Promise<GranolaAutomationArtefactsResult>;
   listAutomationMatches(options?: { limit?: number }): Promise<GranolaAutomationMatchesResult>;
   listAutomationRuns(options?: {
     limit?: number;
@@ -437,6 +519,7 @@ export interface GranolaAppApi {
     decision: "approve" | "reject",
     options?: { note?: string },
   ): Promise<GranolaAutomationActionRun>;
+  rerunAutomationArtefact(id: string): Promise<GranolaAutomationArtefact>;
   refreshAuth(): Promise<GranolaAppAuthState>;
   switchAuthMode(mode: GranolaAppAuthMode): Promise<GranolaAppAuthState>;
   sync(options?: { forceRefresh?: boolean; foreground?: boolean }): Promise<GranolaAppSyncResult>;

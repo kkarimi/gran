@@ -41,9 +41,11 @@ Override that path with either:
         {
           "id": "rewrite-with-agent",
           "kind": "agent",
+          "pipeline": {
+            "kind": "notes"
+          },
           "harnessId": "customer-call",
-          "provider": "openrouter",
-          "model": "openai/gpt-5-mini",
+          "fallbackHarnessIds": ["customer-call-codex"],
           "promptFile": "./agents/customer-call/AGENT.md"
         },
         {
@@ -77,7 +79,9 @@ instructions such as “turn this transcript into follow-up notes”.
 
 Supported agent fields:
 
+- `pipeline.kind`: `notes` or `enrichment`
 - `harnessId`
+- `fallbackHarnessIds`
 - `provider`: `openrouter`, `openai`, or `codex`
 - `model`
 - `prompt`
@@ -96,6 +100,14 @@ If you set `harnessId`, the toolkit resolves that harness first and then layers 
 fields on top. That lets one automation rule say “run the customer-call harness” without copying
 provider and prompt settings into every rule.
 
+If you add `pipeline.kind`, the toolkit turns the agent action into a durable post-processing
+pipeline. The model is asked for structured JSON, the parsed result is stored as an automation
+artefact, and the artefact can be re-run later without waiting for a fresh sync event.
+
+`fallbackHarnessIds` let a pipeline recover when the primary provider or harness fails. The toolkit
+tries the primary harness first, then each fallback harness in order, and records those attempts on
+the generated artefact for later review.
+
 `command` actions receive a JSON payload on stdin by default, including the matched event, rule,
 and meeting bundle when the meeting still exists.
 
@@ -107,6 +119,7 @@ The toolkit stores:
 - raw sync events in `sync-events.jsonl`
 - rule matches in `automation-matches.jsonl`
 - action runs in `automation-runs.jsonl`
+- generated pipeline artefacts in `automation-artefacts.json`
 
 All three live in the shared toolkit data directory so watch loops, `serve`, `web`, and `tui` see
 the same history.
@@ -165,6 +178,13 @@ directory. You can also point them at a project-local file:
       },
       "provider": "openrouter",
       "model": "openai/gpt-5-mini",
+      "promptFile": "./agents/customer-call/AGENT.md",
+      "fallbackHarnessIds": ["customer-call-codex"]
+    },
+    {
+      "id": "customer-call-codex",
+      "name": "Customer call fallback",
+      "provider": "codex",
       "promptFile": "./agents/customer-call/AGENT.md"
     }
   ]
@@ -196,6 +216,14 @@ granola automation approve <run-id>
 granola automation reject <run-id> --note "not relevant"
 ```
 
+Inspect generated artefacts and replay a pipeline:
+
+```bash
+granola automation artefacts
+granola automation artefacts --kind notes --meeting doc-alpha-1111
+granola automation rerun <artefact-id>
+```
+
 ## How It Works
 
 `granola sync` and `granola sync --watch` enrich each durable sync event with the meeting title,
@@ -210,9 +238,9 @@ the sync loop.
 
 ## Surface Support
 
-- CLI: inspect rules, matches, and runs, and resolve pending `ask-user` runs
-- Web: browse recent automation runs and approve or reject pending items
-- TUI: open the automation overlay with `u` and resolve pending items from the terminal
+- CLI: inspect rules, matches, runs, and generated artefacts, and replay pipelines or resolve pending `ask-user` runs
+- Web: browse recent automation runs; artefact review lands in the next review-workspace slice
+- TUI: open the automation overlay with `u`; artefact review lands in the next review-workspace slice
 
 ## Notes on Exports
 

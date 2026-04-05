@@ -1,6 +1,7 @@
 import type {
   GranolaAutomationAction,
   GranolaAutomationAgentAction,
+  GranolaAutomationArtefactAttempt,
   GranolaAutomationActionRun,
   GranolaAutomationCommandAction,
   GranolaAutomationExportNotesAction,
@@ -13,7 +14,11 @@ import type {
 function cloneAction(action: GranolaAutomationAction): GranolaAutomationAction {
   switch (action.kind) {
     case "agent":
-      return { ...action };
+      return {
+        ...action,
+        fallbackHarnessIds: action.fallbackHarnessIds ? [...action.fallbackHarnessIds] : undefined,
+        pipeline: action.pipeline ? { ...action.pipeline } : undefined,
+      };
     case "ask-user":
       return { ...action };
     case "command":
@@ -52,10 +57,13 @@ export interface AutomationActionCommandResult {
 }
 
 export interface AutomationActionAgentResult {
+  artefactIds?: string[];
+  attempts?: GranolaAutomationArtefactAttempt[];
   command?: string;
   dryRun: boolean;
   model: string;
   output?: string;
+  pipelineKind?: string;
   prompt: string;
   provider: string;
   systemPrompt?: string;
@@ -82,6 +90,7 @@ export interface AutomationActionExecutionHandlers {
     match: GranolaAutomationMatch,
     rule: GranolaAutomationRule,
     action: GranolaAutomationAgentAction,
+    run: GranolaAutomationActionRun,
   ): Promise<AutomationActionAgentResult>;
   runCommand(
     match: GranolaAutomationMatch,
@@ -95,19 +104,26 @@ function baseRun(
   rule: GranolaAutomationRule,
   action: GranolaAutomationAction,
   startedAt: string,
+  options: {
+    rerunOfId?: string;
+    runId?: string;
+  } = {},
 ): GranolaAutomationActionRun {
   return {
     actionId: action.id,
     actionKind: action.kind,
     actionName: automationActionName(action),
+    artefactIds: undefined,
     eventId: match.eventId,
     eventKind: match.eventKind,
     folders: match.folders.map((folder) => ({ ...folder })),
-    id: buildAutomationActionRunId(match, action.id),
+    id: options.runId ?? buildAutomationActionRunId(match, action.id),
+    matchId: match.id,
     matchedAt: match.matchedAt,
     meetingId: match.meetingId,
     ruleId: rule.id,
     ruleName: rule.name,
+    rerunOfId: options.rerunOfId,
     startedAt,
     status: "completed",
     tags: [...match.tags],
@@ -160,19 +176,27 @@ export async function executeAutomationAction(
   rule: GranolaAutomationRule,
   action: GranolaAutomationAction,
   handlers: AutomationActionExecutionHandlers,
+  options: {
+    rerunOfId?: string;
+    runId?: string;
+  } = {},
 ): Promise<GranolaAutomationActionRun> {
   const startedAt = handlers.nowIso();
-  const run = baseRun(match, rule, action, startedAt);
+  const run = baseRun(match, rule, action, startedAt, options);
 
   switch (action.kind) {
     case "agent":
       try {
-        const result = await handlers.runAgent(match, rule, action);
+        const result = await handlers.runAgent(match, rule, action, run);
         return completedRun(run, handlers.nowIso(), {
+          artefactIds: result.artefactIds ? [...result.artefactIds] : undefined,
           meta: {
+            attempts: result.attempts,
+            artefactIds: result.artefactIds,
             command: result.command,
             dryRun: result.dryRun,
             model: result.model,
+            pipelineKind: result.pipelineKind,
             provider: result.provider,
             systemPrompt: result.systemPrompt,
           },

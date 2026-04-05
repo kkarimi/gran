@@ -1,5 +1,6 @@
 import {
   createGranolaApp,
+  type GranolaAutomationArtefact,
   type GranolaAutomationActionRun,
   type GranolaAutomationMatch,
   type GranolaAutomationRule,
@@ -16,18 +17,22 @@ function automationHelp(): string {
   return `Granola automation
 
 Usage:
-  granola automation <rules|matches|runs|approve|reject> [options]
+  granola automation <rules|matches|runs|artefacts|approve|reject|rerun> [options]
 
 Subcommands:
   rules               List configured automation rules
   matches             Show recent rule matches from sync events
   runs                Show recent automation action runs
+  artefacts           Show generated note and enrichment artefacts
   approve <id>        Approve a pending ask-user action run
   reject <id>         Reject a pending ask-user action run
+  rerun <id>          Re-run the pipeline that produced an artefact
 
 Options:
   --format <value>    text, json, yaml (default: text)
   --limit <n>         Number of matches to show (default: 20)
+  --kind <value>      notes or enrichment
+  --meeting <id>      Filter artefacts to one meeting id
   --status <value>    completed, failed, pending, skipped
   --note <text>       Note to store with approve/reject decisions
   --rules <path>      Path to automation rules JSON
@@ -135,6 +140,65 @@ function parseRunStatus(
   }
 }
 
+function parseArtefactKind(
+  value: string | boolean | undefined,
+): GranolaAutomationArtefact["kind"] | undefined {
+  switch (value) {
+    case undefined:
+      return undefined;
+    case "enrichment":
+    case "notes":
+      return value;
+    default:
+      throw new Error("invalid automation artefact kind: expected notes or enrichment");
+  }
+}
+
+function parseArtefactStatus(
+  value: string | boolean | undefined,
+): GranolaAutomationArtefact["status"] | undefined {
+  switch (value) {
+    case undefined:
+      return undefined;
+    case "approved":
+    case "generated":
+    case "rejected":
+    case "superseded":
+      return value;
+    default:
+      throw new Error(
+        "invalid automation artefact status: expected approved, generated, rejected, or superseded",
+      );
+  }
+}
+
+function renderArtefacts(artefacts: GranolaAutomationArtefact[], format: AutomationFormat): string {
+  if (format === "json") {
+    return toJson({ artefacts });
+  }
+
+  if (format === "yaml") {
+    return toYaml({ artefacts });
+  }
+
+  if (artefacts.length === 0) {
+    return "No automation artefacts yet\n";
+  }
+
+  const header = "UPDATED AT            STATUS       KIND         TITLE";
+  const lines = artefacts.map((artefact) => {
+    const updatedAt = artefact.updatedAt.slice(0, 19).padEnd(21);
+    const status = artefact.status.padEnd(12).slice(0, 12);
+    const kind = artefact.kind.padEnd(12).slice(0, 12);
+    const tail = [artefact.structured.title, artefact.structured.summary || artefact.id]
+      .filter(Boolean)
+      .join(" - ");
+    return `${updatedAt} ${status} ${kind} ${tail}`;
+  });
+
+  return `${[header, ...lines].join("\n")}\n`;
+}
+
 function renderRuns(runs: GranolaAutomationActionRun[], format: AutomationFormat): string {
   if (format === "json") {
     return toJson({ runs });
@@ -167,7 +231,9 @@ export const automationCommand: CommandDefinition = {
   flags: {
     format: { type: "string" },
     help: { type: "boolean" },
+    kind: { type: "string" },
     limit: { type: "string" },
+    meeting: { type: "string" },
     note: { type: "string" },
     status: { type: "string" },
     timeout: { type: "string" },
@@ -206,6 +272,17 @@ export const automationCommand: CommandDefinition = {
         console.log(renderRuns(result.runs, format).trimEnd());
         return 0;
       }
+      case "artefacts": {
+        const result = await app.listAutomationArtefacts({
+          kind: parseArtefactKind(commandFlags.kind),
+          limit: parseLimit(commandFlags.limit),
+          meetingId:
+            typeof commandFlags.meeting === "string" ? commandFlags.meeting.trim() : undefined,
+          status: parseArtefactStatus(commandFlags.status),
+        });
+        console.log(renderArtefacts(result.artefacts, format).trimEnd());
+        return 0;
+      }
       case "approve":
       case "reject": {
         const id = commandArgs[1]?.trim();
@@ -221,12 +298,24 @@ export const automationCommand: CommandDefinition = {
         );
         return 0;
       }
+      case "rerun": {
+        const id = commandArgs[1]?.trim();
+        if (!id) {
+          throw new Error("missing automation artefact id for rerun");
+        }
+
+        const artefact = await app.rerunAutomationArtefact(id);
+        console.log(
+          `Re-ran ${artefact.kind} pipeline for ${artefact.structured.title} (${artefact.id})`,
+        );
+        return 0;
+      }
       case undefined:
         console.log(automationHelp());
         return 1;
       default:
         throw new Error(
-          "invalid automation command: expected rules, matches, runs, approve, or reject",
+          "invalid automation command: expected rules, matches, runs, artefacts, approve, reject, or rerun",
         );
     }
   },

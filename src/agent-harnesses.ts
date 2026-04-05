@@ -24,6 +24,7 @@ export interface GranolaAgentHarnessMatch {
 
 export interface GranolaAgentHarness {
   cwd?: string;
+  fallbackHarnessIds?: string[];
   id: string;
   match?: GranolaAgentHarnessMatch;
   model?: string;
@@ -105,6 +106,7 @@ function parseHarness(value: unknown): GranolaAgentHarness | undefined {
 
   return {
     cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : undefined,
+    fallbackHarnessIds: stringArray(record.fallbackHarnessIds),
     id,
     match: parseMatch(record.match),
     model:
@@ -133,6 +135,7 @@ function parseHarness(value: unknown): GranolaAgentHarness | undefined {
 function cloneHarness(harness: GranolaAgentHarness): GranolaAgentHarness {
   return {
     ...harness,
+    fallbackHarnessIds: harness.fallbackHarnessIds ? [...harness.fallbackHarnessIds] : undefined,
     match: harness.match
       ? {
           ...harness.match,

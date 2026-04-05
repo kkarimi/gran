@@ -6,8 +6,14 @@ import { resolve as resolvePath } from "node:path";
 import {
   createDefaultAgentHarnessStore,
   resolveAgentHarness,
+  type GranolaAgentHarness,
   type AgentHarnessStore,
 } from "../agent-harnesses.ts";
+import {
+  createDefaultAutomationArtefactStore,
+  defaultAutomationArtefactsFilePath,
+  type AutomationArtefactStore,
+} from "../automation-artefacts.ts";
 import {
   createDefaultAutomationAgentRunner,
   type GranolaAutomationAgentRequest,
@@ -93,6 +99,7 @@ import {
   type GranolaSearchIndexEntry,
   type SearchIndexStore,
 } from "../search-index.ts";
+import { buildPipelineInstructions, parsePipelineOutput } from "../processing.ts";
 import { writeTranscripts } from "../transcripts.ts";
 import type {
   AppConfig,
@@ -105,11 +112,15 @@ import { granolaCacheCandidates } from "../utils.ts";
 
 import type {
   GranolaAppApi,
+  GranolaAutomationArtefact,
+  GranolaAutomationArtefactsResult,
+  GranolaAutomationArtefactAttempt,
   GranolaAutomationCommandAction,
   GranolaAutomationAgentAction,
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
   GranolaAutomationActionRun,
+  GranolaAutomationArtefactListOptions,
   GranolaAutomationMatch,
   GranolaAutomationRule,
   GranolaAutomationMatchesResult,
@@ -150,6 +161,8 @@ interface GranolaAppDependencies {
   agentRunner?: GranolaAutomationAgentRunner;
   auth: GranolaAppAuthState;
   authController?: DefaultGranolaAuthController;
+  automationArtefactStore?: AutomationArtefactStore;
+  automationArtefacts?: GranolaAutomationArtefact[];
   automationMatchStore?: AutomationMatchStore;
   automationMatches?: GranolaAutomationMatch[];
   automationRunStore?: AutomationRunStore;
@@ -172,6 +185,13 @@ interface GranolaAppDependencies {
   syncEventStore?: SyncEventStore;
   syncState?: GranolaAppSyncState;
   syncStateStore?: SyncStateStore;
+}
+
+interface ResolvedAutomationAgentAttempt {
+  harness?: GranolaAgentHarness;
+  prompt: string;
+  request: GranolaAutomationAgentRequest;
+  systemPrompt?: string;
 }
 
 function transcriptCount(cacheData: CacheData): number {
@@ -262,6 +282,10 @@ function meetingTranscriptText(bundle: GranolaMeetingBundle): string | undefined
     .join("\n");
 }
 
+function buildAutomationArtefactId(runId: string, kind: GranolaAutomationArtefact["kind"]): string {
+  return `${kind}:${runId}`;
+}
+
 function buildAutomationAgentPrompt(
   match: GranolaAutomationMatch,
   rule: GranolaAutomationRule,
@@ -348,6 +372,8 @@ function defaultState(
   return {
     auth: { ...auth },
     automation: {
+      artefactCount: 0,
+      artefactsFile: config.automation?.artefactsFile ?? defaultAutomationArtefactsFilePath(),
       loaded: false,
       matchCount: 0,
       matchesFile: defaultAutomationMatchesFilePath(),
@@ -403,6 +429,7 @@ function defaultState(
 
 export class GranolaApp implements GranolaAppApi {
   #automationActionRuns: GranolaAutomationActionRun[];
+  #automationArtefacts: GranolaAutomationArtefact[];
   #automationMatches: GranolaAutomationMatch[];
   #automationRules: GranolaAutomationRule[];
   #cacheData?: CacheData;
@@ -422,6 +449,9 @@ export class GranolaApp implements GranolaAppApi {
     options: { surface?: GranolaAppSurface } = {},
   ) {
     this.#state = defaultState(config, deps.auth, options.surface ?? "cli");
+    this.#automationArtefacts = (deps.automationArtefacts ?? []).map((artefact) =>
+      this.cloneAutomationArtefact(artefact),
+    );
     this.#automationMatches = (deps.automationMatches ?? []).map((match) => ({
       ...match,
       folders: match.folders.map((folder) => ({ ...folder })),
@@ -435,6 +465,8 @@ export class GranolaApp implements GranolaAppApi {
     );
     this.#state.exports.jobs = (deps.exportJobs ?? []).map((job) => cloneExportJob(job));
     this.#state.automation = {
+      artefactCount: this.#automationArtefacts.length,
+      artefactsFile: config.automation?.artefactsFile ?? defaultAutomationArtefactsFilePath(),
       lastRunAt:
         this.#automationActionRuns[0]?.finishedAt ?? this.#automationActionRuns[0]?.startedAt,
       lastMatchedAt: this.#automationMatches[0]?.matchedAt,
@@ -582,9 +614,28 @@ export class GranolaApp implements GranolaAppApi {
   private cloneAutomationRun(run: GranolaAutomationActionRun): GranolaAutomationActionRun {
     return {
       ...run,
+      artefactIds: run.artefactIds ? [...run.artefactIds] : undefined,
       folders: run.folders.map((folder) => ({ ...folder })),
       meta: run.meta ? structuredClone(run.meta) : undefined,
       tags: [...run.tags],
+    };
+  }
+
+  private cloneAutomationArtefact(artefact: GranolaAutomationArtefact): GranolaAutomationArtefact {
+    return {
+      ...artefact,
+      attempts: artefact.attempts.map((attempt) => ({ ...attempt })),
+      structured: {
+        ...artefact.structured,
+        actionItems: artefact.structured.actionItems.map((item) => ({ ...item })),
+        decisions: [...artefact.structured.decisions],
+        followUps: [...artefact.structured.followUps],
+        highlights: [...artefact.structured.highlights],
+        metadata: artefact.structured.metadata
+          ? structuredClone(artefact.structured.metadata)
+          : undefined,
+        sections: artefact.structured.sections.map((section) => ({ ...section })),
+      },
     };
   }
 
@@ -605,6 +656,8 @@ export class GranolaApp implements GranolaAppApi {
 
     this.#state.automation = {
       ...this.#state.automation,
+      artefactCount: this.#automationArtefacts.length,
+      artefactsFile: this.config.automation?.artefactsFile ?? defaultAutomationArtefactsFilePath(),
       lastMatchedAt: latestMatch?.matchedAt ?? this.#state.automation.lastMatchedAt,
       lastRunAt: latestRun?.finishedAt ?? latestRun?.startedAt ?? this.#state.automation.lastRunAt,
       loaded: true,
@@ -671,6 +724,18 @@ export class GranolaApp implements GranolaAppApi {
     this.#automationActionRuns.sort((left, right) =>
       (right.finishedAt ?? right.startedAt).localeCompare(left.finishedAt ?? left.startedAt),
     );
+    this.refreshAutomationState();
+  }
+
+  private async writeAutomationArtefacts(artefacts: GranolaAutomationArtefact[]): Promise<void> {
+    this.#automationArtefacts = artefacts
+      .map((artefact) => this.cloneAutomationArtefact(artefact))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+
+    if (this.deps.automationArtefactStore) {
+      await this.deps.automationArtefactStore.writeArtefacts(this.#automationArtefacts);
+    }
+
     this.refreshAutomationState();
   }
 
@@ -1076,6 +1141,39 @@ export class GranolaApp implements GranolaAppApi {
     };
   }
 
+  async listAutomationArtefacts(
+    options: GranolaAutomationArtefactListOptions = {},
+  ): Promise<GranolaAutomationArtefactsResult> {
+    const limit = options.limit ?? 20;
+    const artefacts = this.deps.automationArtefactStore
+      ? await this.deps.automationArtefactStore.readArtefacts({
+          kind: options.kind,
+          limit,
+          meetingId: options.meetingId,
+          status: options.status,
+        })
+      : this.#automationArtefacts
+          .filter((artefact) => {
+            if (options.kind && artefact.kind !== options.kind) {
+              return false;
+            }
+            if (options.meetingId && artefact.meetingId !== options.meetingId) {
+              return false;
+            }
+            if (options.status && artefact.status !== options.status) {
+              return false;
+            }
+            return true;
+          })
+          .slice(0, limit);
+    this.setUiState({
+      view: "idle",
+    });
+    return {
+      artefacts: artefacts.map((artefact) => this.cloneAutomationArtefact(artefact)),
+    };
+  }
+
   async listAutomationRules(): Promise<GranolaAutomationRulesResult> {
     const rules = await this.loadAutomationRules({ forceRefresh: true });
     this.setUiState({
@@ -1157,6 +1255,87 @@ export class GranolaApp implements GranolaAppApi {
     await this.appendAutomationRuns([resolved]);
     this.emitStateUpdate();
     return this.cloneAutomationRun(resolved);
+  }
+
+  async rerunAutomationArtefact(id: string): Promise<GranolaAutomationArtefact> {
+    const current =
+      (this.deps.automationArtefactStore
+        ? await this.deps.automationArtefactStore.readArtefact(id)
+        : undefined) ?? this.#automationArtefacts.find((artefact) => artefact.id === id);
+    if (!current) {
+      throw new Error(`automation artefact not found: ${id}`);
+    }
+
+    const rules = await this.loadAutomationRules({ forceRefresh: true });
+    const rule = rules.find((candidate) => candidate.id === current.ruleId);
+    if (!rule) {
+      throw new Error(`automation rule not found: ${current.ruleId}`);
+    }
+
+    const action = enabledAutomationActions(rule).find(
+      (candidate) => candidate.id === current.actionId,
+    );
+    if (!action || action.kind !== "agent" || !action.pipeline) {
+      throw new Error(`automation artefact is not rerunnable: ${id}`);
+    }
+
+    const match =
+      (this.deps.automationMatchStore
+        ? (await this.deps.automationMatchStore.readMatches(0)).find(
+            (candidate) => candidate.id === current.matchId,
+          )
+        : undefined) ??
+      this.#automationMatches.find((candidate) => candidate.id === current.matchId);
+    if (!match) {
+      throw new Error(`automation match not found: ${current.matchId}`);
+    }
+
+    const nextRun = await executeAutomationAction(
+      this.cloneAutomationMatch(match),
+      rule,
+      action,
+      {
+        exportNotes: async (nextMatch, nextAction) =>
+          await this.runAutomationNotesAction(nextMatch, nextAction),
+        exportTranscripts: async (nextMatch, nextAction) =>
+          await this.runAutomationTranscriptAction(nextMatch, nextAction),
+        nowIso: () => this.nowIso(),
+        runAgent: async (nextMatch, nextRule, nextAction, run) =>
+          await this.runAutomationAgent(nextMatch, nextRule, nextAction, run),
+        runCommand: async (nextMatch, nextRule, nextAction) =>
+          await this.runAutomationCommand(nextMatch, nextRule, nextAction),
+      },
+      {
+        rerunOfId: current.runId,
+        runId: `${current.runId}:rerun:${this.nowIso().replaceAll(/[-:.]/g, "").replace("T", "").replace("Z", "")}`,
+      },
+    );
+
+    await this.appendAutomationRuns([nextRun]);
+
+    const nextArtefactId = nextRun.artefactIds?.[0];
+    const nextArtefact = nextArtefactId
+      ? this.#automationArtefacts.find((artefact) => artefact.id === nextArtefactId)
+      : undefined;
+    if (!nextArtefact) {
+      throw new Error(`rerun did not produce an automation artefact: ${id}`);
+    }
+
+    const updatedArtefacts = this.#automationArtefacts.map((artefact) =>
+      artefact.id === current.id
+        ? {
+            ...artefact,
+            status: "superseded" as const,
+            supersededById: nextArtefact.id,
+            updatedAt: nextArtefact.createdAt,
+          }
+        : artefact,
+    );
+    await this.writeAutomationArtefacts(updatedArtefacts);
+    this.emitStateUpdate();
+    return this.cloneAutomationArtefact(
+      this.#automationArtefacts.find((artefact) => artefact.id === nextArtefact.id) ?? nextArtefact,
+    );
   }
 
   async loginAuth(
@@ -1426,33 +1605,13 @@ export class GranolaApp implements GranolaAppApi {
     });
   }
 
-  private async runAutomationAgent(
+  private async buildAutomationAgentAttempt(
     match: GranolaAutomationMatch,
     rule: GranolaAutomationRule,
     action: GranolaAutomationAgentAction,
-  ): Promise<{
-    command?: string;
-    dryRun: boolean;
-    model: string;
-    output?: string;
-    prompt: string;
-    provider: string;
-    systemPrompt?: string;
-  }> {
-    const bundle =
-      match.eventKind === "meeting.removed"
-        ? undefined
-        : await this.maybeReadMeetingBundleById(match.meetingId, {
-            requireCache: false,
-          });
-    const harness = resolveAgentHarness(
-      this.deps.agentHarnessStore ? await this.deps.agentHarnessStore.readHarnesses() : [],
-      {
-        bundle,
-        match,
-      },
-      action.harnessId,
-    );
+    bundle: GranolaMeetingBundle | undefined,
+    harness: GranolaAgentHarness | undefined,
+  ): Promise<ResolvedAutomationAgentAttempt> {
     const harnessCwd = harness?.cwd;
     const promptFile = await readOptionalActionFile(action.promptFile, action.cwd ?? harnessCwd);
     const harnessPromptFile = await readOptionalActionFile(harness?.promptFile, harnessCwd);
@@ -1464,7 +1623,7 @@ export class GranolaApp implements GranolaAppApi {
       harness?.systemPromptFile,
       harnessCwd,
     );
-    const instructions = combinePromptSections(
+    let instructions = combinePromptSections(
       harnessPromptFile,
       harness?.prompt,
       promptFile,
@@ -1474,25 +1633,185 @@ export class GranolaApp implements GranolaAppApi {
       throw new Error(`automation agent action ${action.id} is missing prompt instructions`);
     }
 
-    const request: GranolaAutomationAgentRequest = {
-      cwd: action.cwd ?? harnessCwd,
-      dryRun: action.dryRun,
-      model: action.model ?? harness?.model,
+    if (action.pipeline) {
+      instructions = buildPipelineInstructions(action.pipeline.kind, instructions);
+    }
+
+    return {
+      harness,
       prompt: buildAutomationAgentPrompt(match, rule, instructions, bundle),
-      provider: action.provider ?? harness?.provider,
-      retries: action.retries,
+      request: {
+        cwd: action.cwd ?? harnessCwd,
+        dryRun: action.dryRun,
+        model: action.model ?? harness?.model,
+        prompt: buildAutomationAgentPrompt(match, rule, instructions, bundle),
+        provider: action.provider ?? harness?.provider,
+        retries: action.retries,
+        systemPrompt: combinePromptSections(
+          harnessSystemPromptFile,
+          harness?.systemPrompt,
+          systemPromptFile,
+          action.systemPrompt,
+        ),
+        timeoutMs: action.timeoutMs,
+      },
       systemPrompt: combinePromptSections(
         harnessSystemPromptFile,
         harness?.systemPrompt,
         systemPromptFile,
         action.systemPrompt,
       ),
-      timeoutMs: action.timeoutMs,
     };
+  }
 
-    return await (this.deps.agentRunner ?? createDefaultAutomationAgentRunner(this.config)).run(
-      request,
-    );
+  private async runAutomationAgent(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: GranolaAutomationAgentAction,
+    run: GranolaAutomationActionRun,
+  ): Promise<{
+    artefactIds?: string[];
+    attempts?: GranolaAutomationArtefactAttempt[];
+    command?: string;
+    dryRun: boolean;
+    model: string;
+    output?: string;
+    pipelineKind?: string;
+    prompt: string;
+    provider: string;
+    systemPrompt?: string;
+  }> {
+    const bundle =
+      match.eventKind === "meeting.removed"
+        ? undefined
+        : await this.maybeReadMeetingBundleById(match.meetingId, {
+            requireCache: false,
+          });
+    const harnesses = this.deps.agentHarnessStore
+      ? await this.deps.agentHarnessStore.readHarnesses()
+      : [];
+    const primaryHarness = resolveAgentHarness(harnesses, { bundle, match }, action.harnessId);
+    const fallbackHarnessIds = [
+      ...(action.fallbackHarnessIds ?? []),
+      ...(primaryHarness?.fallbackHarnessIds ?? []),
+    ].filter((value, index, values) => Boolean(value) && values.indexOf(value) === index);
+    const attempts = [
+      await this.buildAutomationAgentAttempt(match, rule, action, bundle, primaryHarness),
+      ...(await Promise.all(
+        fallbackHarnessIds
+          .filter((harnessId) => harnessId !== primaryHarness?.id)
+          .map(async (harnessId) => {
+            const fallbackHarness = resolveAgentHarness(harnesses, { bundle, match }, harnessId);
+            return await this.buildAutomationAgentAttempt(
+              match,
+              rule,
+              action,
+              bundle,
+              fallbackHarness,
+            );
+          }),
+      )),
+    ];
+    const runner = this.deps.agentRunner ?? createDefaultAutomationAgentRunner(this.config);
+    const attemptMeta: GranolaAutomationArtefactAttempt[] = [];
+    let lastError: unknown;
+
+    for (const attempt of attempts) {
+      try {
+        const result = await runner.run(attempt.request);
+        attemptMeta.push({
+          harnessId: attempt.harness?.id,
+          model: result.model,
+          provider:
+            result.provider === "codex" ||
+            result.provider === "openai" ||
+            result.provider === "openrouter"
+              ? result.provider
+              : undefined,
+        });
+
+        if (action.pipeline) {
+          const parsed = parsePipelineOutput({
+            kind: action.pipeline.kind,
+            meetingTitle: match.title,
+            rawOutput: result.output ?? "",
+          });
+          const artefact: GranolaAutomationArtefact = {
+            actionId: action.id,
+            actionName: automationActionName(action),
+            attempts: attemptMeta.map((item) => ({ ...item })),
+            createdAt: this.nowIso(),
+            eventId: match.eventId,
+            id: buildAutomationArtefactId(run.id, action.pipeline.kind),
+            kind: action.pipeline.kind,
+            matchId: match.id,
+            meetingId: match.meetingId,
+            model: result.model,
+            parseMode: parsed.parseMode,
+            prompt: result.prompt,
+            provider:
+              result.provider === "codex" ||
+              result.provider === "openai" ||
+              result.provider === "openrouter"
+                ? result.provider
+                : "codex",
+            rawOutput: result.output ?? "",
+            rerunOfId: run.rerunOfId
+              ? buildAutomationArtefactId(run.rerunOfId, action.pipeline.kind)
+              : undefined,
+            ruleId: rule.id,
+            ruleName: rule.name,
+            runId: run.id,
+            status: "generated",
+            structured: parsed.structured,
+            updatedAt: this.nowIso(),
+          };
+          await this.writeAutomationArtefacts([artefact, ...this.#automationArtefacts]);
+
+          return {
+            artefactIds: [artefact.id],
+            attempts: attemptMeta,
+            command: result.command,
+            dryRun: result.dryRun,
+            model: result.model,
+            output: parsed.structured.summary ?? parsed.structured.markdown,
+            pipelineKind: action.pipeline.kind,
+            prompt: result.prompt,
+            provider: result.provider,
+            systemPrompt: result.systemPrompt,
+          };
+        }
+
+        return {
+          attempts: attemptMeta,
+          command: result.command,
+          dryRun: result.dryRun,
+          model: result.model,
+          output: result.output,
+          prompt: result.prompt,
+          provider: result.provider,
+          systemPrompt: result.systemPrompt,
+        };
+      } catch (error) {
+        lastError = error;
+        attemptMeta.push({
+          error: error instanceof Error ? error.message : String(error),
+          harnessId: attempt.harness?.id,
+          model: attempt.request.model,
+          provider: attempt.request.provider,
+        });
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(
+          typeof lastError === "string"
+            ? lastError
+            : lastError
+              ? JSON.stringify(lastError)
+              : "automation agent failed",
+        );
   }
 
   private async runAutomationActions(
@@ -1523,8 +1842,8 @@ export class GranolaApp implements GranolaAppApi {
             exportTranscripts: async (nextMatch, nextAction) =>
               await this.runAutomationTranscriptAction(nextMatch, nextAction),
             nowIso: () => this.nowIso(),
-            runAgent: async (nextMatch, nextRule, nextAction) =>
-              await this.runAutomationAgent(nextMatch, nextRule, nextAction),
+            runAgent: async (nextMatch, nextRule, nextAction, run) =>
+              await this.runAutomationAgent(nextMatch, nextRule, nextAction, run),
             runCommand: async (nextMatch, nextRule, nextAction) =>
               await this.runAutomationCommand(nextMatch, nextRule, nextAction),
           }),
@@ -2223,6 +2542,10 @@ export async function createGranolaApp(
   } = {},
 ): Promise<GranolaApp> {
   const auth = await inspectDefaultGranolaAuth(config);
+  const automationArtefactStore = createDefaultAutomationArtefactStore(
+    config.automation?.artefactsFile,
+  );
+  const automationArtefacts = await automationArtefactStore.readArtefacts({ limit: 0 });
   const automationMatchStore = createDefaultAutomationMatchStore();
   const automationMatches = await automationMatchStore.readMatches(0);
   const automationRunStore = createDefaultAutomationRunStore();
@@ -2250,6 +2573,8 @@ export async function createGranolaApp(
       agentRunner: createDefaultAutomationAgentRunner(config),
       agentHarnessStore,
       authController,
+      automationArtefactStore,
+      automationArtefacts,
       automationMatches,
       automationMatchStore,
       automationRunStore,

@@ -157,6 +157,11 @@ export async function loadConfig(options: {
 
   return {
     automation: {
+      artefactsFile:
+        pickString(env.GRANOLA_AUTOMATION_ARTEFACTS_FILE) ??
+        pickString(configValues["automation-artefacts-file"]) ??
+        pickString(configValues.automationArtefactsFile) ??
+        defaultGranolaToolkitPersistenceLayout().automationArtefactsFile,
       rulesFile:
         pickString(options.globalFlags.rules) ??
         pickString(env.GRANOLA_AUTOMATION_RULES_FILE) ??

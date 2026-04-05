@@ -14,6 +14,8 @@ import {
   type GranolaServerInfo,
 } from "../transport.ts";
 import type {
+  GranolaAutomationArtefactKind,
+  GranolaAutomationArtefactStatus,
   GranolaAutomationActionRunStatus,
   GranolaAppAuthMode,
   GranolaAppStateEvent,
@@ -93,6 +95,40 @@ function parseAutomationRunStatus(
       return value;
     default:
       throw new Error("invalid automation status: expected completed, failed, pending, or skipped");
+  }
+}
+
+function parseAutomationArtefactKind(
+  value: string | null,
+): GranolaAutomationArtefactKind | undefined {
+  switch (value) {
+    case null:
+    case "":
+      return undefined;
+    case "enrichment":
+    case "notes":
+      return value;
+    default:
+      throw new Error("invalid automation artefact kind: expected enrichment or notes");
+  }
+}
+
+function parseAutomationArtefactStatus(
+  value: string | null,
+): GranolaAutomationArtefactStatus | undefined {
+  switch (value) {
+    case null:
+    case "":
+      return undefined;
+    case "approved":
+    case "generated":
+    case "rejected":
+    case "superseded":
+      return value;
+    default:
+      throw new Error(
+        "invalid automation artefact status: expected approved, generated, rejected, or superseded",
+      );
   }
 }
 
@@ -492,6 +528,20 @@ export async function startGranolaServer(
         return;
       }
 
+      if (method === "GET" && path === granolaTransportPaths.automationArtefacts) {
+        sendJson(
+          response,
+          await app.listAutomationArtefacts({
+            kind: parseAutomationArtefactKind(url.searchParams.get("kind")),
+            limit: parseInteger(url.searchParams.get("limit")),
+            meetingId: url.searchParams.get("meetingId")?.trim() || undefined,
+            status: parseAutomationArtefactStatus(url.searchParams.get("status")),
+          }),
+          { headers: originHeaders },
+        );
+        return;
+      }
+
       if (method === "GET" && path === granolaTransportPaths.automationRuns) {
         sendJson(
           response,
@@ -501,6 +551,18 @@ export async function startGranolaServer(
           }),
           { headers: originHeaders },
         );
+        return;
+      }
+
+      if (
+        method === "POST" &&
+        path.endsWith("/rerun") &&
+        path.startsWith(`${granolaTransportPaths.automationArtefacts}/`)
+      ) {
+        const id = decodeURIComponent(
+          path.slice(`${granolaTransportPaths.automationArtefacts}/`.length, -"/rerun".length),
+        );
+        sendJson(response, await app.rerunAutomationArtefact(id), { headers: originHeaders });
         return;
       }
 

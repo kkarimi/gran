@@ -199,6 +199,7 @@ describe("buildGranolaTuiSummary", () => {
       {
         auth: storedAuthState,
         automation: {
+          artefactCount: 0,
           loaded: true,
           pendingRunCount: 0,
           matchCount: 0,

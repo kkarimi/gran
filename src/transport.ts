@@ -1,4 +1,6 @@
 import type {
+  GranolaAutomationArtefactKind,
+  GranolaAutomationArtefactStatus,
   GranolaAutomationActionRunStatus,
   GranolaExportJobsListOptions,
   GranolaFolderListOptions,
@@ -41,6 +43,7 @@ export const granolaTransportPaths = {
   authStatus: "/auth/status",
   authUnlock: "/auth/unlock",
   automationMatches: "/automation/matches",
+  automationArtefacts: "/automation/artefacts",
   automationRules: "/automation/rules",
   automationRuns: "/automation/runs",
   events: "/events",
@@ -136,11 +139,31 @@ export function granolaAutomationRunsPath(
   });
 }
 
+export function granolaAutomationArtefactsPath(
+  options: {
+    kind?: GranolaAutomationArtefactKind;
+    limit?: number;
+    meetingId?: string;
+    status?: GranolaAutomationArtefactStatus;
+  } = {},
+): string {
+  return appendSearchParams(granolaTransportPaths.automationArtefacts, {
+    kind: options.kind,
+    limit: options.limit,
+    meetingId: options.meetingId,
+    status: options.status,
+  });
+}
+
 export function granolaAutomationRunDecisionPath(
   id: string,
   decision: "approve" | "reject",
 ): string {
   return `${granolaTransportPaths.automationRuns}/${encodeURIComponent(id)}/${decision}`;
+}
+
+export function granolaAutomationArtefactRerunPath(id: string): string {
+  return `${granolaTransportPaths.automationArtefacts}/${encodeURIComponent(id)}/rerun`;
 }
 
 export function granolaExportJobRerunPath(id: string): string {

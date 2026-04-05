@@ -138,6 +138,7 @@ export interface GranolaAgentsOptions {
 
 export interface AppConfig {
   automation?: {
+    artefactsFile: string;
     rulesFile: string;
   };
   agents?: GranolaAgentsOptions;

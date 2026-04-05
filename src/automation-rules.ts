@@ -6,12 +6,13 @@ import type {
   GranolaAutomationCommandAction,
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
+  GranolaAutomationPipelineConfig,
   GranolaAutomationMatch,
   GranolaAutomationRule,
   GranolaAppSyncEvent,
 } from "./app/index.ts";
 import { defaultGranolaToolkitPersistenceLayout } from "./persistence/layout.ts";
-import { parseJsonString } from "./utils.ts";
+import { asRecord, parseJsonString, stringValue } from "./utils.ts";
 
 function cloneRule(rule: GranolaAutomationRule): GranolaAutomationRule {
   return {
@@ -32,7 +33,11 @@ function cloneRule(rule: GranolaAutomationRule): GranolaAutomationRule {
 function cloneAction(action: GranolaAutomationAction): GranolaAutomationAction {
   switch (action.kind) {
     case "agent":
-      return { ...action };
+      return {
+        ...action,
+        fallbackHarnessIds: action.fallbackHarnessIds ? [...action.fallbackHarnessIds] : undefined,
+        pipeline: action.pipeline ? { ...action.pipeline } : undefined,
+      };
     case "ask-user":
       return { ...action };
     case "command":
@@ -78,6 +83,16 @@ function stringRecord(value: unknown): Record<string, string> | undefined {
   return Object.fromEntries(entries.map(([key, item]) => [key.trim(), item.trim()]));
 }
 
+function parsePipeline(value: unknown): GranolaAutomationPipelineConfig | undefined {
+  const record = asRecord(value);
+  const kind = record
+    ? stringValue(record.kind).trim()
+    : typeof value === "string"
+      ? value.trim()
+      : "";
+  return kind === "enrichment" || kind === "notes" ? { kind } : undefined;
+}
+
 function parseAction(value: unknown, index: number): GranolaAutomationAction | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
@@ -120,6 +135,7 @@ function parseAction(value: unknown, index: number): GranolaAutomationAction | u
         typeof record.harnessId === "string" && record.harnessId.trim()
           ? record.harnessId.trim()
           : undefined;
+      const fallbackHarnessIds = stringArray(record.fallbackHarnessIds);
       const systemPrompt =
         typeof record.systemPrompt === "string" && record.systemPrompt.trim()
           ? record.systemPrompt.trim()
@@ -136,12 +152,14 @@ function parseAction(value: unknown, index: number): GranolaAutomationAction | u
         cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : undefined,
         dryRun: typeof record.dryRun === "boolean" ? record.dryRun : undefined,
         enabled,
+        fallbackHarnessIds,
         harnessId,
         id,
         kind,
         model:
           typeof record.model === "string" && record.model.trim() ? record.model.trim() : undefined,
         name,
+        pipeline: parsePipeline(record.pipeline),
         prompt,
         promptFile,
         provider,

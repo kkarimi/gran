@@ -8,6 +8,7 @@ import { parseJsonString } from "./utils.ts";
 function cloneRun(run: GranolaAutomationActionRun): GranolaAutomationActionRun {
   return {
     ...run,
+    artefactIds: run.artefactIds ? [...run.artefactIds] : undefined,
     folders: run.folders.map((folder) => ({ ...folder })),
     meta: run.meta ? structuredClone(run.meta) : undefined,
     tags: [...run.tags],
