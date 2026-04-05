@@ -69,6 +69,7 @@ const release = () => {
   run("vp check");
   run("vp test");
   run("npm run coverage");
+  run("npm run hooks:smoke");
   run("npm run standalone:smoke");
   run("vp pack");
   run("npm run docs:check");

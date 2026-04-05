@@ -43,6 +43,7 @@
     "docs:dev": "npm --prefix docs run dev",
     "docs:start": "npm --prefix docs run start",
     "fmt": "vp fmt",
+    "hooks:smoke": "node scripts/hooks-smoke.mjs",
     "lint": "vp lint",
     "pack:dry-run": "npm pack --dry-run",
     "prepublishOnly": "node scripts/prepublish.mjs",
@@ -59,7 +60,7 @@
     "transcripts": "node dist/cli.js transcripts",
     "test": "vp test",
     "typecheck": "vp exec tsc --noEmit",
-    "prepare": "vp config",
+    "prepare": "vp config && node scripts/install-hooks.mjs",
     "web:build": "node scripts/build-web-client.mjs",
     "web:check": "node scripts/build-web-client.mjs --check"
   },

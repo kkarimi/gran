@@ -1,1 +1,1 @@
-vp staged
+node scripts/pre-commit.mjs
