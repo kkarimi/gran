@@ -39,8 +39,6 @@ try {
   }
 
   run("npm", ["run", "prepare"], tempDir, { stdio: "inherit" });
-  run("git", ["config", "user.name", "Granola Toolkit Smoke"], tempDir);
-  run("git", ["config", "user.email", "smoke@example.com"], tempDir);
 
   const target = resolve(tempDir, "src/web/client-state.ts");
   const original = readFileSync(target, "utf8");
@@ -52,7 +50,20 @@ try {
   writeFileSync(target, next, "utf8");
 
   run("git", ["add", "src/web/client-state.ts"], tempDir);
-  run("git", ["commit", "-m", "test: smoke pre-commit web bundle"], tempDir, { stdio: "inherit" });
+  run(
+    "git",
+    [
+      "-c",
+      "user.name=Granola Toolkit Smoke",
+      "-c",
+      "user.email=smoke@example.com",
+      "commit",
+      "-m",
+      "test: smoke pre-commit web bundle",
+    ],
+    tempDir,
+    { stdio: "inherit" },
+  );
 
   const committedFiles = run("git", ["show", "--name-only", "--format=", "HEAD"], tempDir)
     .split("\n")
