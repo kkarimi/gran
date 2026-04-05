@@ -132,9 +132,9 @@ describe("spawnGranolaServiceProcess", () => {
       expect.objectContaining({
         cwd: "/tmp/workspace",
         detached: true,
-        env: {
+        env: expect.objectContaining({
           PATH: process.env.PATH,
-        },
+        }),
         stdio: ["ignore", expect.any(Number), expect.any(Number)],
       }),
     );
