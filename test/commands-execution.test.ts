@@ -425,6 +425,11 @@ describe("command execution", () => {
     expect(startGranolaServer).toHaveBeenCalledWith(app, {
       hostname: "0.0.0.0",
       port: 4096,
+      runtime: {
+        mode: "server",
+        syncEnabled: true,
+        syncIntervalMs: 60_000,
+      },
       security: {
         password: "secret-pass",
         trustedOrigins: ["https://app.example", "https://admin.example"],
@@ -1390,6 +1395,84 @@ describe("command execution", () => {
     );
     expect(log).toHaveBeenCalledWith(
       "Granola Toolkit web workspace already running on http://127.0.0.1:4123/",
+    );
+  });
+
+  test("web command starts the background service when safe and none is running", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const openExternalUrl = vi.spyOn(browserModule, "openExternalUrl").mockResolvedValue();
+    const loadConfig = vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    const createGranolaApp = vi.spyOn(appModule, "createGranolaApp");
+    vi.spyOn(serviceModule, "discoverGranolaService").mockResolvedValue(undefined);
+    vi.spyOn(serviceModule, "spawnGranolaServiceProcess").mockResolvedValue(2222);
+    vi.spyOn(serviceModule, "waitForGranolaService").mockResolvedValue({
+      info: {
+        capabilities: {
+          attach: true,
+          auth: true,
+          automation: true,
+          events: true,
+          exports: true,
+          folders: true,
+          meetingOpen: true,
+          processing: true,
+          sync: true,
+          webClient: true,
+        },
+        persistence: {
+          exportJobs: true,
+          meetingIndex: true,
+          sessionStore: "file",
+          syncEvents: true,
+          syncState: true,
+        },
+        product: "granola-toolkit",
+        protocolVersion: 2,
+        runtime: {
+          mode: "background-service",
+          syncEnabled: true,
+          syncIntervalMs: 60_000,
+        },
+        transport: "local-http",
+      },
+      kind: "running",
+      record: {
+        hostname: "127.0.0.1",
+        logFile: "/tmp/service.log",
+        passwordProtected: false,
+        pid: 2222,
+        port: 4123,
+        protocolVersion: 2,
+        startedAt: "2026-04-05T10:00:00.000Z",
+        syncEnabled: true,
+        syncIntervalMs: 60_000,
+        url: "http://127.0.0.1:4123/",
+      },
+    });
+
+    const exitCode = await webCommand.run(
+      makeContext({
+        commandFlags: {
+          meeting: "doc-alpha-1111",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(loadConfig).toHaveBeenCalled();
+    expect(createGranolaApp).not.toHaveBeenCalled();
+    expect(serviceModule.spawnGranolaServiceProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commandArgs: [],
+        env: expect.any(Object),
+        logFile: expect.any(String),
+      }),
+    );
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      new URL("http://127.0.0.1:4123/?meeting=doc-alpha-1111"),
+    );
+    expect(log).toHaveBeenCalledWith(
+      "Granola Toolkit background service started on http://127.0.0.1:4123/",
     );
   });
 });

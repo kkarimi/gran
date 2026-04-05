@@ -91,6 +91,11 @@ export async function runGranolaWebWorkspace(
     enableWebClient: true,
     hostname: options.hostname,
     port: options.port,
+    runtime: {
+      mode: "web-workspace",
+      syncEnabled: options.syncEnabled,
+      syncIntervalMs: options.syncIntervalMs,
+    },
     security: {
       password: options.password,
       trustedOrigins: options.trustedOrigins,

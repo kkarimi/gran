@@ -11,6 +11,7 @@ import { defaultGranolaToolkitPersistenceLayout } from "../persistence/layout.ts
 import {
   granolaTransportPaths,
   GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+  type GranolaServerRuntimeMode,
   type GranolaServerInfo,
 } from "../transport.ts";
 import type {
@@ -403,6 +404,11 @@ export interface GranolaServerOptions {
   enableWebClient?: boolean;
   hostname?: string;
   port?: number;
+  runtime?: {
+    mode?: GranolaServerRuntimeMode;
+    syncEnabled?: boolean;
+    syncIntervalMs?: number;
+  };
   security?: GranolaServerSecurityOptions;
 }
 
@@ -413,6 +419,12 @@ export async function startGranolaServer(
   const enableWebClient = options.enableWebClient ?? false;
   const hostname = options.hostname ?? "127.0.0.1";
   const port = options.port ?? 0;
+  const runtime = {
+    mode:
+      options.runtime?.mode ?? (enableWebClient ? ("web-workspace" as const) : ("server" as const)),
+    syncEnabled: options.runtime?.syncEnabled ?? false,
+    syncIntervalMs: options.runtime?.syncIntervalMs,
+  };
   const security = {
     password: options.security?.password?.trim() || undefined,
     trustedOrigins: (options.security?.trustedOrigins ?? [])
@@ -441,6 +453,7 @@ export async function startGranolaServer(
     },
     product: "granola-toolkit",
     protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+    runtime,
     transport: "local-http",
   };
 

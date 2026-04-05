@@ -11,6 +11,8 @@ import type { GranolaToolkitSessionStoreKind } from "./persistence/layout.ts";
 
 export const GRANOLA_TRANSPORT_PROTOCOL_VERSION = 2;
 
+export type GranolaServerRuntimeMode = "background-service" | "server" | "web-workspace";
+
 export interface GranolaServerInfo {
   capabilities: {
     attach: boolean;
@@ -33,6 +35,11 @@ export interface GranolaServerInfo {
   };
   product: "granola-toolkit";
   protocolVersion: number;
+  runtime: {
+    mode: GranolaServerRuntimeMode;
+    syncEnabled: boolean;
+    syncIntervalMs?: number;
+  };
   transport: "local-http";
 }
 

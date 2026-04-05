@@ -48,21 +48,23 @@ surfaces can find it automatically.
 
 ## Web
 
-`granola web` either reuses the running background service or starts a fresh local browser runtime
-at `/`, then opens it in your default browser unless you pass `--open=false`.
+`granola web` now prefers the reusable background service: it will attach to the running service if
+one exists, or start that service for you before opening `/` in your default browser. Pass
+`--foreground` when you explicitly want a throwaway foreground browser runtime instead.
 
 Examples:
 
 ```bash
 granola web
 granola web --meeting 1234abcd
+granola web --foreground --open=false --port 4096
 granola web --open=false --port 4096
 granola web --network lan --password "change-me"
 ```
 
-If a background service is already running and you do not pass runtime overrides like `--port`,
-`--hostname`, `--network`, `--password`, or `--sync-interval`, `granola web` will open that
-existing service instead of starting a second one.
+If you do not pass runtime overrides like `--port`, `--hostname`, `--network`, `--password`, or
+`--sync-interval`, `granola web` will stay on the shared service path instead of starting another
+local runtime.
 
 The browser workspace includes:
 

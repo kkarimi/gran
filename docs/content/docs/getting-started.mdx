@@ -85,7 +85,10 @@ The first-run flow in the web workspace will guide you through the same setup in
 Granola API key, run the first meeting import, choose an agent provider, and create a starter
 reviewable notes pipeline before it drops you into the full workspace.
 
-After setup, prefer the background service for day-to-day use:
+`granola web` now prefers the reusable background-service path, so for many users the command above
+is enough to both launch the browser and warm the local sync runtime.
+
+If you want to warm the service before opening the browser, or keep it running headlessly, use:
 
 ```bash
 granola service start
@@ -93,9 +96,6 @@ granola web
 granola attach
 granola service status
 ```
-
-`granola web` will reuse the running background service when you have not asked it to start a new
-runtime with custom bind or sync flags.
 
 ## Typical Starting Commands
 

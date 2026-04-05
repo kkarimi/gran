@@ -35,6 +35,11 @@ function createServerInfo() {
     },
     product: "granola-toolkit" as const,
     protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+    runtime: {
+      mode: "background-service" as const,
+      syncEnabled: true,
+      syncIntervalMs: 60_000,
+    },
     transport: "local-http" as const,
   };
 }

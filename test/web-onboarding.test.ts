@@ -7,9 +7,39 @@ import {
   starterHarnessId,
   starterRuleId,
 } from "../src/web-app/onboarding.tsx";
+import type { GranolaServerInfo } from "../src/transport.ts";
 
 describe("web onboarding", () => {
   test("derives setup progress from auth, sync, and automation state", () => {
+    const serverInfo: GranolaServerInfo = {
+      capabilities: {
+        attach: true,
+        auth: true,
+        automation: true,
+        events: true,
+        exports: true,
+        folders: true,
+        meetingOpen: true,
+        processing: true,
+        sync: true,
+        webClient: true,
+      },
+      persistence: {
+        exportJobs: true,
+        meetingIndex: true,
+        sessionStore: "file",
+        syncEvents: true,
+        syncState: true,
+      },
+      product: "granola-toolkit",
+      protocolVersion: 2,
+      runtime: {
+        mode: "background-service",
+        syncEnabled: true,
+        syncIntervalMs: 60_000,
+      },
+      transport: "local-http",
+    };
     const appState = {
       auth: {
         apiKeyAvailable: true,
@@ -88,12 +118,15 @@ describe("web onboarding", () => {
         },
       ],
       meetingsLoadedCount: 2,
+      serverInfo,
     });
 
+    expect(derived.activeStepId).toBe(null);
     expect(derived.complete).toBe(true);
     expect(derived.connected).toBe(true);
     expect(derived.synced).toBe(true);
     expect(derived.pipelineReady).toBe(true);
+    expect(derived.serviceDetail).toBe("Background service active · sync every minute.");
     expect(derived.stepCards.map((step) => step.complete)).toEqual([true, true, true]);
   });
 

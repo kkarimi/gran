@@ -401,6 +401,11 @@ export async function startToolkitWebServer(
   }
   const server = await startGranolaServer(app, {
     enableWebClient: true,
+    runtime: {
+      mode: "background-service",
+      syncEnabled: true,
+      syncIntervalMs: 60_000,
+    },
   });
 
   return {

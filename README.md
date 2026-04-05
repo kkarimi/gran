@@ -26,7 +26,6 @@ macOS arm64, Linux x64, and Windows x64. Extract the archive and run `granola` (
 ```bash
 granola init --provider openrouter
 granola auth login --api-key grn_...
-granola service start
 granola web
 ```
 
@@ -38,9 +37,12 @@ If you start with `granola web`, the browser now walks you through the same firs
 enter a Granola API key, import your meetings, choose an agent provider, and land in a workspace
 with a starter reviewable notes pipeline already configured.
 
-`granola service start` is the new long-running background mode. It keeps the local sync loop warm,
-serves the browser workspace, and lets `granola attach` discover the running service without making
-you keep a foreground terminal open.
+`granola web` now prefers the long-running background-service path by default: it will reuse the
+existing service when one is already running, or start it for you when you have not asked for a
+foreground/debug session.
+
+`granola service start` is still available when you want to warm the local sync loop without
+opening a browser first.
 
 If you prefer to reuse the desktop app session instead, `granola auth login` still imports it from
 `supabase.json`.

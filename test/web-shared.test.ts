@@ -75,6 +75,11 @@ describe("web workspace helpers", () => {
       enableWebClient: true,
       hostname: "127.0.0.1",
       port: 4096,
+      runtime: {
+        mode: "web-workspace",
+        syncEnabled: true,
+        syncIntervalMs: 60_000,
+      },
       security: {
         password: undefined,
         trustedOrigins: [],

@@ -1,28 +1,26 @@
-# V1 Release TODO
+# V1 Launch TODO
 
-Previous completed roadmap: `V1-CANDIDATE-TODO.md`.
+Previous completed roadmap: `V1-RELEASE-TODO.md`.
 
-North star: make `granola-toolkit` feel like a trustworthy daily-use product, not just a powerful toolkit. The next release needs reliable background sync, API-key-first auth, a clean guided first-run flow, and release quality that matches the ambition of the automation layer.
+North star: make `granola-toolkit` feel like a calm, service-backed product that a real user can install, connect, and trust on day one. The remaining v1 gap is not raw capability; it is whether the durable background runtime, guided setup, and browser UX actually feel coherent under first-run use.
 
-## V1 Release Guardrails
+## V1 Launch Guardrails
 
-- Keep the sync engine, event log, agent execution, and UI layers separate.
-- Prefer one local service/runtime boundary over hidden per-command state rebuilds.
-- Optimise first-run UX around Granola API keys; desktop session import and `supabase.json` stay as fallbacks.
-- Keep the web app focused on progressive disclosure instead of showing every advanced panel at once.
-- Add E2E tests for the happy path before calling the UX “good enough”.
-- Keep shipping in small release slices with full QA and published versions recorded here.
+- Treat the reusable background service as the default local runtime, not a side path.
+- Keep onboarding focused on the shortest route to value: API key, import, AI choice, starter pipeline.
+- Avoid adding more panels before the default browser flow is calm enough to explain itself.
+- Surface service and sync state explicitly so the user understands what keeps running.
+- Add browser E2E coverage for the real first-run flow before calling the UX “v1 ready”.
+- Keep shipping small slices with the full QA matrix and published versions recorded here.
 
-| Priority | Status | Size | Published In | Area                     | Task                                                                                                                                                                   | Why                                                                                                                             |
-| -------- | ------ | ---- | ------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| P1       | Done   | L    | 0.60.0       | Sync / Background Loop   | Add a long-running local sync/service mode that continuously refreshes meetings, transcripts, folders, and durable sync events instead of only rebuilding on demand.   | The toolkit needs a real background heartbeat before automation can feel dependable.                                            |
-| P1       | Done   | M    | 0.59.0       | Web / Guided Onboarding  | Add a first-run web onboarding flow that connects Granola, runs the first sync/import, lets the user choose an AI provider, and seeds a usable starter pipeline.       | The current web surface is overwhelming, and new users should not need to understand harnesses and rules before they see value. |
-| P1       | Done   | M    | 0.61.0       | Auth / API Keys First    | Make API keys the default recommended auth path across web, CLI, and TUI, with clearer status, copy, and fallbacks for stored sessions and `supabase.json`.            | Granola now exposes personal API keys, so the default UX should follow the most stable supported auth path.                     |
-| P1       | Done   | M    | 0.59.0       | Testing / Onboarding E2E | Add an end-to-end browser scenario for first-run onboarding: enter API key, sync meetings, choose an agent/provider, and land in a clean workspace with starter state. | We need confidence in the exact setup path users will take, not just component-level tests.                                     |
-| P2       | Done   | L    | 0.62.0       | Web / Workspace Cleanup  | Simplify the post-onboarding web workspace with progressive disclosure, cleaner panel hierarchy, and better defaults instead of the current all-panels-at-once layout. | Fixing onboarding alone is not enough if the landing workspace still feels noisy and hard to navigate.                          |
-| P2       | Done   | M    | 0.63.0       | Releases / Notes         | Replace tag-only release hygiene with proper GitHub Releases, better notes, and a clearer published changelog for each npm release.                                    | A v1 release needs a credible release story, not just npm versions and Git tags.                                                |
-| P2       | Done   | M    | 0.64.0       | Search / Full Text       | Add search across titles, folders, tags, notes, transcripts, and generated artefacts from the shared local index.                                                      | Once sync becomes continuous, “find the meeting where X was said” becomes one of the highest-value user workflows.              |
-| P3       | Done   | M    | 0.65.0       | UX / Review Inbox        | Polish review, approval, and automation history into a single clearer inbox across web and TUI.                                                                        | The automation layer is strong, but the operator experience still needs to feel calmer and more intentional.                    |
+| Priority | Status  | Size | Published In | Area                                    | Task                                                                                                                                                   | Why                                                                                                   |
+| -------- | ------- | ---- | ------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| P1       | Done    | M    | 0.66.0       | Runtime / Service-First Web             | Make `granola web` attach to or start the reusable background service by default, with a clear foreground/debug escape hatch.                          | The default browser path should warm the local sync engine instead of creating another throwaway run. |
+| P1       | Done    | M    | 0.66.0       | Web / Guided Setup V2                   | Refocus the onboarding flow into a cleaner three-step setup with explicit service context, better copy, and clearer next actions.                      | The current setup technically exists, but it still feels noisy and accidental in real use.            |
+| P1       | Done    | M    | 0.66.0       | Testing / Service-Backed Onboarding E2E | Add or upgrade browser coverage for the actual happy path: launch, connect with an API key, sync/import, choose an agent, create the starter pipeline. | V1 confidence needs a real user journey, not just component checks and partial browser assertions.    |
+| P2       | Pending | L    |              | Web / Home Dashboard                    | Add a calmer post-setup landing that surfaces sync health, recent meetings, background-service status, and starter automation before advanced panels.  | Users should land in one coherent home view instead of a dense wall of controls.                      |
+| P2       | Pending | M    |              | Sync / Health + Recovery                | Improve sync health language, cadence visibility, stale-state warnings, and recovery suggestions in the browser and CLI.                               | A background process only builds trust if users can tell whether it is healthy.                       |
+| P2       | Pending | M    |              | Auth / Provider Setup Polish            | Tighten API-key and AI-provider setup copy, missing-key detection, and fallback guidance for OpenRouter, OpenAI, Codex, and desktop import.            | First-run setup still leaks too much implementation detail into the UI.                               |
 
 Status note:
-The toolkit has the core automation foundation. The next release block is productisation: background sync, clean onboarding, API-key-first auth, and a web UX that feels coherent under real first-run use.
+The remaining work is productisation of the default path: make the background service the expected runtime, make setup feel guided, and make the browser land in a calmer place.

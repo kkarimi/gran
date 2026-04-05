@@ -10,6 +10,7 @@ import type {
   GranolaAutomationRule,
 } from "../app/index.ts";
 import { defaultGranolaAgentModel, granolaAgentProviderLabel } from "../agent-defaults.ts";
+import type { GranolaServerInfo } from "../transport.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
 
 export const starterHarnessId = "starter-meeting-notes";
@@ -21,13 +22,17 @@ interface OnboardingStepCard {
   complete: boolean;
   cta?: string;
   detail?: string;
+  id: "agent" | "connect" | "import";
   title: string;
 }
 
 export interface GranolaOnboardingState {
+  activeStepId: OnboardingStepCard["id"] | null;
   complete: boolean;
   connected: boolean;
   pipelineReady: boolean;
+  serviceDetail: string;
+  serviceWarning?: string;
   stepCards: OnboardingStepCard[];
   synced: boolean;
   syncedMeetingCount: number;
@@ -74,17 +79,72 @@ function suggestedFolderLabel(folders: FolderSummaryRecord[]): string | undefine
   return undefined;
 }
 
+function formatSyncInterval(syncIntervalMs?: number): string | undefined {
+  if (!syncIntervalMs || !Number.isFinite(syncIntervalMs) || syncIntervalMs <= 0) {
+    return undefined;
+  }
+
+  if (syncIntervalMs % 60_000 === 0) {
+    const minutes = syncIntervalMs / 60_000;
+    return minutes === 1 ? "every minute" : `every ${minutes} minutes`;
+  }
+
+  if (syncIntervalMs % 1_000 === 0) {
+    const seconds = syncIntervalMs / 1_000;
+    return seconds === 1 ? "every second" : `every ${seconds} seconds`;
+  }
+
+  return `every ${syncIntervalMs}ms`;
+}
+
+function describeService(serverInfo?: GranolaServerInfo | null): {
+  detail: string;
+  warning?: string;
+} {
+  const runtime = serverInfo?.runtime;
+  const intervalLabel = formatSyncInterval(runtime?.syncIntervalMs);
+
+  switch (runtime?.mode) {
+    case "background-service":
+      return {
+        detail: runtime.syncEnabled
+          ? `Background service active${intervalLabel ? ` · sync ${intervalLabel}` : ""}.`
+          : "Background service active · sync is currently disabled.",
+      };
+    case "server":
+      return {
+        detail: runtime.syncEnabled
+          ? `Connected to a local Granola server${intervalLabel ? ` · sync ${intervalLabel}` : ""}.`
+          : "Connected to a local Granola server · sync is currently disabled.",
+      };
+    case "web-workspace":
+      return {
+        detail: runtime.syncEnabled
+          ? `Foreground web session${intervalLabel ? ` · sync ${intervalLabel}` : ""} while this process stays open.`
+          : "Foreground web session · sync is currently disabled.",
+        warning:
+          "Recommended: use the reusable background-service path for day-to-day sync and automation.",
+      };
+    default:
+      return {
+        detail: "Runtime information will appear once the web workspace finishes connecting.",
+      };
+  }
+}
+
 export function deriveOnboardingState(input: {
   appState?: GranolaAppState | null;
   automationRuleCount: number;
   harnesses: GranolaAgentHarness[];
   meetingsLoadedCount: number;
+  serverInfo?: GranolaServerInfo | null;
 }): GranolaOnboardingState {
   const auth = input.appState?.auth;
   const connected = Boolean(auth?.apiKeyAvailable || auth?.storedSessionAvailable);
   const synced = Boolean(input.appState?.sync.lastCompletedAt);
   const pipelineReady = input.harnesses.length > 0 && input.automationRuleCount > 0;
   const syncedMeetingCount = input.appState?.documents.count ?? input.meetingsLoadedCount;
+  const service = describeService(input.serverInfo);
 
   const stepCards: OnboardingStepCard[] = [
     {
@@ -94,15 +154,17 @@ export function deriveOnboardingState(input: {
       detail: connected
         ? `Connected via ${auth?.mode === "api-key" ? "API key" : auth?.mode === "stored-session" ? "stored session" : "fallback auth"}.`
         : "Recommended: use a Granola Personal API key from Settings → API.",
+      id: "connect",
       title: "Connect Granola",
     },
     {
-      body: "Run the first sync so the local index has meetings, folders, and transcript-ready events.",
+      body: "Run the first import so the local index has meetings, folders, notes, and transcript-ready events.",
       complete: synced,
       cta: synced ? undefined : "Import meetings",
       detail: synced
         ? `${syncedMeetingCount} meetings indexed locally.`
         : "This builds the local meeting index the workspace and automation layer rely on.",
+      id: "import",
       title: "Import Meetings",
     },
     {
@@ -112,14 +174,19 @@ export function deriveOnboardingState(input: {
       detail: pipelineReady
         ? "Starter harnesses and automation rules are ready."
         : "The starter pipeline generates reviewable meeting notes on transcript-ready events.",
+      id: "agent",
       title: "Choose An Agent",
     },
   ];
+  const activeStepId = stepCards.find((step) => !step.complete)?.id ?? null;
 
   return {
+    activeStepId,
     complete: connected && synced && pipelineReady,
     connected,
     pipelineReady,
+    serviceDetail: service.detail,
+    serviceWarning: service.warning,
     stepCards,
     synced,
     syncedMeetingCount,
@@ -203,10 +270,11 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
       <div class="onboarding-panel__hero">
         <div>
           <p class="onboarding-panel__eyebrow">First-Run Setup</p>
-          <h2>Connect Granola, import your meetings, and pick an agent.</h2>
+          <h2>Set up Granola Toolkit in three steps.</h2>
           <p>
-            The toolkit already has the core automation engine. This flow just gets you to the first
-            useful setup without dumping every advanced panel on screen at once.
+            Add your Granola API key, import your meetings, and choose the agent that should draft
+            reviewable notes. The goal is to reach one useful default without dropping you into
+            every advanced panel on day one.
           </p>
         </div>
         <div class="onboarding-panel__summary">
@@ -216,6 +284,7 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
           >
             {props.state.complete ? "Ready" : "Setup in progress"}
           </div>
+          <div class="auth-card__meta">{props.state.serviceDetail}</div>
           <div class="auth-card__meta">
             {props.state.synced
               ? `${props.state.syncedMeetingCount} meetings indexed`
@@ -228,11 +297,18 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
           </Show>
         </div>
       </div>
+      <Show when={props.state.serviceWarning}>
+        {(warning) => <div class="onboarding-panel__warning">{warning()}</div>}
+      </Show>
 
       <div class="onboarding-steps">
         <For each={props.state.stepCards}>
           {(step, index) => (
-            <article class="onboarding-step" data-complete={step.complete}>
+            <article
+              class="onboarding-step"
+              data-active={props.state.activeStepId === step.id}
+              data-complete={step.complete}
+            >
               <div class="onboarding-step__head">
                 <div>
                   <span class="onboarding-step__number">Step {index() + 1}</span>
@@ -247,7 +323,7 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
                 {(detail) => <div class="auth-card__meta">{detail()}</div>}
               </Show>
 
-              <Show when={index() === 0 && !step.complete}>
+              <Show when={step.id === "connect" && props.state.activeStepId === "connect"}>
                 <div class="onboarding-step__body">
                   <input
                     class="input"
@@ -278,7 +354,7 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
                 </div>
               </Show>
 
-              <Show when={index() === 1 && !step.complete}>
+              <Show when={step.id === "import" && props.state.activeStepId === "import"}>
                 <div class="onboarding-step__body">
                   <button
                     class="button button--primary"
@@ -291,7 +367,7 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
                 </div>
               </Show>
 
-              <Show when={index() === 2 && !step.complete}>
+              <Show when={step.id === "agent" && props.state.activeStepId === "agent"}>
                 <div class="onboarding-step__body">
                   <div class="onboarding-providers">
                     <For each={providerOptions}>

@@ -378,6 +378,14 @@ select {
   background: rgba(255, 255, 255, 0.82);
 }
 
+.onboarding-panel__warning {
+  padding: 14px 18px;
+  border: 1px solid rgba(187, 132, 76, 0.28);
+  border-radius: 18px;
+  background: rgba(255, 247, 237, 0.76);
+  color: var(--muted);
+}
+
 .onboarding-steps {
   display: grid;
   gap: 16px;
@@ -394,6 +402,11 @@ select {
 
 .onboarding-step[data-complete="true"] {
   background: rgba(255, 255, 255, 0.9);
+}
+
+.onboarding-step[data-active="true"] {
+  border-color: rgba(187, 132, 76, 0.36);
+  box-shadow: inset 0 0 0 1px rgba(187, 132, 76, 0.14);
 }
 
 .onboarding-step__head {

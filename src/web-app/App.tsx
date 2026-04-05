@@ -24,6 +24,7 @@ import type {
 } from "../app/index.ts";
 import { buildGranolaReviewInbox, summariseGranolaReviewInbox } from "../review-inbox.ts";
 import { createGranolaServerClient, type GranolaServerClient } from "../server/client.ts";
+import type { GranolaServerInfo } from "../transport.ts";
 import { granolaTransportPaths } from "../transport.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
 import {
@@ -102,6 +103,7 @@ interface GranolaWebAppState {
   recentMeetings: WebWorkspacePreferences["recentMeetings"];
   savedFilters: WebWorkspacePreferences["savedFilters"];
   search: string;
+  serverInfo: GranolaServerInfo | null;
   selectedAutomationArtefactId: string | null;
   selectedFolderId: string | null;
   selectedHarnessId: string | null;
@@ -176,6 +178,7 @@ export function App() {
     recentMeetings: initialPreferences.recentMeetings,
     savedFilters: initialPreferences.savedFilters,
     search: "",
+    serverInfo: null,
     selectedAutomationArtefactId: null,
     selectedFolderId: startup.folderId || null,
     selectedHarnessId: null,
@@ -251,11 +254,13 @@ export function App() {
       await client.close().catch(() => undefined);
       client = null;
     }
+    setState("serverInfo", null);
   };
 
   const attachClient = async () => {
     await detachClient();
     client = await createGranolaServerClient(window.location.origin);
+    setState("serverInfo", client.info);
     setState("appState", client.getState());
     unsubscribe = client.subscribe((event) => {
       setState("appState", event.state);
@@ -1330,6 +1335,7 @@ export function App() {
       automationRuleCount: state.automationRules.length,
       harnesses: state.harnesses,
       meetingsLoadedCount: state.meetings.length,
+      serverInfo: state.serverInfo,
     });
 
   const showOnboarding = () => !state.serverLocked && !onboardingState().complete;

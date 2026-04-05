@@ -80,16 +80,17 @@ test.describe("toolkit web workspace", () => {
 
       await expect(
         page.getByRole("heading", {
-          name: "Connect Granola, import your meetings, and pick an agent.",
+          name: "Set up Granola Toolkit in three steps.",
         }),
       ).toBeVisible();
+      await expect(page.getByText("Background service active")).toBeVisible();
       await expect(page.getByText("Step 1")).toBeVisible();
       await expect(page.getByRole("button", { name: "Save API key" })).toBeVisible();
-      const importMeetingsButton = page.getByRole("button", { name: "Import meetings now" });
-      await expect(importMeetingsButton).toBeDisabled();
+      await expect(page.getByRole("button", { name: "Import meetings now" })).toHaveCount(0);
 
       await page.getByPlaceholder("grn_...").fill("grn_test_123");
       await page.getByRole("button", { name: "Save API key" }).click();
+      const importMeetingsButton = page.getByRole("button", { name: "Import meetings now" });
       await expect(importMeetingsButton).toBeEnabled({
         timeout: 20_000,
       });

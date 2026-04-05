@@ -81,6 +81,11 @@ export const serveCommand: CommandDefinition = {
     const server = await startGranolaServer(app, {
       hostname,
       port,
+      runtime: {
+        mode: "server",
+        syncEnabled: backgroundSyncEnabled,
+        syncIntervalMs,
+      },
       security: {
         password,
         trustedOrigins,
