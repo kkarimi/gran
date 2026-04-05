@@ -6,7 +6,10 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   FileAgentHarnessStore,
+  MemoryAgentHarnessStore,
+  explainAgentHarnesses,
   matchAgentHarnesses,
+  normaliseAgentHarnesses,
   resolveAgentHarness,
 } from "../src/agent-harnesses.ts";
 import type { GranolaAutomationMatch, GranolaMeetingBundle } from "../src/app/index.ts";
@@ -163,5 +166,90 @@ describe("agent harnesses", () => {
         match,
       }),
     ).toEqual(expect.objectContaining({ id: "customer-call" }));
+  });
+
+  test("writes harness definitions and validates fallback references", async () => {
+    const store = new MemoryAgentHarnessStore();
+
+    await store.writeHarnesses([
+      {
+        fallbackHarnessIds: ["fallback"],
+        id: "customer-call",
+        match: {
+          tags: ["customer"],
+        },
+        name: "Customer call",
+        prompt: "Create customer-facing notes.",
+        provider: "openrouter",
+      },
+      {
+        id: "fallback",
+        name: "Fallback",
+        prompt: "Write generic notes.",
+        provider: "codex",
+      },
+    ]);
+
+    await expect(store.readHarnesses()).resolves.toEqual([
+      expect.objectContaining({ id: "customer-call" }),
+      expect.objectContaining({ id: "fallback" }),
+    ]);
+
+    expect(() =>
+      normaliseAgentHarnesses([
+        {
+          fallbackHarnessIds: ["missing"],
+          id: "broken",
+          name: "Broken",
+          prompt: "Prompt",
+        },
+      ]),
+    ).toThrow("fallback harness missing referenced by broken was not found");
+  });
+
+  test("explains why a meeting matches or misses harness rules", () => {
+    const explanations = explainAgentHarnesses(
+      [
+        {
+          id: "customer-call",
+          match: {
+            recurringEventIds: ["recurring-456"],
+            tags: ["customer"],
+            transcriptLoaded: true,
+          },
+          name: "Customer call",
+          prompt: "Prompt",
+          provider: "openrouter",
+        },
+        {
+          id: "ops-only",
+          match: {
+            folderNames: ["Ops"],
+          },
+          name: "Ops only",
+          prompt: "Prompt",
+          provider: "codex",
+        },
+      ],
+      {
+        bundle,
+        match,
+      },
+    );
+
+    expect(explanations[0]).toEqual(
+      expect.objectContaining({
+        matched: true,
+        harness: expect.objectContaining({ id: "customer-call" }),
+      }),
+    );
+    expect(explanations[0]?.reasons.join(" ")).toContain("Recurring event matched recurring-456.");
+    expect(explanations[1]).toEqual(
+      expect.objectContaining({
+        matched: false,
+        harness: expect.objectContaining({ id: "ops-only" }),
+      }),
+    );
+    expect(explanations[1]?.reasons.join(" ")).toContain("Folder names Ops did not match");
   });
 });

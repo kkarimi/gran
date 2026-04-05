@@ -199,6 +199,18 @@ Template fields such as `{{artefact.title}}`, `{{artefact.summary}}`, `{{meeting
 `ask-user` actions do not perform side effects immediately. They create a pending automation run
 that can be approved or rejected later from the CLI, web workspace, or TUI.
 
+## Editing Harnesses In The Web Workspace
+
+The web workspace now includes a dedicated harness editor. Use it when you want to:
+
+- browse every saved harness in one place
+- edit prompts, prompt files, providers, models, fallback chains, and match rules
+- see why the currently selected meeting did or did not match a harness
+- run a harness against the selected meeting before changing live automation
+
+The editor saves back to the shared `agent-harnesses.json` store, so the CLI, server, web
+workspace, and automation loop all stay on the same source of truth.
+
 ## Evaluating Harnesses
 
 Use fixture-backed evaluations to compare harnesses, prompts, and providers before changing live

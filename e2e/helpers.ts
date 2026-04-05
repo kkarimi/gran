@@ -3,12 +3,13 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { extname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { MemoryAgentHarnessStore } from "../src/agent-harnesses.ts";
 import { GranolaApp } from "../src/app/core.ts";
 import { startGranolaServer } from "../src/server/http.ts";
 import { MemorySyncEventStore } from "../src/sync-events.ts";
@@ -182,6 +183,8 @@ async function waitForHttpReady(url: string, options: { timeoutMs?: number } = {
 
 export async function startToolkitWebServer(): Promise<StartedServer> {
   const outputRoot = await mkdtemp(join(tmpdir(), "granola-playwright-"));
+  const cacheFile = join(outputRoot, "cache.json");
+  await writeFile(cacheFile, `${JSON.stringify(cacheData)}\n`, "utf8");
   const app = new GranolaApp(
     {
       debug: false,
@@ -191,7 +194,7 @@ export async function startToolkitWebServer(): Promise<StartedServer> {
       },
       supabase: "/tmp/supabase.json",
       transcripts: {
-        cacheFile: "",
+        cacheFile,
         output: join(outputRoot, "transcripts"),
       },
     },
@@ -202,6 +205,36 @@ export async function startToolkitWebServer(): Promise<StartedServer> {
         refreshAvailable: false,
         storedSessionAvailable: false,
         supabaseAvailable: false,
+      },
+      agentHarnessStore: new MemoryAgentHarnessStore([
+        {
+          id: "team-notes",
+          match: {
+            folderNames: ["Team"],
+            transcriptLoaded: true,
+          },
+          name: "Team Notes",
+          prompt: "Write concise internal team notes.",
+          provider: "codex",
+        },
+      ]),
+      agentRunner: {
+        run: async (request) => ({
+          dryRun: false,
+          model: request.model ?? "gpt-5-codex",
+          output: JSON.stringify({
+            actionItems: [],
+            decisions: [],
+            followUps: [],
+            highlights: [],
+            markdown: "# Team Notes",
+            sections: [{ body: "Team summary", title: "Summary" }],
+            summary: "Team summary",
+            title: "Team Notes",
+          }),
+          prompt: request.prompt,
+          provider: request.provider ?? "codex",
+        }),
       },
       cacheLoader: async () => cacheData,
       granolaClient: {

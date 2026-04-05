@@ -1,4 +1,7 @@
 import type {
+  GranolaAgentHarness,
+  GranolaAgentHarnessesResult,
+  GranolaAgentHarnessExplanationsResult,
   GranolaAutomationArtefact,
   GranolaAutomationArtefactKind,
   GranolaAutomationArtefactStatus,
@@ -34,6 +37,7 @@ import type {
   TranscriptOutputFormat,
 } from "../app/index.ts";
 import {
+  granolaAutomationHarnessExplainPath,
   granolaAutomationArtefactDecisionPath,
   granolaAutomationArtefactPath,
   granolaAutomationArtefactRerunPath,
@@ -60,6 +64,14 @@ interface GranolaServerClientOptions {
   fetchImpl?: typeof fetch;
   password?: string;
   reconnectDelayMs?: number;
+}
+
+function resolveFetchImpl(fetchImpl?: typeof fetch): typeof fetch {
+  if (fetchImpl) {
+    return ((input, init) => fetchImpl(input, init)) as typeof fetch;
+  }
+
+  return ((input, init) => globalThis.fetch(input, init)) as typeof fetch;
 }
 
 function cloneValue<T>(value: T): T {
@@ -151,7 +163,7 @@ export class GranolaServerClient implements GranolaAppApi {
     initialState: GranolaAppState,
     options: GranolaServerClientOptions = {},
   ) {
-    this.#fetchImpl = options.fetchImpl ?? fetch;
+    this.#fetchImpl = resolveFetchImpl(options.fetchImpl);
     this.info = cloneValue(info);
     this.#password = options.password?.trim() || undefined;
     this.#reconnectDelayMs = options.reconnectDelayMs ?? 1_000;
@@ -163,7 +175,7 @@ export class GranolaServerClient implements GranolaAppApi {
     options: GranolaServerClientOptions = {},
   ): Promise<GranolaServerClient> {
     const url = normaliseServerUrl(serverUrl);
-    const fetchImpl = options.fetchImpl ?? fetch;
+    const fetchImpl = resolveFetchImpl(options.fetchImpl);
     const infoResponse = await fetchImpl(new URL(granolaTransportPaths.serverInfo, url), {
       headers: mergeHeaders({
         ...(options.password?.trim() ? { "x-granola-password": options.password.trim() } : {}),
@@ -224,6 +236,24 @@ export class GranolaServerClient implements GranolaAppApi {
     return await this.requestJson(granolaTransportPaths.authStatus);
   }
 
+  async listAgentHarnesses(): Promise<GranolaAgentHarnessesResult> {
+    return await this.requestJson(granolaTransportPaths.automationHarnesses);
+  }
+
+  async saveAgentHarnesses(harnesses: GranolaAgentHarness[]): Promise<GranolaAgentHarnessesResult> {
+    return await this.requestJson(granolaTransportPaths.automationHarnesses, {
+      body: JSON.stringify({ harnesses }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+  }
+
+  async explainAgentHarnesses(meetingId: string): Promise<GranolaAgentHarnessExplanationsResult> {
+    return await this.requestJson(granolaAutomationHarnessExplainPath(meetingId));
+  }
+
   async listAutomationArtefacts(
     options: {
       kind?: GranolaAutomationArtefactKind;
@@ -236,8 +266,8 @@ export class GranolaServerClient implements GranolaAppApi {
   }
 
   async evaluateAutomationCases(
-    _cases: GranolaAutomationEvaluationCase[],
-    _options?: {
+    cases: GranolaAutomationEvaluationCase[],
+    options?: {
       dryRun?: boolean;
       harnessIds?: string[];
       kind?: GranolaAutomationArtefactKind;
@@ -245,7 +275,16 @@ export class GranolaServerClient implements GranolaAppApi {
       provider?: import("../types.ts").GranolaAgentProviderKind;
     },
   ): Promise<GranolaAutomationEvaluationResult> {
-    throw new Error("automation evaluate is not supported over attached servers yet");
+    return await this.requestJson(granolaTransportPaths.automationEvaluate, {
+      body: JSON.stringify({
+        cases,
+        options,
+      }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
   }
 
   async listProcessingIssues(

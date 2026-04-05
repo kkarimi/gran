@@ -583,6 +583,12 @@ function createWorkspaceHarness(
   }));
 
   const app: GranolaTuiApp = {
+    explainAgentHarnesses: vi.fn(async () => ({
+      eventKind: "transcript.ready" as const,
+      harnesses: [],
+      meetingId: "doc-alpha-1111",
+      meetingTitle: "Alpha Sync",
+    })),
     evaluateAutomationCases: vi.fn(),
     exportNotes: vi.fn(),
     exportTranscripts: vi.fn(),
@@ -593,6 +599,7 @@ function createWorkspaceHarness(
     getState: () => state,
     inspectAuth: vi.fn(async () => state.auth),
     inspectSync: vi.fn(async () => state.sync),
+    listAgentHarnesses: vi.fn(async () => ({ harnesses: [] })),
     getAutomationArtefact: vi.fn(async (id: string) => ({
       actionId: "pipeline-notes",
       actionName: "Pipeline notes",
@@ -699,6 +706,7 @@ function createWorkspaceHarness(
     resolveAutomationRun,
     rerunAutomationArtefact: vi.fn(),
     rerunExportJob: vi.fn(),
+    saveAgentHarnesses: vi.fn(async () => ({ harnesses: [] })),
     sync: vi.fn(async () => ({
       changes: [],
       state: state.sync,

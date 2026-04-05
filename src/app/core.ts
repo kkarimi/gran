@@ -5,6 +5,7 @@ import { join, resolve as resolvePath } from "node:path";
 
 import {
   createDefaultAgentHarnessStore,
+  explainAgentHarnesses,
   matchAgentHarnesses,
   resolveAgentHarness,
   type GranolaAgentHarness,
@@ -162,6 +163,8 @@ import type {
   GranolaAppAuthState,
   GranolaAppExportJobState,
   GranolaAppExportRunState,
+  GranolaAgentHarnessesResult,
+  GranolaAgentHarnessExplanationsResult,
   GranolaAppSyncChange,
   GranolaAppSyncEvent,
   GranolaAppSyncEventsResult,
@@ -186,6 +189,7 @@ import type {
   GranolaMeetingListOptions,
   GranolaMeetingListResult,
   GranolaNotesExportResult,
+  GranolaSyncEventKind,
   GranolaTranscriptsExportResult,
 } from "./types.ts";
 import type { FolderRecord, FolderSummaryRecord, MeetingSummaryRecord } from "./models.ts";
@@ -230,6 +234,30 @@ interface ResolvedAutomationAgentAttempt {
   prompt: string;
   request: GranolaAutomationAgentRequest;
   systemPrompt?: string;
+}
+
+function defaultHarnessEventKind(bundle: GranolaMeetingBundle): GranolaSyncEventKind {
+  return bundle.meeting.meeting.transcriptLoaded ? "transcript.ready" : "meeting.changed";
+}
+
+function harnessEvaluationMatch(
+  bundle: GranolaMeetingBundle,
+  generatedAt: string,
+  eventKind = defaultHarnessEventKind(bundle),
+): GranolaAutomationMatch {
+  return {
+    eventId: `evaluate:${bundle.document.id}`,
+    eventKind,
+    folders: bundle.meeting.meeting.folders.map((folder) => ({ ...folder })),
+    id: `evaluate:${bundle.document.id}`,
+    matchedAt: generatedAt,
+    meetingId: bundle.document.id,
+    ruleId: "automation-evaluation",
+    ruleName: "Automation evaluation",
+    tags: [...bundle.meeting.meeting.tags],
+    title: bundle.meeting.meeting.title || bundle.document.title || bundle.document.id,
+    transcriptLoaded: bundle.meeting.meeting.transcriptLoaded,
+  };
 }
 
 function transcriptCount(cacheData: CacheData): number {
@@ -1384,6 +1412,54 @@ export class GranolaApp implements GranolaAppApi {
     };
   }
 
+  async listAgentHarnesses(): Promise<GranolaAgentHarnessesResult> {
+    const harnesses = this.deps.agentHarnessStore
+      ? await this.deps.agentHarnessStore.readHarnesses()
+      : [];
+    this.setUiState({
+      view: "idle",
+    });
+    return {
+      harnesses,
+    };
+  }
+
+  async saveAgentHarnesses(harnesses: GranolaAgentHarness[]): Promise<GranolaAgentHarnessesResult> {
+    if (!this.deps.agentHarnessStore) {
+      throw new Error("agent harness store is not configured");
+    }
+
+    await this.deps.agentHarnessStore.writeHarnesses(harnesses);
+    this.setUiState({
+      view: "idle",
+    });
+    return await this.listAgentHarnesses();
+  }
+
+  async explainAgentHarnesses(meetingId: string): Promise<GranolaAgentHarnessExplanationsResult> {
+    const bundle = await this.getMeeting(meetingId, {
+      requireCache: true,
+    }).catch(async () => await this.getMeeting(meetingId));
+    const generatedAt = this.nowIso();
+    const harnesses = this.deps.agentHarnessStore
+      ? await this.deps.agentHarnessStore.readHarnesses()
+      : [];
+    const eventKind = defaultHarnessEventKind(bundle);
+
+    this.setUiState({
+      view: "idle",
+    });
+    return {
+      eventKind,
+      harnesses: explainAgentHarnesses(harnesses, {
+        bundle,
+        match: harnessEvaluationMatch(bundle, generatedAt, eventKind),
+      }),
+      meetingId: bundle.document.id,
+      meetingTitle: bundle.meeting.meeting.title || bundle.document.title || bundle.document.id,
+    };
+  }
+
   async evaluateAutomationCases(
     cases: GranolaAutomationEvaluationCase[],
     options: {
@@ -1403,19 +1479,7 @@ export class GranolaApp implements GranolaAppApi {
     const results: GranolaAutomationEvaluationResult["results"] = [];
 
     for (const evaluationCase of cases) {
-      const match: GranolaAutomationMatch = {
-        eventId: `evaluate:${evaluationCase.id}`,
-        eventKind: "transcript.ready",
-        folders: evaluationCase.bundle.meeting.meeting.folders.map((folder) => ({ ...folder })),
-        id: `evaluate:${evaluationCase.id}`,
-        matchedAt: generatedAt,
-        meetingId: evaluationCase.bundle.document.id,
-        ruleId: "automation-evaluation",
-        ruleName: "Automation evaluation",
-        tags: [...evaluationCase.bundle.meeting.meeting.tags],
-        title: evaluationCase.title,
-        transcriptLoaded: evaluationCase.bundle.meeting.meeting.transcriptLoaded,
-      };
+      const match = harnessEvaluationMatch(evaluationCase.bundle, generatedAt);
       const selectedHarnesses =
         options.harnessIds && options.harnessIds.length > 0
           ? options.harnessIds.map((harnessId) =>

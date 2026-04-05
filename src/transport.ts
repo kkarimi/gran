@@ -44,6 +44,9 @@ export const granolaTransportPaths = {
   authRefresh: "/auth/refresh",
   authStatus: "/auth/status",
   authUnlock: "/auth/unlock",
+  automationEvaluate: "/automation/evaluate",
+  automationHarnesses: "/automation/harnesses",
+  automationHarnessExplain: "/automation/harnesses/explain",
   automationMatches: "/automation/matches",
   automationArtefacts: "/automation/artefacts",
   automationRules: "/automation/rules",
@@ -139,6 +142,12 @@ export function granolaAutomationRunsPath(
   return appendSearchParams(granolaTransportPaths.automationRuns, {
     limit: options.limit,
     status: options.status,
+  });
+}
+
+export function granolaAutomationHarnessExplainPath(meetingId: string): string {
+  return appendSearchParams(granolaTransportPaths.automationHarnessExplain, {
+    meetingId,
   });
 }
 

@@ -1,5 +1,8 @@
+import { writeFileSync } from "node:fs";
+
 import { afterEach, describe, expect, test } from "vite-plus/test";
 
+import { MemoryAgentHarnessStore } from "../src/agent-harnesses.ts";
 import { GranolaApp } from "../src/app/core.ts";
 import { MemoryAutomationMatchStore } from "../src/automation-matches.ts";
 import { MemoryAutomationRunStore } from "../src/automation-runs.ts";
@@ -68,11 +71,15 @@ const folders: GranolaFolder[] = [
   },
 ];
 
-function createTestApp(): {
+function createTestApp(options: { withCacheFile?: boolean } = {}): {
   app: GranolaApp;
   setDocuments: (nextDocuments: GranolaDocument[]) => void;
 } {
   let currentDocuments = documents;
+  const cacheFile = "/tmp/granola-server-client-cache.json";
+  if (options.withCacheFile) {
+    writeFileSync(cacheFile, `${JSON.stringify(cacheData)}\n`, "utf8");
+  }
 
   return {
     app: new GranolaApp(
@@ -84,7 +91,7 @@ function createTestApp(): {
         },
         supabase: "/tmp/supabase.json",
         transcripts: {
-          cacheFile: "",
+          cacheFile: options.withCacheFile ? cacheFile : "",
           output: "/tmp/transcripts",
         },
       },
@@ -95,6 +102,36 @@ function createTestApp(): {
           storedSessionAvailable: false,
           supabaseAvailable: true,
           supabasePath: "/tmp/supabase.json",
+        },
+        agentHarnessStore: new MemoryAgentHarnessStore([
+          {
+            id: "team-harness",
+            match: {
+              tags: ["team"],
+              transcriptLoaded: true,
+            },
+            name: "Team harness",
+            prompt: "Write concise team notes.",
+            provider: "codex",
+          },
+        ]),
+        agentRunner: {
+          run: async (request) => ({
+            dryRun: false,
+            model: request.model ?? "gpt-5-codex",
+            output: JSON.stringify({
+              actionItems: [],
+              decisions: [],
+              followUps: [],
+              highlights: [],
+              markdown: "# Evaluated Notes",
+              sections: [{ body: "Done.", title: "Summary" }],
+              summary: "Evaluation summary",
+              title: "Evaluated Notes",
+            }),
+            prompt: request.prompt,
+            provider: request.provider ?? "codex",
+          }),
         },
         automationMatchStore: new MemoryAutomationMatchStore(),
         automationRunStore: new MemoryAutomationRunStore(),
@@ -399,6 +436,96 @@ describe("GranolaServerClient", () => {
         meeting: expect.objectContaining({
           noteMarkdown: expect.stringContaining("# Alpha Sync"),
         }),
+      }),
+    );
+  });
+
+  test("manages harnesses and evaluations through the attached server", async () => {
+    const { app } = createTestApp({ withCacheFile: true });
+    const server = await startGranolaServer(app);
+    closeServer = async () => await server.close();
+
+    const client = await createGranolaServerClient(server.url);
+    closeClient = async () => await client.close();
+
+    await expect(client.listAgentHarnesses()).resolves.toEqual({
+      harnesses: [
+        expect.objectContaining({
+          id: "team-harness",
+          name: "Team harness",
+        }),
+      ],
+    });
+
+    await expect(
+      client.saveAgentHarnesses([
+        {
+          id: "team-harness",
+          match: {
+            tags: ["team"],
+            transcriptLoaded: true,
+          },
+          model: "gpt-5-codex",
+          name: "Team harness",
+          prompt: "Write concise team notes.",
+          provider: "openrouter",
+        },
+      ]),
+    ).resolves.toEqual({
+      harnesses: [
+        expect.objectContaining({
+          id: "team-harness",
+          provider: "openrouter",
+        }),
+      ],
+    });
+
+    await expect(client.explainAgentHarnesses("doc-alpha-1111")).resolves.toEqual(
+      expect.objectContaining({
+        eventKind: "transcript.ready",
+        harnesses: [
+          expect.objectContaining({
+            matched: true,
+            harness: expect.objectContaining({ id: "team-harness" }),
+          }),
+        ],
+        meetingId: "doc-alpha-1111",
+      }),
+    );
+
+    const bundle = await client.getMeeting("doc-alpha-1111", { requireCache: true });
+    await expect(
+      client.evaluateAutomationCases(
+        [
+          {
+            bundle,
+            id: "eval-alpha",
+            title: "Alpha Sync",
+          },
+        ],
+        {
+          harnessIds: ["team-harness"],
+          kind: "notes",
+          model: "gpt-5-codex",
+          provider: "openrouter",
+        },
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        kind: "notes",
+        results: [
+          expect.objectContaining({
+            caseId: "eval-alpha",
+            harnessId: "team-harness",
+            model: "gpt-5-codex",
+            provider: "openrouter",
+            status: "completed",
+            structured: expect.objectContaining({
+              markdown: "# Evaluated Notes",
+              title: "Evaluated Notes",
+            }),
+          }),
+        ],
       }),
     );
   });

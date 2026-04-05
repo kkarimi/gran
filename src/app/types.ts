@@ -10,6 +10,10 @@ import type {
   NoteOutputFormat,
   TranscriptOutputFormat,
 } from "./models.ts";
+import type {
+  GranolaAgentHarness,
+  GranolaAgentHarnessMatchExplanation,
+} from "../agent-harnesses.ts";
 import type { AppConfig, CacheData, GranolaDocument, GranolaAgentProviderKind } from "../types.ts";
 
 export type GranolaAppAuthMode = GranolaSessionMetadata["mode"];
@@ -595,6 +599,17 @@ export interface GranolaAutomationArtefactsResult {
   artefacts: GranolaAutomationArtefact[];
 }
 
+export interface GranolaAgentHarnessesResult {
+  harnesses: GranolaAgentHarness[];
+}
+
+export interface GranolaAgentHarnessExplanationsResult {
+  eventKind: GranolaSyncEventKind;
+  harnesses: GranolaAgentHarnessMatchExplanation[];
+  meetingId: string;
+  meetingTitle: string;
+}
+
 export interface GranolaAutomationEvaluationCase {
   bundle: GranolaMeetingBundle;
   id: string;
@@ -672,6 +687,9 @@ export interface GranolaAppApi {
   getState(): GranolaAppState;
   subscribe(listener: (event: GranolaAppStateEvent) => void): () => void;
   inspectAuth(): Promise<GranolaAppAuthState>;
+  listAgentHarnesses(): Promise<GranolaAgentHarnessesResult>;
+  saveAgentHarnesses(harnesses: GranolaAgentHarness[]): Promise<GranolaAgentHarnessesResult>;
+  explainAgentHarnesses(meetingId: string): Promise<GranolaAgentHarnessExplanationsResult>;
   getAutomationArtefact(id: string): Promise<GranolaAutomationArtefact>;
   listAutomationArtefacts(
     options?: GranolaAutomationArtefactListOptions,

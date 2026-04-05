@@ -14,11 +14,13 @@ import {
   type GranolaServerInfo,
 } from "../transport.ts";
 import type {
+  GranolaAgentHarness,
   GranolaAutomationArtefactKind,
   GranolaAutomationArtefactStatus,
   GranolaAutomationActionRunStatus,
   GranolaAppAuthMode,
   GranolaAppStateEvent,
+  GranolaAutomationEvaluationCase,
   GranolaMeetingSort,
   GranolaProcessingIssueSeverity,
   NoteOutputFormat,
@@ -146,6 +148,50 @@ function parseProcessingIssueSeverity(
     default:
       throw new Error("invalid processing severity: expected error or warning");
   }
+}
+
+function parseAgentProviderKind(
+  value: unknown,
+): import("../types.ts").GranolaAgentProviderKind | undefined {
+  switch (value) {
+    case undefined:
+    case null:
+    case "":
+      return undefined;
+    case "codex":
+    case "openai":
+    case "openrouter":
+      return value;
+    default:
+      throw new Error("invalid provider: expected codex, openai, or openrouter");
+  }
+}
+
+function harnessesFromBody(value: unknown): GranolaAgentHarness[] {
+  if (!Array.isArray(value)) {
+    throw new Error("harnesses must be an array");
+  }
+
+  return value as GranolaAgentHarness[];
+}
+
+function evaluationCasesFromBody(value: unknown): GranolaAutomationEvaluationCase[] {
+  if (!Array.isArray(value)) {
+    throw new Error("evaluation cases must be an array");
+  }
+
+  return value as GranolaAutomationEvaluationCase[];
+}
+
+function stringArrayFromBody(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const items = value
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim());
+  return items.length > 0 ? items : undefined;
 }
 
 function folderIdFromBody(value: unknown): string | undefined {
@@ -529,6 +575,29 @@ export async function startGranolaServer(
         return;
       }
 
+      if (method === "GET" && path === granolaTransportPaths.automationHarnesses) {
+        sendJson(response, await app.listAgentHarnesses(), { headers: originHeaders });
+        return;
+      }
+
+      if (method === "POST" && path === granolaTransportPaths.automationHarnesses) {
+        const body = await readJsonBody(request);
+        sendJson(response, await app.saveAgentHarnesses(harnessesFromBody(body.harnesses)), {
+          headers: originHeaders,
+        });
+        return;
+      }
+
+      if (method === "GET" && path === granolaTransportPaths.automationHarnessExplain) {
+        const meetingId = url.searchParams.get("meetingId")?.trim();
+        if (!meetingId) {
+          throw new Error("meeting id is required");
+        }
+
+        sendJson(response, await app.explainAgentHarnesses(meetingId), { headers: originHeaders });
+        return;
+      }
+
       if (method === "GET" && path === granolaTransportPaths.automationRules) {
         sendJson(response, await app.listAutomationRules(), { headers: originHeaders });
         return;
@@ -566,6 +635,31 @@ export async function startGranolaServer(
             limit: parseInteger(url.searchParams.get("limit")),
             meetingId: url.searchParams.get("meetingId")?.trim() || undefined,
             severity: parseProcessingIssueSeverity(url.searchParams.get("severity")),
+          }),
+          { headers: originHeaders },
+        );
+        return;
+      }
+
+      if (method === "POST" && path === granolaTransportPaths.automationEvaluate) {
+        const body = await readJsonBody(request);
+        const options =
+          body.options && typeof body.options === "object" && !Array.isArray(body.options)
+            ? (body.options as Record<string, unknown>)
+            : {};
+        sendJson(
+          response,
+          await app.evaluateAutomationCases(evaluationCasesFromBody(body.cases), {
+            dryRun: typeof options.dryRun === "boolean" ? options.dryRun : undefined,
+            harnessIds: stringArrayFromBody(options.harnessIds),
+            kind:
+              parseAutomationArtefactKind(typeof options.kind === "string" ? options.kind : null) ??
+              undefined,
+            model:
+              typeof options.model === "string" && options.model.trim()
+                ? options.model.trim()
+                : undefined,
+            provider: parseAgentProviderKind(options.provider),
           }),
           { headers: originHeaders },
         );

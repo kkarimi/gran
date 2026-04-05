@@ -1,5 +1,10 @@
 export { GranolaApp, createGranolaApp } from "./core.ts";
 export type {
+  GranolaAgentHarness,
+  GranolaAgentHarnessMatch,
+  GranolaAgentHarnessMatchExplanation,
+} from "../agent-harnesses.ts";
+export type {
   FolderRecord,
   FolderSummaryRecord,
   GranolaMeetingParticipantRole,
@@ -61,6 +66,8 @@ export type {
   GranolaAppAutomationState,
   GranolaAppAuthMode,
   GranolaAppAuthState,
+  GranolaAgentHarnessesResult,
+  GranolaAgentHarnessExplanationsResult,
   GranolaAppCacheState,
   GranolaAppExportJobState,
   GranolaExportScope,

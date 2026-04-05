@@ -510,6 +510,39 @@ select {
   padding: 0 24px 24px;
 }
 
+.harness-panel {
+  padding: 0 24px 24px;
+}
+
+.harness-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.harness-toolbar,
+.harness-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.harness-status-row h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.harness-test-result {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
 .review-body {
   display: grid;
   gap: 18px;
@@ -596,6 +629,7 @@ select {
 
 @media (max-width: 1024px) {
   .shell,
+  .harness-grid,
   .review-grid,
   .workspace-grid {
     grid-template-columns: 1fr;
