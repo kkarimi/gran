@@ -27,11 +27,37 @@ If you use external agents, the repo also ships an OpenClaw-ready skill at
 
 ## First Run
 
+Create a local project bootstrap first:
+
+```bash
+granola init --provider openrouter
+```
+
+That writes:
+
+- `.granola.toml`
+- `./.granola/agent-harnesses.json`
+- `./.granola/automation-rules.json`
+- starter prompt files under `./.granola/prompts/`
+
+The generated files are intentionally local and editable. They give you a working starting point
+for team notes and customer follow-up notes without forcing you to reverse-engineer the JSON shape
+first.
+
 Store a Granola Personal API key once:
 
 ```bash
 granola auth login --api-key grn_...
 granola auth status
+```
+
+If you chose `--provider openrouter` or `--provider openai`, export the matching provider key in
+the shell or service that runs your sync loop:
+
+```bash
+export OPENROUTER_API_KEY=...
+# or
+export OPENAI_API_KEY=...
 ```
 
 If you prefer to reuse the desktop app session, `granola auth login` still imports it from
@@ -40,7 +66,7 @@ If you prefer to reuse the desktop app session, `granola auth login` still impor
 Then verify that folders and meetings resolve cleanly:
 
 ```bash
-granola sync
+granola sync --config ./.granola.toml
 granola sync --watch
 granola automation rules
 granola automation runs
@@ -53,7 +79,7 @@ granola meeting view 1234abcd
 ## Typical Starting Commands
 
 ```bash
-granola sync
+granola sync --config ./.granola.toml
 granola search onboarding risk
 granola notes
 granola notes --folder Team

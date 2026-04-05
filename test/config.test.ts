@@ -40,17 +40,17 @@ describe("loadConfig", () => {
     expect(config.configFileUsed).toBe(configPath);
     expect(config.debug).toBe(true);
     expect(config.supabase).toBe("/tmp/supabase.json");
-    expect(config.notes.output).toBe("./notes-out");
+    expect(config.notes.output).toBe(join(directory, "notes-out"));
     expect(config.notes.timeoutMs).toBe(30_000);
     expect(config.transcripts.cacheFile).toBe("/tmp/cache.json");
-    expect(config.transcripts.output).toBe("./transcripts-out");
+    expect(config.transcripts.output).toBe(join(directory, "transcripts-out"));
     expect(config.agents).toEqual(
       expect.objectContaining({
         codexCommand: "codex-beta",
         defaultModel: "openai/gpt-5-mini",
         defaultProvider: "openrouter",
         dryRun: true,
-        harnessesFile: "./agent-harnesses.json",
+        harnessesFile: join(directory, "agent-harnesses.json"),
         maxRetries: 4,
         timeoutMs: 45_000,
       }),

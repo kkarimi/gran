@@ -122,6 +122,7 @@ describe("agent harnesses", () => {
     const store = new FileAgentHarnessStore(filePath);
     expect(await store.readHarnesses()).toEqual([
       expect.objectContaining({
+        cwd: expect.stringContaining("granola-agent-harnesses-"),
         id: "customer-call",
         match: expect.objectContaining({
           recurringEventIds: ["recurring-456"],

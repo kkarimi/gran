@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
 
 import type { AppConfig } from "./types.ts";
 import { defaultGranolaToolkitPersistenceLayout } from "./persistence/layout.ts";
@@ -131,6 +131,21 @@ function envFlag(value: string | undefined): boolean | undefined {
   return undefined;
 }
 
+function resolveConfigPath(
+  configPath: string | undefined,
+  value: string | undefined,
+): string | undefined {
+  if (!value?.trim()) {
+    return value;
+  }
+
+  if (!configPath || isAbsolute(value)) {
+    return value;
+  }
+
+  return resolvePath(dirname(configPath), value);
+}
+
 export async function loadConfig(options: {
   env?: NodeJS.ProcessEnv;
   globalFlags: FlagValues;
@@ -139,6 +154,7 @@ export async function loadConfig(options: {
   const env = options.env ?? process.env;
   const configFile = pickString(options.globalFlags.config);
   const config = await loadTomlConfig(configFile);
+  const configPath = config.path;
 
   const configValues = config.values;
   const defaultSupabase = firstExistingPath(granolaSupabaseCandidates());
@@ -159,19 +175,27 @@ export async function loadConfig(options: {
     automation: {
       artefactsFile:
         pickString(env.GRANOLA_AUTOMATION_ARTEFACTS_FILE) ??
-        pickString(configValues["automation-artefacts-file"]) ??
-        pickString(configValues.automationArtefactsFile) ??
+        resolveConfigPath(
+          configPath,
+          pickString(configValues["automation-artefacts-file"]) ??
+            pickString(configValues.automationArtefactsFile),
+        ) ??
         defaultGranolaToolkitPersistenceLayout().automationArtefactsFile,
       pkmTargetsFile:
         pickString(env.GRANOLA_PKM_TARGETS_FILE) ??
-        pickString(configValues["pkm-targets-file"]) ??
-        pickString(configValues.pkmTargetsFile) ??
+        resolveConfigPath(
+          configPath,
+          pickString(configValues["pkm-targets-file"]) ?? pickString(configValues.pkmTargetsFile),
+        ) ??
         defaultGranolaToolkitPersistenceLayout().pkmTargetsFile,
       rulesFile:
         pickString(options.globalFlags.rules) ??
         pickString(env.GRANOLA_AUTOMATION_RULES_FILE) ??
-        pickString(configValues["automation-rules-file"]) ??
-        pickString(configValues.automationRulesFile) ??
+        resolveConfigPath(
+          configPath,
+          pickString(configValues["automation-rules-file"]) ??
+            pickString(configValues.automationRulesFile),
+        ) ??
         defaultGranolaToolkitPersistenceLayout().automationRulesFile,
     },
     agents: {
@@ -200,8 +224,11 @@ export async function loadConfig(options: {
         false,
       harnessesFile:
         pickString(env.GRANOLA_AGENT_HARNESSES_FILE) ??
-        pickString(configValues["agent-harnesses-file"]) ??
-        pickString(configValues.agentHarnessesFile) ??
+        resolveConfigPath(
+          configPath,
+          pickString(configValues["agent-harnesses-file"]) ??
+            pickString(configValues.agentHarnessesFile),
+        ) ??
         defaultGranolaToolkitPersistenceLayout().agentHarnessesFile,
       maxRetries:
         pickNumber(env.GRANOLA_AGENT_MAX_RETRIES) ??
@@ -237,28 +264,33 @@ export async function loadConfig(options: {
       output:
         pickString(options.subcommandFlags.output) ??
         pickString(env.OUTPUT) ??
-        pickString(configValues.output) ??
+        resolveConfigPath(configPath, pickString(configValues.output)) ??
         "./notes",
       timeoutMs: parseDuration(timeoutValue),
     },
     supabase:
       pickString(options.globalFlags.supabase) ??
       pickString(env.SUPABASE_FILE) ??
-      pickString(configValues.supabase) ??
+      resolveConfigPath(configPath, pickString(configValues.supabase)) ??
       defaultSupabase,
     transcripts: {
       cacheFile:
         pickString(options.subcommandFlags.cache) ??
         pickString(env.CACHE_FILE) ??
-        pickString(configValues["cache-file"]) ??
-        pickString(configValues.cacheFile) ??
+        resolveConfigPath(
+          configPath,
+          pickString(configValues["cache-file"]) ?? pickString(configValues.cacheFile),
+        ) ??
         defaultCache ??
         "",
       output:
         pickString(options.subcommandFlags.output) ??
         pickString(env.TRANSCRIPT_OUTPUT) ??
-        pickString(configValues["transcript-output"]) ??
-        pickString(configValues.transcriptOutput) ??
+        resolveConfigPath(
+          configPath,
+          pickString(configValues["transcript-output"]) ??
+            pickString(configValues.transcriptOutput),
+        ) ??
         "./transcripts",
     },
   };

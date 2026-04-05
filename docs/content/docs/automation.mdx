@@ -5,6 +5,16 @@ description: Match durable sync events against local rules and run local actions
 
 ## Rule Files
 
+For a fresh project, start with:
+
+```bash
+granola init --provider openrouter
+```
+
+That generates a local `.granola.toml`, starter harnesses, starter prompts, and starter automation
+rules that you can edit in place. The examples below describe the same shapes in raw JSON so you
+can extend them beyond the starter setup.
+
 The toolkit reads automation rules from a JSON file. By default it uses the shared toolkit data
 directory:
 

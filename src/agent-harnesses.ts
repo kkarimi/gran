@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, isAbsolute, resolve as resolvePath } from "node:path";
 
 import type {
   GranolaAutomationMatch,
@@ -161,6 +161,29 @@ function cloneHarness(harness: GranolaAgentHarness): GranolaAgentHarness {
           titleIncludes: harness.match.titleIncludes ? [...harness.match.titleIncludes] : undefined,
         }
       : undefined,
+  };
+}
+
+function resolveRelativeHarnessPath(
+  baseDirectory: string,
+  value: string | undefined,
+): string | undefined {
+  if (!value?.trim()) {
+    return value;
+  }
+
+  return isAbsolute(value) ? value : resolvePath(baseDirectory, value);
+}
+
+function normaliseFileHarness(
+  baseDirectory: string,
+  harness: GranolaAgentHarness,
+): GranolaAgentHarness {
+  const cloned = cloneHarness(harness);
+  const cwd = resolveRelativeHarnessPath(baseDirectory, cloned.cwd) ?? baseDirectory;
+  return {
+    ...cloned,
+    cwd,
   };
 }
 
@@ -558,7 +581,7 @@ export class FileAgentHarnessStore implements AgentHarnessStore {
       return rawHarnesses
         .map((harness) => parseHarness(harness))
         .filter((harness): harness is GranolaAgentHarness => Boolean(harness))
-        .map(cloneHarness);
+        .map((harness) => normaliseFileHarness(dirname(this.filePath), harness));
     } catch {
       return [];
     }

@@ -3,6 +3,7 @@ import { automationCommand } from "./automation.ts";
 import { authCommand } from "./auth.ts";
 import { exportsCommand } from "./exports.ts";
 import { folderCommand } from "./folder.ts";
+import { initCommand } from "./init.ts";
 import { meetingCommand } from "./meeting.ts";
 import { notesCommand } from "./notes.ts";
 import { searchCommand } from "./search.ts";
@@ -18,6 +19,7 @@ export const commands = [
   authCommand,
   exportsCommand,
   folderCommand,
+  initCommand,
   meetingCommand,
   notesCommand,
   searchCommand,

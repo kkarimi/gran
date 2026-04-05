@@ -24,18 +24,16 @@ macOS arm64, Linux x64, and Windows x64. Extract the archive and run `granola` (
 ## Quick Start
 
 ```bash
+granola init --provider openrouter
 granola auth login --api-key grn_...
 granola sync
 granola sync --watch
-granola automation rules
-granola automation runs
-granola search customer onboarding
-granola folder list
-granola meeting list --limit 10
-granola notes --folder Team
 granola web
-granola tui
 ```
+
+`granola init` creates a local `.granola.toml`, starter harnesses, starter automation rules, and
+prompt files under `./.granola/` so the first-run setup is not just “read docs and assemble JSON by
+hand”.
 
 If you prefer to reuse the desktop app session instead, `granola auth login` still imports it from
 `supabase.json`.
