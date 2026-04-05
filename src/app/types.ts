@@ -595,6 +595,33 @@ export interface GranolaAutomationArtefactsResult {
   artefacts: GranolaAutomationArtefact[];
 }
 
+export interface GranolaAutomationEvaluationCase {
+  bundle: GranolaMeetingBundle;
+  id: string;
+  title: string;
+}
+
+export interface GranolaAutomationEvaluationRun {
+  caseId: string;
+  caseTitle: string;
+  error?: string;
+  harnessId?: string;
+  harnessName?: string;
+  model?: string;
+  parseMode?: GranolaAutomationArtefact["parseMode"];
+  prompt: string;
+  provider?: GranolaAgentProviderKind;
+  rawOutput?: string;
+  status: "completed" | "failed";
+  structured?: GranolaAutomationArtefactStructuredOutput;
+}
+
+export interface GranolaAutomationEvaluationResult {
+  generatedAt: string;
+  kind: GranolaAutomationArtefactKind;
+  results: GranolaAutomationEvaluationRun[];
+}
+
 export interface GranolaAutomationArtefactListOptions {
   kind?: GranolaAutomationArtefactKind;
   limit?: number;
@@ -649,6 +676,16 @@ export interface GranolaAppApi {
   listAutomationArtefacts(
     options?: GranolaAutomationArtefactListOptions,
   ): Promise<GranolaAutomationArtefactsResult>;
+  evaluateAutomationCases(
+    cases: GranolaAutomationEvaluationCase[],
+    options?: {
+      dryRun?: boolean;
+      harnessIds?: string[];
+      kind?: GranolaAutomationArtefactKind;
+      model?: string;
+      provider?: GranolaAgentProviderKind;
+    },
+  ): Promise<GranolaAutomationEvaluationResult>;
   listProcessingIssues(options?: {
     limit?: number;
     meetingId?: string;

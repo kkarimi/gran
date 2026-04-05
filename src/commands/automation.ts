@@ -1,13 +1,16 @@
 import {
   createGranolaApp,
   type GranolaAutomationArtefact,
+  type GranolaAutomationEvaluationResult,
   type GranolaAutomationActionRun,
   type GranolaAutomationMatch,
   type GranolaAutomationRule,
   type GranolaProcessingIssue,
 } from "../app/index.ts";
 import { loadConfig } from "../config.ts";
+import { readAutomationEvaluationCases } from "../evaluations.ts";
 import { toJson, toYaml } from "../render.ts";
+import type { GranolaAgentProviderKind } from "../types.ts";
 
 import { debug } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
@@ -18,7 +21,7 @@ function automationHelp(): string {
   return `Granola automation
 
 Usage:
-  granola automation <rules|matches|runs|artefacts|health|recover|approve|reject|approve-artefact|reject-artefact|rerun> [options]
+  granola automation <rules|matches|runs|artefacts|health|evaluate|recover|approve|reject|approve-artefact|reject-artefact|rerun> [options]
 
 Subcommands:
   rules               List configured automation rules
@@ -26,6 +29,7 @@ Subcommands:
   runs                Show recent automation action runs
   artefacts           Show generated note and enrichment artefacts
   health              Show processing-health issues and recovery candidates
+  evaluate            Run fixture-backed harness evaluations
   recover <issue-id>  Recover a processing-health issue
   approve <id>        Approve a pending ask-user action run
   reject <id>         Reject a pending ask-user action run
@@ -39,6 +43,10 @@ Options:
   --format <value>    text, json, yaml (default: text)
   --limit <n>         Number of matches to show (default: 20)
   --kind <value>      notes or enrichment
+  --fixture <path>    Evaluation fixture file or directory
+  --harness <value>   Harness id or comma-separated ids for evaluation
+  --provider <value>  codex, openai, openrouter
+  --model <value>     Override the harness model for evaluation
   --meeting <id>      Filter artefacts to one meeting id
   --severity <value>  error or warning
   --status <value>    completed, failed, pending, skipped
@@ -162,6 +170,35 @@ function parseArtefactKind(
   }
 }
 
+function parseHarnessIds(value: string | boolean | undefined): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error("invalid harness list: expected a comma-separated string");
+  }
+
+  const ids = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return ids.length > 0 ? ids : undefined;
+}
+
+function parseProvider(value: string | boolean | undefined): GranolaAgentProviderKind | undefined {
+  switch (value) {
+    case undefined:
+      return undefined;
+    case "codex":
+    case "openai":
+    case "openrouter":
+      return value;
+    default:
+      throw new Error("invalid provider: expected codex, openai, or openrouter");
+  }
+}
+
 function parseArtefactStatus(
   value: string | boolean | undefined,
 ): GranolaAutomationArtefact["status"] | undefined {
@@ -205,6 +242,56 @@ function renderArtefacts(artefacts: GranolaAutomationArtefact[], format: Automat
   });
 
   return `${[header, ...lines].join("\n")}\n`;
+}
+
+function renderEvaluations(
+  result: GranolaAutomationEvaluationResult,
+  format: AutomationFormat,
+): string {
+  if (format === "json") {
+    return toJson(result);
+  }
+
+  if (format === "yaml") {
+    return toYaml(result);
+  }
+
+  if (result.results.length === 0) {
+    return "No evaluation results\n";
+  }
+
+  const header =
+    "CASE                 HARNESS              STATUS      PROVIDER/MODEL                  SUMMARY";
+  const lines = result.results.map((entry) => {
+    const harness = (entry.harnessName || entry.harnessId || "-").padEnd(20).slice(0, 20);
+    const status = entry.status.padEnd(11).slice(0, 11);
+    const providerModel = `${entry.provider || "-"}${entry.model ? `/${entry.model}` : ""}`
+      .padEnd(30)
+      .slice(0, 30);
+    const summary =
+      entry.status === "failed"
+        ? entry.error || "Evaluation failed"
+        : [
+            entry.structured?.title,
+            entry.structured?.summary,
+            entry.structured?.actionItems.length
+              ? `${entry.structured.actionItems.length} action item(s)`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" - ");
+    return `${entry.caseTitle.padEnd(20).slice(0, 20)} ${harness} ${status} ${providerModel} ${summary}`;
+  });
+
+  return (
+    [
+      `Evaluated ${result.results.length} run(s) across ${new Set(result.results.map((entry) => entry.caseId)).size} case(s)`,
+      `Kind: ${result.kind}`,
+      "",
+      header,
+      ...lines,
+    ].join("\n") + "\n"
+  );
 }
 
 function parseSeverity(
@@ -278,12 +365,16 @@ function renderRuns(runs: GranolaAutomationActionRun[], format: AutomationFormat
 export const automationCommand: CommandDefinition = {
   description: "Inspect automation rules and rule matches",
   flags: {
+    fixture: { type: "string" },
     format: { type: "string" },
+    harness: { type: "string" },
     help: { type: "boolean" },
     kind: { type: "string" },
     limit: { type: "string" },
     meeting: { type: "string" },
+    model: { type: "string" },
     note: { type: "string" },
+    provider: { type: "string" },
     severity: { type: "string" },
     status: { type: "string" },
     timeout: { type: "string" },
@@ -341,6 +432,25 @@ export const automationCommand: CommandDefinition = {
           severity: parseSeverity(commandFlags.severity),
         });
         console.log(renderProcessingIssues(result.issues, format).trimEnd());
+        return 0;
+      }
+      case "evaluate": {
+        const fixturePath =
+          typeof commandFlags.fixture === "string" ? commandFlags.fixture.trim() : "";
+        if (!fixturePath) {
+          throw new Error("automation evaluate requires --fixture <path>");
+        }
+
+        const result = await app.evaluateAutomationCases(
+          await readAutomationEvaluationCases(fixturePath),
+          {
+            harnessIds: parseHarnessIds(commandFlags.harness),
+            kind: parseArtefactKind(commandFlags.kind) ?? "notes",
+            model: typeof commandFlags.model === "string" ? commandFlags.model.trim() : undefined,
+            provider: parseProvider(commandFlags.provider),
+          },
+        );
+        console.log(renderEvaluations(result, format).trimEnd());
         return 0;
       }
       case "recover": {
@@ -406,7 +516,7 @@ export const automationCommand: CommandDefinition = {
         return 1;
       default:
         throw new Error(
-          "invalid automation command: expected rules, matches, runs, artefacts, health, recover, approve, reject, approve-artefact, reject-artefact, or rerun",
+          "invalid automation command: expected rules, matches, runs, artefacts, health, evaluate, recover, approve, reject, approve-artefact, reject-artefact, or rerun",
         );
     }
   },

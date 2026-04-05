@@ -14,6 +14,7 @@ import { tuiCommand } from "../src/commands/tui.ts";
 import { transcriptsCommand } from "../src/commands/transcripts.ts";
 import * as appModule from "../src/app/index.ts";
 import * as configModule from "../src/config.ts";
+import * as evaluationModule from "../src/evaluations.ts";
 import * as serverModule from "../src/server/http.ts";
 import * as sharedModule from "../src/commands/shared.ts";
 import * as syncLoopModule from "../src/sync-loop.ts";
@@ -751,6 +752,121 @@ describe("command execution", () => {
     });
     expect(log).toHaveBeenCalledWith(expect.stringContaining("Alpha Sync Notes"));
     expect(log).toHaveBeenCalledWith(expect.stringContaining("generated"));
+  });
+
+  test("automation evaluate runs fixture-backed harness evaluations", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const cases = [
+      {
+        bundle: {
+          document: {
+            content: "",
+            createdAt: "2024-01-01T09:00:00Z",
+            id: "doc-alpha-1111",
+            notesPlain: "Existing notes",
+            tags: ["team"],
+            title: "Alpha Sync",
+            updatedAt: "2024-01-03T10:00:00Z",
+          },
+          meeting: {
+            meeting: {
+              createdAt: "2024-01-01T09:00:00Z",
+              folders: [],
+              id: "doc-alpha-1111",
+              noteContentSource: "notes" as const,
+              tags: ["team"],
+              title: "Alpha Sync",
+              transcriptLoaded: true,
+              transcriptSegmentCount: 1,
+              updatedAt: "2024-01-03T10:00:00Z",
+            },
+            note: {
+              content: "Existing notes",
+              contentSource: "notes" as const,
+              createdAt: "2024-01-01T09:00:00Z",
+              id: "doc-alpha-1111",
+              tags: ["team"],
+              title: "Alpha Sync",
+              updatedAt: "2024-01-03T10:00:00Z",
+            },
+            noteMarkdown: "# Alpha Sync",
+            roleHelpers: {
+              ownerCandidates: [],
+              participants: [],
+              speakers: [],
+            },
+            transcript: null,
+            transcriptText: "You: Hello team",
+          },
+        },
+        id: "alpha-case",
+        title: "Alpha Sync",
+      },
+    ];
+    const app = {
+      evaluateAutomationCases: vi.fn(async () => ({
+        generatedAt: "2024-03-01T12:00:00Z",
+        kind: "notes" as const,
+        results: [
+          {
+            caseId: "alpha-case",
+            caseTitle: "Alpha Sync",
+            harnessId: "team-notes",
+            harnessName: "Team notes",
+            model: "gpt-5-codex",
+            parseMode: "json" as const,
+            prompt: "Prompt",
+            provider: "codex" as const,
+            rawOutput: "{}",
+            status: "completed" as const,
+            structured: {
+              actionItems: [],
+              decisions: [],
+              followUps: [],
+              highlights: [],
+              markdown: "# Alpha",
+              sections: [],
+              summary: "Generated notes",
+              title: "Alpha Sync Notes",
+            },
+          },
+        ],
+      })),
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+    vi.spyOn(evaluationModule, "readAutomationEvaluationCases").mockResolvedValue(cases as never);
+
+    const exitCode = await automationCommand.run(
+      makeContext({
+        commandArgs: ["evaluate"],
+        commandFlags: {
+          fixture: "/tmp/evaluations",
+          harness: "team-notes",
+          model: "openai/gpt-5-mini",
+          provider: "openrouter",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(evaluationModule.readAutomationEvaluationCases).toHaveBeenCalledWith("/tmp/evaluations");
+    expect(app.evaluateAutomationCases).toHaveBeenCalledWith(cases, {
+      harnessIds: ["team-notes"],
+      kind: "notes",
+      model: "openai/gpt-5-mini",
+      provider: "openrouter",
+    });
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("Evaluated 1 run(s) across 1 case(s)"),
+    );
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Alpha Sync Notes"));
   });
 
   test("automation health prints recovery candidates", async () => {

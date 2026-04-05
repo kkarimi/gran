@@ -583,6 +583,7 @@ function createWorkspaceHarness(
   }));
 
   const app: GranolaTuiApp = {
+    evaluateAutomationCases: vi.fn(),
     exportNotes: vi.fn(),
     exportTranscripts: vi.fn(),
     findFolder: vi.fn(),

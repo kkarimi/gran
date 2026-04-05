@@ -3,6 +3,8 @@ import type {
   GranolaAutomationArtefactKind,
   GranolaAutomationArtefactStatus,
   GranolaAutomationArtefactUpdate,
+  GranolaAutomationEvaluationCase,
+  GranolaAutomationEvaluationResult,
   FolderRecord,
   GranolaAppApi,
   GranolaAutomationActionRun,
@@ -231,6 +233,19 @@ export class GranolaServerClient implements GranolaAppApi {
     } = {},
   ): Promise<{ artefacts: GranolaAutomationArtefact[] }> {
     return await this.requestJson(granolaAutomationArtefactsPath(options));
+  }
+
+  async evaluateAutomationCases(
+    _cases: GranolaAutomationEvaluationCase[],
+    _options?: {
+      dryRun?: boolean;
+      harnessIds?: string[];
+      kind?: GranolaAutomationArtefactKind;
+      model?: string;
+      provider?: import("../types.ts").GranolaAgentProviderKind;
+    },
+  ): Promise<GranolaAutomationEvaluationResult> {
+    throw new Error("automation evaluate is not supported over attached servers yet");
   }
 
   async listProcessingIssues(

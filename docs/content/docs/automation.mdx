@@ -199,6 +199,30 @@ Template fields such as `{{artefact.title}}`, `{{artefact.summary}}`, `{{meeting
 `ask-user` actions do not perform side effects immediately. They create a pending automation run
 that can be approved or rejected later from the CLI, web workspace, or TUI.
 
+## Evaluating Harnesses
+
+Use fixture-backed evaluations to compare harnesses, prompts, and providers before changing live
+automation.
+
+The simplest fixture is a JSON meeting bundle exported from the toolkit itself:
+
+```bash
+granola meeting export <meeting-id> --format json > eval-fixtures/customer-sync.json
+granola automation evaluate --fixture eval-fixtures/customer-sync.json --harness customer-call
+granola automation evaluate --fixture eval-fixtures/customer-sync.json --harness customer-call --provider openrouter --model openai/gpt-5-mini
+```
+
+You can also point `--fixture` at a directory of `.json` files. Each file can be either:
+
+- a raw `meeting export` JSON bundle
+- a wrapper with `{ "cases": [{ "id": "...", "title": "...", "bundle": { ... } }] }`
+
+`granola automation evaluate` runs the selected harnesses against each case, parses the pipeline
+output with the same structured-output rules as live automation, and prints a comparison-friendly
+report. Use `--format json` or `--format yaml` when you want to diff reports or feed them into
+other tooling. Use `--provider` and `--model` to compare the same harness against a different
+runtime without changing the harness file itself.
+
 The toolkit stores:
 
 - raw sync events in `sync-events.jsonl`

@@ -5,6 +5,7 @@ import { join, resolve as resolvePath } from "node:path";
 
 import {
   createDefaultAgentHarnessStore,
+  matchAgentHarnesses,
   resolveAgentHarness,
   type GranolaAgentHarness,
   type AgentHarnessStore,
@@ -133,6 +134,7 @@ import {
 import type {
   GranolaAppApi,
   GranolaAutomationArtefact,
+  GranolaAutomationArtefactKind,
   GranolaAutomationArtefactsResult,
   GranolaAutomationArtefactAttempt,
   GranolaAutomationArtefactHistoryAction,
@@ -146,6 +148,8 @@ import type {
   GranolaAutomationActionRun,
   GranolaAutomationArtefactListOptions,
   GranolaAutomationArtefactUpdate,
+  GranolaAutomationEvaluationCase,
+  GranolaAutomationEvaluationResult,
   GranolaAutomationMatch,
   GranolaAutomationRule,
   GranolaAutomationMatchesResult,
@@ -1377,6 +1381,129 @@ export class GranolaApp implements GranolaAppApi {
     });
     return {
       artefacts: artefacts.map((artefact) => this.cloneAutomationArtefact(artefact)),
+    };
+  }
+
+  async evaluateAutomationCases(
+    cases: GranolaAutomationEvaluationCase[],
+    options: {
+      dryRun?: boolean;
+      harnessIds?: string[];
+      kind?: GranolaAutomationArtefactKind;
+      model?: string;
+      provider?: GranolaAutomationAgentAction["provider"];
+    } = {},
+  ): Promise<GranolaAutomationEvaluationResult> {
+    const generatedAt = this.nowIso();
+    const kind = options.kind ?? "notes";
+    const harnesses = this.deps.agentHarnessStore
+      ? await this.deps.agentHarnessStore.readHarnesses()
+      : [];
+    const runner = this.deps.agentRunner ?? createDefaultAutomationAgentRunner(this.config);
+    const results: GranolaAutomationEvaluationResult["results"] = [];
+
+    for (const evaluationCase of cases) {
+      const match: GranolaAutomationMatch = {
+        eventId: `evaluate:${evaluationCase.id}`,
+        eventKind: "transcript.ready",
+        folders: evaluationCase.bundle.meeting.meeting.folders.map((folder) => ({ ...folder })),
+        id: `evaluate:${evaluationCase.id}`,
+        matchedAt: generatedAt,
+        meetingId: evaluationCase.bundle.document.id,
+        ruleId: "automation-evaluation",
+        ruleName: "Automation evaluation",
+        tags: [...evaluationCase.bundle.meeting.meeting.tags],
+        title: evaluationCase.title,
+        transcriptLoaded: evaluationCase.bundle.meeting.meeting.transcriptLoaded,
+      };
+      const selectedHarnesses =
+        options.harnessIds && options.harnessIds.length > 0
+          ? options.harnessIds.map((harnessId) =>
+              resolveAgentHarness(harnesses, { bundle: evaluationCase.bundle, match }, harnessId),
+            )
+          : matchAgentHarnesses(harnesses, { bundle: evaluationCase.bundle, match });
+      const resolvedHarnesses = selectedHarnesses.filter(
+        (harness): harness is GranolaAgentHarness => Boolean(harness),
+      );
+
+      if (resolvedHarnesses.length === 0) {
+        results.push({
+          caseId: evaluationCase.id,
+          caseTitle: evaluationCase.title,
+          error: "No harness matched this fixture case.",
+          prompt: "",
+          status: "failed",
+        });
+        continue;
+      }
+
+      for (const harness of resolvedHarnesses) {
+        const action: GranolaAutomationAgentAction = {
+          dryRun: options.dryRun,
+          harnessId: harness.id,
+          id: `evaluate:${harness.id}`,
+          kind: "agent",
+          model: options.model,
+          pipeline: { kind },
+          provider: options.provider,
+        };
+        const rule: GranolaAutomationRule = {
+          id: `evaluate:${harness.id}`,
+          name: `Evaluate ${harness.name}`,
+          when: {},
+        };
+
+        try {
+          const attempt = await this.buildAutomationAgentAttempt(
+            match,
+            rule,
+            action,
+            evaluationCase.bundle,
+            harness,
+          );
+          const result = await runner.run(attempt.request);
+          const parsed = parsePipelineOutput({
+            kind,
+            meetingTitle: evaluationCase.title,
+            rawOutput: result.output ?? "",
+            roleHelpers: evaluationCase.bundle.meeting.roleHelpers,
+          });
+          results.push({
+            caseId: evaluationCase.id,
+            caseTitle: evaluationCase.title,
+            harnessId: harness.id,
+            harnessName: harness.name,
+            model: result.model,
+            parseMode: parsed.parseMode,
+            prompt: result.prompt,
+            provider: result.provider,
+            rawOutput: result.output ?? "",
+            status: "completed",
+            structured: parsed.structured,
+          });
+        } catch (error) {
+          results.push({
+            caseId: evaluationCase.id,
+            caseTitle: evaluationCase.title,
+            error: error instanceof Error ? error.message : String(error),
+            harnessId: harness.id,
+            harnessName: harness.name,
+            model: options.model ?? harness.model,
+            prompt: "",
+            provider: options.provider ?? harness.provider,
+            status: "failed",
+          });
+        }
+      }
+    }
+
+    this.setUiState({
+      view: "idle",
+    });
+    return {
+      generatedAt,
+      kind,
+      results,
     };
   }
 

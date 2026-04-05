@@ -925,6 +925,159 @@ describe("GranolaApp", () => {
     );
   });
 
+  test("evaluates fixture cases through harnesses and parses structured outputs", async () => {
+    const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-eval-cache-")), "cache.json");
+    await writeFile(cacheFile, "{}\n", "utf8");
+    const evaluationDocuments: GranolaDocument[] = [
+      {
+        content: "Fallback note body",
+        createdAt: "2024-01-01T09:00:00Z",
+        id: "doc-eval-1111",
+        notesPlain: "Existing notes",
+        people: {
+          attendees: [{ email: "alice@example.com", name: "Alice Chen" }],
+          creator: { email: "nima@example.com", name: "Nima Karimi" },
+        },
+        tags: ["team"],
+        title: "Evaluation Sync",
+        updatedAt: "2024-01-03T10:00:00Z",
+      },
+    ];
+    const evaluationCache: CacheData = {
+      documents: {
+        "doc-eval-1111": {
+          createdAt: "2024-01-01T09:00:00Z",
+          id: "doc-eval-1111",
+          title: "Evaluation Sync",
+          updatedAt: "2024-01-03T10:00:00Z",
+        },
+      },
+      transcripts: {
+        "doc-eval-1111": [
+          {
+            documentId: "doc-eval-1111",
+            endTimestamp: "2024-01-01T09:00:03Z",
+            id: "segment-1",
+            isFinal: true,
+            source: "microphone",
+            startTimestamp: "2024-01-01T09:00:01Z",
+            text: "I will send the recap.",
+          },
+        ],
+      },
+    };
+    const app = new GranolaApp(
+      {
+        agents: {
+          codexCommand: "codex",
+          defaultProvider: "codex",
+          dryRun: false,
+          harnessesFile: "/tmp/agent-harnesses.json",
+          maxRetries: 2,
+          openaiBaseUrl: "https://api.openai.com/v1",
+          openrouterBaseUrl: "https://openrouter.ai/api/v1",
+          timeoutMs: 30_000,
+        },
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile,
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        agentHarnessStore: new MemoryAgentHarnessStore([
+          {
+            id: "team-harness",
+            name: "Team harness",
+            prompt: "Write concise decision-focused notes.",
+            provider: "openrouter",
+          },
+        ]),
+        agentRunner: {
+          run: vi.fn(
+            async (
+              request: GranolaAutomationAgentRequest,
+            ): Promise<GranolaAutomationAgentResult> => ({
+              dryRun: false,
+              model: "openai/gpt-5-mini",
+              output: JSON.stringify({
+                actionItems: [{ owner: "you", title: "Send recap" }],
+                decisions: [],
+                followUps: [],
+                highlights: [],
+                markdown: "# Evaluation Sync Notes",
+                participantSummaries: [
+                  {
+                    actionItems: ["Send recap"],
+                    role: "self",
+                    speaker: "You",
+                    summary: "Owned the recap.",
+                  },
+                ],
+                sections: [{ body: "Done.", title: "Summary" }],
+                summary: "Owned the recap.",
+                title: "Evaluation Sync Notes",
+              }),
+              prompt: request.prompt,
+              provider: request.provider ?? "openrouter",
+            }),
+          ),
+        },
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        cacheLoader: async () => evaluationCache,
+        granolaClient: {
+          listDocuments: async () => evaluationDocuments,
+          listFolders: async () => [],
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+    );
+
+    const bundle = await app.getMeeting("doc-eval-1111");
+    const result = await app.evaluateAutomationCases([
+      {
+        bundle,
+        id: "case-1",
+        title: "Evaluation Sync",
+      },
+    ]);
+
+    expect(result.results).toEqual([
+      expect.objectContaining({
+        caseId: "case-1",
+        harnessId: "team-harness",
+        parseMode: "json",
+        status: "completed",
+        structured: expect.objectContaining({
+          actionItems: [
+            expect.objectContaining({
+              owner: "Nima Karimi",
+              ownerEmail: "nima@example.com",
+              ownerOriginal: "you",
+            }),
+          ],
+          participantSummaries: [
+            expect.objectContaining({
+              speaker: "You",
+              summary: "Owned the recap.",
+            }),
+          ],
+        }),
+      }),
+    ]);
+  });
+
   test("stores pipeline artefacts, uses fallback harnesses, and supports reruns", async () => {
     const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-cache-")), "cache.json");
     await writeFile(cacheFile, "{}\n", "utf8");
