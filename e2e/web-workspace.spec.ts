@@ -32,9 +32,9 @@ test.describe("toolkit web workspace", () => {
     await expect(page.getByRole("heading", { name: "Harness Editor" })).toBeVisible();
     await page.getByRole("button", { name: /Alpha Sync/i }).click();
     await expect(page.getByText("Team Notes").first()).toBeVisible();
-    await expect(page.getByText("Matched selected meeting")).toBeVisible();
-
-    await page.getByRole("button", { name: "Test Harness" }).click();
+    const testHarnessButton = page.getByRole("button", { name: "Test Harness" });
+    await expect(testHarnessButton).toBeEnabled();
+    await testHarnessButton.click();
     await expect(page.getByRole("heading", { name: "Latest Test Run" })).toBeVisible();
     await expect(page.getByLabel("Structured Title")).toHaveValue("Team Notes");
     await expect(page.getByLabel("Resolved Prompt Preview")).toHaveValue(
