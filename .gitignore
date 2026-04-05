@@ -5,6 +5,8 @@ node_modules
 out
 dist
 *.tgz
+playwright-report
+test-results
 
 # code coverage
 coverage
