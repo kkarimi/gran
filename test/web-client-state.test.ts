@@ -12,6 +12,7 @@ import {
   describeSyncStatus,
   exportScopeLabel,
   hasActiveFilters,
+  hasScopedMeetingBrowse,
   nextWorkspaceTab,
   parseWorkspaceTab,
   parseWorkspacePreferences,
@@ -77,7 +78,7 @@ describe("web client state helpers", () => {
     expect(
       selectMeetingId([{ id: "doc-alpha-1111" }, { id: "doc-bravo-2222" }], "doc-bravo-2222"),
     ).toBe("doc-bravo-2222");
-    expect(selectMeetingId([{ id: "doc-bravo-2222" }], "doc-alpha-1111")).toBe("doc-bravo-2222");
+    expect(selectMeetingId([{ id: "doc-bravo-2222" }], "doc-alpha-1111")).toBeNull();
     expect(selectMeetingId([], "doc-alpha-1111")).toBeNull();
   });
 
@@ -163,16 +164,23 @@ describe("web client state helpers", () => {
   });
 
   test("describes auth and sync status in user-facing language", () => {
-    expect(describeAuthStatus({ mode: "api-key" })).toBe("Personal API key active");
+    expect(describeAuthStatus({ mode: "api-key" })).toBe("Connected with Personal API key");
     expect(describeAuthStatus({ lastError: "bad token", mode: "stored-session" })).toBe(
-      "Auth needs attention",
+      "Connection needs attention",
     );
     expect(
       describeSyncStatus({
         lastCompletedAt: "2026-04-04T20:11:12Z",
         summary: { changedCount: 3 },
       }),
-    ).toBe("Synced 20:11:12 · 3 changes");
+    ).toBe("Last synced 20:11:12 · 3 changes");
     expect(describeSyncStatus({ lastError: "boom" })).toBe("Sync needs attention");
+  });
+
+  test("treats folder and search filters as the trigger for scoped browsing", () => {
+    expect(hasScopedMeetingBrowse({})).toBe(false);
+    expect(hasScopedMeetingBrowse({ selectedFolderId: "folder-team-1111" })).toBe(true);
+    expect(hasScopedMeetingBrowse({ search: "alpha" })).toBe(true);
+    expect(hasScopedMeetingBrowse({ updatedFrom: "2026-04-01" })).toBe(true);
   });
 });

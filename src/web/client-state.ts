@@ -315,6 +315,17 @@ export function currentFilterSummary(
   return parts.join(", ");
 }
 
+export function hasScopedMeetingBrowse(
+  filters: Pick<WebClientFilters, "search" | "selectedFolderId" | "updatedFrom" | "updatedTo">,
+): boolean {
+  return Boolean(
+    normaliseFilterValue(filters.search) ||
+    normaliseFilterValue(filters.selectedFolderId) ||
+    normaliseFilterValue(filters.updatedFrom) ||
+    normaliseFilterValue(filters.updatedTo),
+  );
+}
+
 export function selectMeetingId(
   meetings: MeetingLike[],
   selectedMeetingId: string | null | undefined,
@@ -323,7 +334,7 @@ export function selectMeetingId(
     return selectedMeetingId;
   }
 
-  return meetings[0]?.id ?? null;
+  return null;
 }
 
 export function buildMeetingsQuery(
@@ -428,7 +439,7 @@ export function describeSyncStatus(sync: {
   summary?: { changedCount?: number };
 }): string {
   if (sync.running) {
-    return "Sync running";
+    return "Sync in progress";
   }
 
   if (sync.lastError) {
@@ -437,10 +448,10 @@ export function describeSyncStatus(sync: {
 
   if (sync.lastCompletedAt) {
     const suffix = sync.summary?.changedCount ? ` · ${sync.summary.changedCount} changes` : "";
-    return `Synced ${sync.lastCompletedAt.slice(11, 19)}${suffix}`;
+    return `Last synced ${sync.lastCompletedAt.slice(11, 19)}${suffix}`;
   }
 
-  return "Sync idle";
+  return "Not synced yet";
 }
 
 export function describeAuthStatus(auth?: {
@@ -448,19 +459,19 @@ export function describeAuthStatus(auth?: {
   mode?: "api-key" | "stored-session" | "supabase-file";
 }): string {
   if (!auth) {
-    return "Waiting for auth";
+    return "Connecting to Granola";
   }
 
   if (auth.lastError) {
-    return "Auth needs attention";
+    return "Connection needs attention";
   }
 
   switch (auth.mode) {
     case "api-key":
-      return "Personal API key active";
+      return "Connected with Personal API key";
     case "stored-session":
-      return "Stored session active";
+      return "Connected with stored desktop session";
     default:
-      return "supabase.json fallback active";
+      return "Connected with supabase.json fallback";
   }
 }

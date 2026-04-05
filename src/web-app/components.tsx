@@ -4,12 +4,12 @@ import { For, Show, type JSX } from "solid-js";
 
 import type {
   GranolaAutomationArtefact,
-  FolderSummaryRecord,
   GranolaAutomationActionRun,
   GranolaAppAuthState,
   GranolaAppExportJobState,
   GranolaAppState,
   GranolaExportScope,
+  FolderSummaryRecord,
   GranolaMeetingBundle,
   GranolaMeetingSort,
   GranolaProcessingIssue,
@@ -18,6 +18,7 @@ import type {
 } from "../app/index.ts";
 import { granolaAuthModeLabel, granolaAuthRecommendation } from "../auth-summary.ts";
 import type { GranolaReviewInboxItem, GranolaReviewInboxSummary } from "../review-inbox.ts";
+import type { GranolaServerInfo } from "../transport.ts";
 import {
   describeAuthStatus,
   describeSyncStatus,
@@ -33,13 +34,10 @@ import {
 export type WebStatusTone = "busy" | "error" | "idle" | "ok";
 
 interface ToolbarFiltersProps {
-  onQuickOpen: () => void;
-  onQuickOpenInput: (value: string) => void;
   onSearchInput: (value: string) => void;
   onSortChange: (value: GranolaMeetingSort) => void;
   onUpdatedFromChange: (value: string) => void;
   onUpdatedToChange: (value: string) => void;
-  quickOpen: string;
   search: string;
   sort: GranolaMeetingSort;
   updatedFrom: string;
@@ -82,6 +80,16 @@ interface MeetingListProps {
   selectedMeetingId?: string | null;
   updatedFrom: string;
   updatedTo: string;
+}
+
+interface HomeDashboardPanelProps {
+  appState?: GranolaAppState | null;
+  folders: FolderSummaryRecord[];
+  onOpenFolder: (folderId: string) => void;
+  onOpenMeeting: (meeting: WebWorkspaceRecentMeeting) => void;
+  recentMeetings: WebWorkspaceRecentMeeting[];
+  reviewSummary: GranolaReviewInboxSummary;
+  serverInfo?: GranolaServerInfo | null;
 }
 
 interface AuthPanelProps {
@@ -219,123 +227,185 @@ function scopeLabel(scope: GranolaExportScope): string {
   return exportScopeLabel(scope);
 }
 
+function formatDateLabel(value?: string): string {
+  if (!value) {
+    return "Unknown date";
+  }
+
+  return value.slice(0, 10);
+}
+
+function formatFolderNames(folders: FolderSummaryRecord[]): string {
+  if (folders.length === 0) {
+    return "No folder";
+  }
+
+  return folders.map((folder) => folder.name || folder.id).join(", ");
+}
+
+function reviewSummaryLabel(summary: GranolaReviewInboxSummary): string {
+  if (summary.total === 0) {
+    return "Nothing waiting for review";
+  }
+
+  return `${summary.total} items need review`;
+}
+
+function runtimeLabel(serverInfo?: GranolaServerInfo | null): string {
+  if (!serverInfo) {
+    return "Connecting to local service";
+  }
+
+  if (!serverInfo.runtime.syncEnabled) {
+    return "Local session";
+  }
+
+  if (serverInfo.runtime.mode === "background-service") {
+    if (serverInfo.runtime.syncIntervalMs) {
+      const minutes = Math.max(1, Math.round(serverInfo.runtime.syncIntervalMs / 60_000));
+      return `Background sync every ${minutes} min`;
+    }
+
+    return "Background sync active";
+  }
+
+  return "Connected to local workspace";
+}
+
 export function ToolbarFilters(props: ToolbarFiltersProps): JSX.Element {
   return (
-    <>
-      <section class="hero">
-        <h1>Granola Toolkit</h1>
-        <p>
-          Browser workspace for folders, meetings, notes, transcripts, and export flows on top of
-          one local server instance.
-        </p>
-        <input
-          class="search"
-          onInput={(event) => {
-            props.onSearchInput(event.currentTarget.value);
-          }}
-          placeholder="Search meetings, notes, transcripts, or artefacts"
-          value={props.search}
-        />
-        <div class="field-row field-row--inline">
-          <label>
-            <span class="field-label">Sort</span>
-            <select
-              class="select"
-              onChange={(event) => {
-                props.onSortChange(event.currentTarget.value as GranolaMeetingSort);
-              }}
-              value={props.sort}
-            >
-              <option value="updated-desc">Newest first</option>
-              <option value="updated-asc">Oldest first</option>
-              <option value="title-asc">Title A-Z</option>
-              <option value="title-desc">Title Z-A</option>
-            </select>
-          </label>
-          <label>
-            <span class="field-label">Updated From</span>
-            <input
-              class="field-input"
-              onChange={(event) => {
-                props.onUpdatedFromChange(event.currentTarget.value);
-              }}
-              type="date"
-              value={props.updatedFrom}
-            />
-          </label>
-        </div>
-        <label class="field-row">
-          <span class="field-label">Updated To</span>
+    <section class="hero">
+      <h1>Granola Toolkit</h1>
+      <p>
+        Start from folders, recent meetings, or search. The browser stays attached to the same local
+        service and sync loop as the CLI and TUI.
+      </p>
+      <input
+        class="search"
+        onInput={(event) => {
+          props.onSearchInput(event.currentTarget.value);
+        }}
+        placeholder="Search meeting titles, tags, folders, and notes"
+        value={props.search}
+      />
+      <div class="field-row field-row--inline">
+        <label>
+          <span class="field-label">Sort</span>
+          <select
+            class="select"
+            onChange={(event) => {
+              props.onSortChange(event.currentTarget.value as GranolaMeetingSort);
+            }}
+            value={props.sort}
+          >
+            <option value="updated-desc">Newest first</option>
+            <option value="updated-asc">Oldest first</option>
+            <option value="title-asc">Title A-Z</option>
+            <option value="title-desc">Title Z-A</option>
+          </select>
+        </label>
+        <label>
+          <span class="field-label">Updated From</span>
           <input
             class="field-input"
             onChange={(event) => {
-              props.onUpdatedToChange(event.currentTarget.value);
+              props.onUpdatedFromChange(event.currentTarget.value);
             }}
             type="date"
-            value={props.updatedTo}
+            value={props.updatedFrom}
           />
         </label>
-      </section>
-      <section class="toolbar">
-        <div>
-          <p>
-            Meetings are loaded from the shared server state so this view can stay aligned with the
-            terminal UI and sync loop.
-          </p>
-        </div>
-        <div class="toolbar-form">
-          <input
-            class="field-input"
-            onInput={(event) => {
-              props.onQuickOpenInput(event.currentTarget.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                props.onQuickOpen();
-              }
-            }}
-            placeholder="Quick open by id or title"
-            value={props.quickOpen}
-          />
-          <button class="button button--secondary" onClick={props.onQuickOpen} type="button">
-            Open
-          </button>
-        </div>
-      </section>
-    </>
+      </div>
+      <label class="field-row">
+        <span class="field-label">Updated To</span>
+        <input
+          class="field-input"
+          onChange={(event) => {
+            props.onUpdatedToChange(event.currentTarget.value);
+          }}
+          type="date"
+          value={props.updatedTo}
+        />
+      </label>
+    </section>
   );
 }
 
-export function FolderList(props: FolderListProps): JSX.Element {
+export function HomeDashboardPanel(props: HomeDashboardPanelProps): JSX.Element {
+  const syncStatus = () => describeSyncStatus(props.appState?.sync ?? {});
+  const authStatus = () => describeAuthStatus(props.appState?.auth);
+  const indexedMeetings = () =>
+    props.appState?.index.loaded
+      ? props.appState.index.meetingCount
+      : props.appState?.documents.loaded
+        ? props.appState.documents.count
+        : 0;
+
   return (
-    <section class="folder-panel">
-      <div class="folder-panel__head">
-        <h2>Folders</h2>
-        <p>Pick a folder to scope the meeting browser, or stay on All meetings.</p>
+    <section class="home-dashboard">
+      <div class="home-dashboard__hero">
+        <div>
+          <p class="home-dashboard__eyebrow">Home</p>
+          <h2>Start from a folder, recent meeting, or review queue.</h2>
+          <p>
+            Granola Toolkit works best when it feels like a calm inbox for today’s work, not a raw
+            dump of every meeting you have ever had.
+          </p>
+        </div>
+        <div class="home-dashboard__summary">
+          <div class="home-dashboard__summary-label">Local runtime</div>
+          <strong>{runtimeLabel(props.serverInfo)}</strong>
+          <span>{syncStatus()}</span>
+        </div>
       </div>
-      <div class="folder-list">
-        <Show
-          fallback={
-            <>
-              <button
-                class="folder-row"
-                data-selected={!props.selectedFolderId ? "true" : undefined}
-                onClick={() => {
-                  props.onSelect(null);
-                }}
-                type="button"
-              >
-                <span class="folder-row__title">All meetings</span>
-                <span class="folder-row__meta">Browse the full meeting list.</span>
-              </button>
-              <For each={props.folders}>
+      <div class="home-dashboard__stats">
+        <article class="dashboard-stat">
+          <span class="dashboard-stat__label">Connection</span>
+          <strong>{authStatus()}</strong>
+          <span>API key first, desktop session fallback.</span>
+        </article>
+        <article class="dashboard-stat">
+          <span class="dashboard-stat__label">Meetings indexed</span>
+          <strong>{String(indexedMeetings())}</strong>
+          <span>Ready to browse once you pick a scope.</span>
+        </article>
+        <article class="dashboard-stat">
+          <span class="dashboard-stat__label">Folders</span>
+          <strong>{String(props.folders.length)}</strong>
+          <span>
+            {props.folders.length > 0
+              ? "Use folders as the default way to browse."
+              : "Folders will show up after Granola exposes them."}
+          </span>
+        </article>
+        <article class="dashboard-stat">
+          <span class="dashboard-stat__label">Review queue</span>
+          <strong>{reviewSummaryLabel(props.reviewSummary)}</strong>
+          <span>
+            {props.reviewSummary.total > 0
+              ? `${props.reviewSummary.issues} issues, ${props.reviewSummary.artefacts} artefacts, ${props.reviewSummary.runs} approvals.`
+              : "Nothing needs approval right now."}
+          </span>
+        </article>
+      </div>
+      <div class="home-dashboard__grid">
+        <section class="detail-section">
+          <h2>Folders</h2>
+          <Show
+            when={props.folders.length > 0}
+            fallback={
+              <div class="empty empty--inline">
+                No folders are available yet. Run a sync or finish connecting your account first.
+              </div>
+            }
+          >
+            <div class="folder-list">
+              <For each={props.folders.slice(0, 6)}>
                 {(folder) => (
                   <button
                     class="folder-row"
-                    data-selected={folder.id === props.selectedFolderId ? "true" : undefined}
                     onClick={() => {
-                      props.onSelect(folder.id);
+                      props.onOpenFolder(folder.id);
                     }}
                     type="button"
                   >
@@ -346,14 +416,100 @@ export function FolderList(props: FolderListProps): JSX.Element {
                   </button>
                 )}
               </For>
-              <Show when={props.folders.length === 0}>
-                <div class="folder-empty">No folders found.</div>
-              </Show>
-            </>
-          }
+            </div>
+          </Show>
+        </section>
+        <section class="detail-section">
+          <h2>Recent meetings</h2>
+          <Show
+            when={props.recentMeetings.length > 0}
+            fallback={
+              <div class="empty empty--inline">
+                Meetings you open will show up here so you can jump back in quickly.
+              </div>
+            }
+          >
+            <div class="folder-list">
+              <For each={props.recentMeetings}>
+                {(meeting) => (
+                  <button
+                    class="folder-row"
+                    onClick={() => {
+                      props.onOpenMeeting(meeting);
+                    }}
+                    type="button"
+                  >
+                    <span class="folder-row__title">{meeting.title}</span>
+                    <span class="folder-row__meta">
+                      {`${meeting.folderId ? "Scoped meeting" : "Recent meeting"} • ${formatDateLabel(
+                        meeting.updatedAt,
+                      )}`}
+                    </span>
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+export function BrowsePromptPanel(props: {
+  foldersAvailable: number;
+  hasRecentMeetings: boolean;
+}): JSX.Element {
+  return (
+    <section class="browse-prompt">
+      <h2>Browse with a scope</h2>
+      <p>
+        Pick a folder, open a recent meeting, or use search above. The meeting list stays hidden
+        until you narrow it down.
+      </p>
+      <Show when={props.foldersAvailable === 0 && !props.hasRecentMeetings}>
+        <p class="browse-prompt__hint">
+          Once you have synced at least once, folders and recent meetings will show up here.
+        </p>
+      </Show>
+    </section>
+  );
+}
+
+export function FolderList(props: FolderListProps): JSX.Element {
+  return (
+    <section class="folder-panel">
+      <div class="folder-panel__head">
+        <h2>Folders</h2>
+        <p>Use folders as the default way to narrow the workspace before opening meetings.</p>
+      </div>
+      <div class="folder-list">
+        <Show
           when={!props.error}
+          fallback={<div class="folder-empty folder-empty--error">{props.error}</div>}
         >
-          <div class="folder-empty folder-empty--error">{props.error}</div>
+          <>
+            <For each={props.folders}>
+              {(folder) => (
+                <button
+                  class="folder-row"
+                  data-selected={folder.id === props.selectedFolderId ? "true" : undefined}
+                  onClick={() => {
+                    props.onSelect(folder.id);
+                  }}
+                  type="button"
+                >
+                  <span class="folder-row__title">
+                    {(folder.isFavourite ? "★ " : "") + (folder.name || folder.id)}
+                  </span>
+                  <span class="folder-row__meta">{`${folder.documentCount} meetings`}</span>
+                </button>
+              )}
+            </For>
+            <Show when={props.folders.length === 0}>
+              <div class="folder-empty">No folders found.</div>
+            </Show>
+          </>
         </Show>
       </div>
     </section>
@@ -473,45 +629,47 @@ export function MeetingList(props: MeetingListProps): JSX.Element {
 
   return (
     <section class="meeting-list">
+      <div class="meeting-list__head">
+        <h2>Meetings</h2>
+        <p>{summary() ? `Browsing ${summary()}.` : "Choose a meeting from this focused list."}</p>
+      </div>
       <Show
-        fallback={
-          <Show
-            fallback={
-              <div class="meeting-empty">
-                {summary()
-                  ? `No meetings match ${summary()}.`
-                  : props.emptyHint || "No meetings yet. Try Sync now."}
-              </div>
-            }
-            when={props.meetings.length > 0}
-          >
-            <For each={props.meetings}>
-              {(meeting) => (
-                <button
-                  class="meeting-row"
-                  data-selected={meeting.id === props.selectedMeetingId ? "true" : undefined}
-                  onClick={() => {
-                    props.onSelect(meeting.id);
-                  }}
-                  type="button"
-                >
-                  <span class="meeting-row__title">{meeting.title || meeting.id}</span>
-                  <span class="meeting-row__meta">
-                    {meeting.tags.length
-                      ? meeting.tags.map((tag) => `#${tag}`).join(" ")
-                      : "untagged"}
-                  </span>
-                  <span class="meeting-row__meta">
-                    {meeting.updatedAt ? meeting.updatedAt.slice(0, 10) : "unknown"}
-                  </span>
-                </button>
-              )}
-            </For>
-          </Show>
-        }
-        when={props.error}
+        when={!props.error}
+        fallback={<div class="meeting-empty meeting-empty--error">{props.error}</div>}
       >
-        <div class="meeting-empty meeting-empty--error">{props.error}</div>
+        <Show
+          fallback={
+            <div class="meeting-empty">
+              {summary()
+                ? `No meetings match ${summary()}.`
+                : props.emptyHint || "No meetings yet. Try Sync now."}
+            </div>
+          }
+          when={props.meetings.length > 0}
+        >
+          <For each={props.meetings}>
+            {(meeting) => (
+              <button
+                class="meeting-row"
+                data-selected={meeting.id === props.selectedMeetingId ? "true" : undefined}
+                onClick={() => {
+                  props.onSelect(meeting.id);
+                }}
+                type="button"
+              >
+                <span class="meeting-row__title">{meeting.title || meeting.id}</span>
+                <span class="meeting-row__meta">
+                  {meeting.tags.length
+                    ? meeting.tags.map((tag) => `#${tag}`).join(" ")
+                    : "untagged"}
+                </span>
+                <span class="meeting-row__meta">
+                  {meeting.updatedAt ? meeting.updatedAt.slice(0, 10) : "unknown"}
+                </span>
+              </button>
+            )}
+          </For>
+        </Show>
       </Show>
     </section>
   );
@@ -519,29 +677,34 @@ export function MeetingList(props: MeetingListProps): JSX.Element {
 
 export function AppStatePanel(props: {
   appState?: GranolaAppState | null;
+  heading: string;
+  reviewSummary: GranolaReviewInboxSummary;
+  serverInfo?: GranolaServerInfo | null;
   statusLabel: string;
   statusTone: WebStatusTone;
 }): JSX.Element {
   const syncStatus = () => describeSyncStatus(props.appState?.sync ?? {});
   const authStatus = () => describeAuthStatus(props.appState?.auth);
+  const indexedMeetings = () =>
+    props.appState?.index.loaded
+      ? props.appState.index.meetingCount
+      : props.appState?.documents.loaded
+        ? props.appState.documents.count
+        : 0;
 
   return (
     <section class="detail-head">
       <div>
-        <h2>Meeting Workspace</h2>
+        <h2>{props.heading}</h2>
+        <p class="detail-head__copy">
+          The browser is attached to your local Granola service, so sync, review, and exports stay
+          in step with the CLI and TUI.
+        </p>
         <Show fallback={<p>Waiting for server state…</p>} when={props.appState}>
           {(appState) => (
             <div class="status-grid">
               <div>
-                <span class="status-label">Surface</span>
-                <strong>{appState().ui.surface}</strong>
-              </div>
-              <div>
-                <span class="status-label">View</span>
-                <strong>{appState().ui.view}</strong>
-              </div>
-              <div>
-                <span class="status-label">Auth</span>
+                <span class="status-label">Connection</span>
                 <strong>{authStatus()}</strong>
               </div>
               <div>
@@ -549,42 +712,22 @@ export function AppStatePanel(props: {
                 <strong>{syncStatus()}</strong>
               </div>
               <div>
-                <span class="status-label">Documents</span>
-                <strong>
-                  {appState().documents.loaded ? String(appState().documents.count) : "not loaded"}
-                </strong>
+                <span class="status-label">Meetings indexed</span>
+                <strong>{String(indexedMeetings())}</strong>
               </div>
               <div>
                 <span class="status-label">Folders</span>
                 <strong>
-                  {appState().folders.loaded ? String(appState().folders.count) : "not loaded"}
+                  {appState().folders.loaded ? String(appState().folders.count) : "Not loaded yet"}
                 </strong>
               </div>
               <div>
-                <span class="status-label">Cache</span>
-                <strong>
-                  {appState().cache.loaded
-                    ? `${appState().cache.transcriptCount} transcript sets`
-                    : appState().cache.configured
-                      ? "configured"
-                      : "not configured"}
-                </strong>
+                <span class="status-label">Needs review</span>
+                <strong>{reviewSummaryLabel(props.reviewSummary)}</strong>
               </div>
               <div>
-                <span class="status-label">Index</span>
-                <strong>
-                  {appState().index.loaded
-                    ? `${appState().index.meetingCount} meetings`
-                    : appState().index.available
-                      ? "available"
-                      : "not built"}
-                </strong>
-              </div>
-              <div>
-                <span class="status-label">Automation</span>
-                <strong>
-                  {`${appState().automation.runCount} runs / ${appState().automation.pendingRunCount} pending runs / ${appState().automation.pendingArtefactCount} pending artefacts`}
-                </strong>
+                <span class="status-label">Runtime</span>
+                <strong>{runtimeLabel(props.serverInfo)}</strong>
               </div>
             </div>
           )}
@@ -1365,62 +1508,87 @@ export function Workspace(props: WorkspaceProps): JSX.Element {
   };
 
   return (
-    <>
-      <nav class="workspace-tabs">
-        <For each={["notes", "transcript", "metadata", "raw"] as const}>
-          {(tab) => (
-            <button
-              class="workspace-tab"
-              data-selected={parsedTab() === tab ? "true" : undefined}
-              onClick={() => {
-                props.onSelectTab(tab);
-              }}
-              type="button"
-            >
-              {tab === "notes"
-                ? "Notes"
-                : tab === "transcript"
-                  ? "Transcript"
-                  : tab === "metadata"
-                    ? "Metadata"
-                    : "Raw"}
-            </button>
-          )}
-        </For>
-        <span class="workspace-hint">1-4 switch tabs, [ and ] cycle</span>
-      </nav>
-      <Show
-        when={props.selectedMeeting}
-        fallback={
-          <div class="empty">
-            {props.detailError || "Select a meeting to inspect its notes and transcript."}
-          </div>
-        }
-      >
-        {(meeting) => (
-          <>
-            <div class="detail-meta">
-              <div class="detail-chip">{`ID: ${meeting().meeting.id}`}</div>
-              <div class="detail-chip">{`Source: ${meeting().meeting.noteContentSource}`}</div>
-              <div class="detail-chip">{`Transcript: ${meeting().meeting.transcriptSegmentCount} segments`}</div>
-            </div>
-            <Show when={!props.detailError} fallback={<div class="empty">{props.detailError}</div>}>
-              <div class="detail-body">
-                <div class="workspace-grid">
-                  <aside class="detail-section workspace-sidebar">
-                    <h2>Meeting Metadata</h2>
-                    <pre class="detail-pre">{metadataLines(meeting())}</pre>
-                  </aside>
-                  <section class="detail-section workspace-main">
-                    <h2>{details()?.title}</h2>
-                    <pre class="detail-pre">{details()?.body}</pre>
-                  </section>
-                </div>
+    <Show
+      when={props.selectedMeeting}
+      fallback={
+        <div class="empty">
+          {props.detailError ||
+            "Choose a folder, recent meeting, or search result to open it here."}
+        </div>
+      }
+    >
+      {(meeting) => (
+        <>
+          <section class="meeting-context">
+            <div class="meeting-context__head">
+              <div>
+                <p class="meeting-context__eyebrow">Selected meeting</p>
+                <h2>{meeting().meeting.title || meeting().meeting.id}</h2>
+                <p class="meeting-context__summary">
+                  {`${formatDateLabel(meeting().meeting.updatedAt)} • ${formatFolderNames(
+                    meeting().meeting.folders,
+                  )} • ${
+                    meeting().meeting.transcriptLoaded
+                      ? `${meeting().meeting.transcriptSegmentCount} transcript segments`
+                      : "Transcript not loaded yet"
+                  }`}
+                </p>
               </div>
-            </Show>
-          </>
-        )}
-      </Show>
-    </>
+            </div>
+            <div class="detail-meta">
+              <div class="detail-chip">{`Updated ${formatDateLabel(meeting().meeting.updatedAt)}`}</div>
+              <div class="detail-chip">{`Notes: ${meeting().meeting.noteContentSource}`}</div>
+              <Show when={meeting().meeting.folders.length > 0}>
+                <For each={meeting().meeting.folders}>
+                  {(folder) => <div class="detail-chip">{folder.name || folder.id}</div>}
+                </For>
+              </Show>
+              <Show when={meeting().meeting.tags.length > 0}>
+                <For each={meeting().meeting.tags}>
+                  {(tag) => <div class="detail-chip">{`#${tag}`}</div>}
+                </For>
+              </Show>
+            </div>
+          </section>
+          <nav class="workspace-tabs">
+            <For each={["notes", "transcript", "metadata", "raw"] as const}>
+              {(tab) => (
+                <button
+                  class="workspace-tab"
+                  data-selected={parsedTab() === tab ? "true" : undefined}
+                  onClick={() => {
+                    props.onSelectTab(tab);
+                  }}
+                  type="button"
+                >
+                  {tab === "notes"
+                    ? "Notes"
+                    : tab === "transcript"
+                      ? "Transcript"
+                      : tab === "metadata"
+                        ? "Metadata"
+                        : "Raw"}
+                </button>
+              )}
+            </For>
+            <span class="workspace-hint">1-4 switch tabs, [ and ] cycle</span>
+          </nav>
+          <Show when={!props.detailError} fallback={<div class="empty">{props.detailError}</div>}>
+            <div class="detail-body">
+              <div class="workspace-grid">
+                <aside class="detail-section workspace-sidebar">
+                  <h2>Meeting context</h2>
+                  <pre class="detail-pre">{metadataLines(meeting())}</pre>
+                </aside>
+                <section class="detail-section workspace-main">
+                  <h2>{details()?.title}</h2>
+                  <pre class="detail-pre">{details()?.body}</pre>
+                </section>
+              </div>
+            </div>
+          </Show>
+        </>
+      )}
+    </Show>
   );
 }

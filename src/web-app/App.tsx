@@ -31,6 +31,7 @@ import {
   applyWorkspaceFilter,
   buildBrowserUrlPath,
   granolaWebWorkspaceStorageKey,
+  hasScopedMeetingBrowse,
   parseWorkspacePreferences,
   rememberRecentMeeting,
   saveWorkspaceFilter,
@@ -47,8 +48,10 @@ import {
   AppStatePanel,
   ArtefactReviewPanel,
   AuthPanel,
+  BrowsePromptPanel,
   ExportJobsPanel,
   FolderList,
+  HomeDashboardPanel,
   IssueReviewPanel,
   MeetingList,
   RecentMeetingsPanel,
@@ -99,7 +102,6 @@ interface GranolaWebAppState {
   processingIssueError: string;
   processingIssues: import("../app/index.ts").GranolaProcessingIssue[];
   preferredProvider: GranolaAgentProviderKind;
-  quickOpen: string;
   recentMeetings: WebWorkspacePreferences["recentMeetings"];
   savedFilters: WebWorkspacePreferences["savedFilters"];
   search: string;
@@ -174,7 +176,6 @@ export function App() {
     processingIssueError: "",
     processingIssues: [],
     preferredProvider: "openrouter",
-    quickOpen: "",
     recentMeetings: initialPreferences.recentMeetings,
     savedFilters: initialPreferences.savedFilters,
     search: "",
@@ -666,8 +667,31 @@ export function App() {
     }
   };
 
+  const hasMeetingBrowseScope = () =>
+    hasScopedMeetingBrowse({
+      search: state.search,
+      selectedFolderId: state.selectedFolderId,
+      updatedFrom: state.updatedFrom,
+      updatedTo: state.updatedTo,
+    });
+
   const loadMeetings = async (options: { preferredMeetingId?: string; refresh?: boolean } = {}) => {
     if (!client) {
+      return;
+    }
+
+    if (!hasMeetingBrowseScope() && !options.preferredMeetingId && !state.selectedMeetingId) {
+      setState("listError", "");
+      setState("meetings", []);
+      setState("selectedMeeting", null);
+      setState("selectedMeetingBundle", null);
+      setState("detailError", "");
+      setState("harnessExplainEventKind", null);
+      setState("harnessExplanations", []);
+      await loadAutomationArtefacts({
+        preferredId: state.selectedAutomationArtefactId,
+        preferredMeetingId: null,
+      });
       return;
     }
 
@@ -736,7 +760,13 @@ export function App() {
       loadProcessingIssues(),
       mergeAuthState(),
     ]);
-    await loadMeetings({ refresh: forceRefresh });
+
+    if (state.selectedMeetingId && !hasMeetingBrowseScope()) {
+      await loadMeeting(state.selectedMeetingId);
+      setState("meetings", []);
+    } else {
+      await loadMeetings({ refresh: forceRefresh });
+    }
 
     setState("serverLocked", false);
     setStatus(
@@ -755,34 +785,6 @@ export function App() {
     } catch (error) {
       setStatus("Connection failed", "error");
       setState("detailError", error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const quickOpenMeeting = async () => {
-    if (!client) {
-      return;
-    }
-
-    const query = state.quickOpen.trim();
-    if (!query) {
-      setStatus("Enter a title or id", "error");
-      return;
-    }
-
-    setStatus("Opening meeting…", "busy");
-    try {
-      const bundle = await client.findMeeting(query);
-      setState("selectedFolderId", bundle.meeting.meeting.folders[0]?.id || null);
-      setState("search", "");
-      setState("updatedFrom", "");
-      setState("updatedTo", "");
-      await loadMeetings({
-        preferredMeetingId: bundle.document.id,
-      });
-      setStatus("Connected", "ok");
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Quick open failed", "error");
     }
   };
 
@@ -914,7 +916,7 @@ export function App() {
     setState("selectedMeeting", null);
     setState("selectedMeetingBundle", null);
     await loadMeetings();
-    setStatus("Filters cleared", "ok");
+    setStatus("Back at home", "ok");
   };
 
   const saveCurrentFilter = () => {
@@ -1339,6 +1341,7 @@ export function App() {
     });
 
   const showOnboarding = () => !state.serverLocked && !onboardingState().complete;
+  const showScopedMeetingList = () => hasMeetingBrowseScope();
   const controlTabs: Array<{ id: ControlPanelTab; label: string }> = [
     { id: "overview", label: "Overview" },
     { id: "auth", label: "Auth" },
@@ -1354,6 +1357,9 @@ export function App() {
           <main class="pane detail detail--onboarding">
             <AppStatePanel
               appState={state.appState}
+              heading="Home"
+              reviewSummary={reviewInboxSummary()}
+              serverInfo={state.serverInfo}
               statusLabel={state.statusLabel}
               statusTone={state.statusTone}
             />
@@ -1412,12 +1418,6 @@ export function App() {
       <div class="shell">
         <aside class="pane sidebar">
           <ToolbarFilters
-            onQuickOpen={() => {
-              void quickOpenMeeting();
-            }}
-            onQuickOpenInput={(value) => {
-              setState("quickOpen", value);
-            }}
             onSearchInput={(value) => {
               setState("search", value.trim());
               void loadMeetings();
@@ -1434,7 +1434,6 @@ export function App() {
               setState("updatedTo", value);
               void loadMeetings();
             }}
-            quickOpen={state.quickOpen}
             search={state.search}
             sort={state.sort}
             updatedFrom={state.updatedFrom}
@@ -1472,24 +1471,37 @@ export function App() {
             }}
             selectedFolderId={state.selectedFolderId}
           />
-          <MeetingList
-            error={state.listError}
-            emptyHint={meetingEmptyHint()}
-            folders={state.folders}
-            meetings={state.meetings}
-            onSelect={(meetingId) => {
-              void loadMeeting(meetingId);
-            }}
-            search={state.search}
-            selectedFolderId={state.selectedFolderId}
-            selectedMeetingId={state.selectedMeetingId}
-            updatedFrom={state.updatedFrom}
-            updatedTo={state.updatedTo}
-          />
+          <Show
+            when={showScopedMeetingList()}
+            fallback={
+              <BrowsePromptPanel
+                foldersAvailable={state.folders.length}
+                hasRecentMeetings={state.recentMeetings.length > 0}
+              />
+            }
+          >
+            <MeetingList
+              error={state.listError}
+              emptyHint={meetingEmptyHint()}
+              folders={state.folders}
+              meetings={state.meetings}
+              onSelect={(meetingId) => {
+                void loadMeeting(meetingId);
+              }}
+              search={state.search}
+              selectedFolderId={state.selectedFolderId}
+              selectedMeetingId={state.selectedMeetingId}
+              updatedFrom={state.updatedFrom}
+              updatedTo={state.updatedTo}
+            />
+          </Show>
         </aside>
         <main class="pane detail">
           <AppStatePanel
             appState={state.appState}
+            heading={state.selectedMeeting || showScopedMeetingList() ? "Workspace status" : "Home"}
+            reviewSummary={reviewInboxSummary()}
+            serverInfo={state.serverInfo}
             statusLabel={state.statusLabel}
             statusTone={state.statusTone}
           />
@@ -1511,7 +1523,7 @@ export function App() {
                 }}
                 type="button"
               >
-                Clear Filters
+                Back to Home
               </button>
               <button
                 class="button button--secondary"
@@ -1533,19 +1545,42 @@ export function App() {
               </button>
             </div>
             <p>
-              Solid-powered web workspace on top of the same local server, sync loop, and shared app
-              contracts.
+              Browse by folder or recent meeting, then review notes and transcripts with clearer
+              context once something is selected.
             </p>
           </section>
-          <Workspace
-            bundle={state.selectedMeetingBundle}
-            detailError={state.detailError}
-            onSelectTab={(tab) => {
-              setState("workspaceTab", tab);
-            }}
-            selectedMeeting={state.selectedMeeting}
-            tab={state.workspaceTab}
-          />
+          <Show
+            when={state.selectedMeeting || showScopedMeetingList() || state.detailError}
+            fallback={
+              <HomeDashboardPanel
+                appState={state.appState}
+                folders={state.folders}
+                onOpenFolder={(folderId) => {
+                  setState("selectedFolderId", folderId);
+                  setState("selectedMeetingId", null);
+                  setState("selectedMeeting", null);
+                  setState("selectedMeetingBundle", null);
+                  void loadMeetings();
+                }}
+                onOpenMeeting={(meeting) => {
+                  void openRecentMeeting(meeting.id, meeting.folderId);
+                }}
+                recentMeetings={state.recentMeetings}
+                reviewSummary={reviewInboxSummary()}
+                serverInfo={state.serverInfo}
+              />
+            }
+          >
+            <Workspace
+              bundle={state.selectedMeetingBundle}
+              detailError={state.detailError}
+              onSelectTab={(tab) => {
+                setState("workspaceTab", tab);
+              }}
+              selectedMeeting={state.selectedMeeting}
+              tab={state.workspaceTab}
+            />
+          </Show>
           <section class="control-deck">
             <div class="control-deck__tabs">
               {controlTabs.map((tab) => (
