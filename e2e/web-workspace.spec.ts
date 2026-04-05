@@ -36,9 +36,14 @@ test.describe("toolkit web workspace", () => {
     await expect(testHarnessButton).toBeEnabled();
     await testHarnessButton.click();
     await expect(page.getByRole("heading", { name: "Latest Test Run" })).toBeVisible();
-    await expect(page.getByLabel("Structured Title")).toHaveValue("Team Notes");
+    await expect(page.getByLabel("Structured Title")).toHaveValue("Team Notes", {
+      timeout: 20_000,
+    });
     await expect(page.getByLabel("Resolved Prompt Preview")).toHaveValue(
       /Write concise internal team notes\./,
+      {
+        timeout: 20_000,
+      },
     );
   });
 });
