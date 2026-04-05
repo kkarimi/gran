@@ -36,6 +36,7 @@ describe("defaultGranolaToolkitPersistenceLayout", () => {
       dataDirectory: "/home/nima/.config/granola-toolkit",
       exportJobsFile: "/home/nima/.config/granola-toolkit/export-jobs.json",
       meetingIndexFile: "/home/nima/.config/granola-toolkit/meeting-index.json",
+      pkmTargetsFile: "/home/nima/.config/granola-toolkit/pkm-targets.json",
       searchIndexFile: "/home/nima/.config/granola-toolkit/search-index.json",
       sessionFile: "/home/nima/.config/granola-toolkit/session.json",
       sessionStoreKind: "file",

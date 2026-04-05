@@ -44,12 +44,14 @@ export type GranolaAutomationActionKind =
   | "command"
   | "export-notes"
   | "export-transcript"
+  | "pkm-sync"
   | "slack-message"
   | "webhook"
   | "write-file";
 export type GranolaAutomationActionRunStatus = "completed" | "failed" | "pending" | "skipped";
 export type GranolaAutomationWebhookPayloadFormat = "json" | "markdown" | "text";
 export type GranolaAutomationWriteFileFormat = "json" | "markdown" | "text";
+export type GranolaPkmTargetKind = "docs-folder" | "obsidian";
 export type GranolaExportScope =
   | {
       mode: "all";
@@ -273,12 +275,33 @@ export interface GranolaAutomationWriteFileAction {
   trigger?: GranolaAutomationActionTrigger;
 }
 
+export interface GranolaAutomationPkmSyncAction {
+  enabled?: boolean;
+  id: string;
+  kind: "pkm-sync";
+  name?: string;
+  sourceActionId?: string;
+  targetId: string;
+  trigger?: GranolaAutomationActionTrigger;
+}
+
+export interface GranolaPkmTarget {
+  filenameTemplate?: string;
+  folderSubdirectories?: boolean;
+  frontmatter?: boolean;
+  id: string;
+  kind: GranolaPkmTargetKind;
+  name?: string;
+  outputDir: string;
+}
+
 export type GranolaAutomationAction =
   | GranolaAutomationAgentAction
   | GranolaAutomationAskUserAction
   | GranolaAutomationCommandAction
   | GranolaAutomationExportNotesAction
   | GranolaAutomationExportTranscriptAction
+  | GranolaAutomationPkmSyncAction
   | GranolaAutomationWebhookAction
   | GranolaAutomationSlackMessageAction
   | GranolaAutomationWriteFileAction;

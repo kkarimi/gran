@@ -47,6 +47,7 @@ export type {
   GranolaAutomationWriteFileAction,
   GranolaAutomationWriteFileFormat,
   GranolaAutomationPipelineConfig,
+  GranolaAutomationPkmSyncAction,
   GranolaAppAutomationState,
   GranolaAppAuthMode,
   GranolaAppAuthState,
@@ -94,5 +95,7 @@ export type {
   GranolaProcessingIssuesResult,
   GranolaProcessingIssueSeverity,
   GranolaProcessingRecoveryResult,
+  GranolaPkmTarget,
+  GranolaPkmTargetKind,
   GranolaTranscriptsExportResult,
 } from "./types.ts";

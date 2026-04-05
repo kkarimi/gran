@@ -8,6 +8,7 @@ import type {
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
   GranolaAutomationMatch,
+  GranolaAutomationPkmSyncAction,
   GranolaAutomationRule,
   GranolaAutomationSlackMessageAction,
   GranolaAutomationWebhookAction,
@@ -36,6 +37,8 @@ function cloneAction(action: GranolaAutomationAction): GranolaAutomationAction {
     case "export-notes":
     case "export-transcript":
       return { ...action };
+    case "pkm-sync":
+      return { ...action };
     case "slack-message":
       return { ...action };
     case "webhook":
@@ -57,6 +60,7 @@ export function automationActionTrigger(
 ): GranolaAutomationActionTrigger {
   switch (action.kind) {
     case "command":
+    case "pkm-sync":
     case "slack-message":
     case "webhook":
     case "write-file":
@@ -94,6 +98,7 @@ export function enabledAutomationActions(
 
       switch (action.kind) {
         case "command":
+        case "pkm-sync":
         case "slack-message":
         case "webhook":
         case "write-file":
@@ -136,6 +141,11 @@ export interface AutomationActionExportResult {
   outputDir: string;
   scope: GranolaExportScope;
   written: number;
+}
+
+export interface AutomationActionPkmResult {
+  filePath: string;
+  targetId: string;
 }
 
 export interface AutomationActionSlackResult {
@@ -197,6 +207,12 @@ export interface AutomationActionExecutionHandlers {
     action: GranolaAutomationWriteFileAction,
     context: AutomationActionContext,
   ): Promise<AutomationActionWriteFileResult>;
+  runPkmSync(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: GranolaAutomationPkmSyncAction,
+    context: AutomationActionContext,
+  ): Promise<AutomationActionPkmResult>;
 }
 
 function baseRun(
@@ -225,6 +241,7 @@ function baseRun(
     meta: {
       sourceActionId:
         action.kind === "command" ||
+        action.kind === "pkm-sync" ||
         action.kind === "slack-message" ||
         action.kind === "webhook" ||
         action.kind === "write-file"
@@ -392,6 +409,20 @@ export async function executeAutomationAction(
             url: result.url,
           },
           result: result.output ?? `Posted Slack message (${result.status})`,
+        });
+      } catch (error) {
+        return failedRun(run, handlers.nowIso(), error);
+      }
+    case "pkm-sync":
+      try {
+        const result = await handlers.runPkmSync(match, rule, action, context);
+        return completedRun(run, handlers.nowIso(), {
+          meta: {
+            ...(run.meta ? structuredClone(run.meta) : {}),
+            filePath: result.filePath,
+            targetId: result.targetId,
+          },
+          result: `Synced PKM target ${result.targetId} to ${result.filePath}`,
         });
       } catch (error) {
         return failedRun(run, handlers.nowIso(), error);

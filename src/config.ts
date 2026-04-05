@@ -162,6 +162,11 @@ export async function loadConfig(options: {
         pickString(configValues["automation-artefacts-file"]) ??
         pickString(configValues.automationArtefactsFile) ??
         defaultGranolaToolkitPersistenceLayout().automationArtefactsFile,
+      pkmTargetsFile:
+        pickString(env.GRANOLA_PKM_TARGETS_FILE) ??
+        pickString(configValues["pkm-targets-file"]) ??
+        pickString(configValues.pkmTargetsFile) ??
+        defaultGranolaToolkitPersistenceLayout().pkmTargetsFile,
       rulesFile:
         pickString(options.globalFlags.rules) ??
         pickString(env.GRANOLA_AUTOMATION_RULES_FILE) ??

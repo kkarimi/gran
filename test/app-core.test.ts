@@ -12,6 +12,7 @@ import { MemoryAutomationRunStore } from "../src/automation-runs.ts";
 import { MemoryAutomationRuleStore } from "../src/automation-rules.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
 import { MemoryMeetingIndexStore } from "../src/meeting-index.ts";
+import { MemoryPkmTargetStore } from "../src/pkm-targets.ts";
 import { MemorySearchIndexStore } from "../src/search-index.ts";
 import { MemorySyncEventStore } from "../src/sync-events.ts";
 import { MemorySyncStateStore } from "../src/sync-state.ts";
@@ -1516,6 +1517,135 @@ describe("GranolaApp", () => {
         expect.objectContaining({
           actionId: "write-approved-json",
           artefactIds: [artefact!.id],
+          status: "completed",
+        }),
+      ]),
+    );
+  });
+
+  test("syncs approved artefacts into named PKM targets", async () => {
+    const outputDir = await mkdtemp(join(tmpdir(), "granola-pkm-target-"));
+    const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-cache-")), "cache.json");
+    await writeFile(cacheFile, "{}\n", "utf8");
+
+    const app = new GranolaApp(
+      {
+        agents: {
+          codexCommand: "codex",
+          defaultProvider: "codex",
+          dryRun: false,
+          harnessesFile: "/tmp/agent-harnesses.json",
+          maxRetries: 1,
+          openaiBaseUrl: "https://api.openai.com/v1",
+          openrouterBaseUrl: "https://openrouter.ai/api/v1",
+          timeoutMs: 30_000,
+        },
+        automation: {
+          artefactsFile: "/tmp/automation-artefacts.json",
+          pkmTargetsFile: "/tmp/pkm-targets.json",
+          rulesFile: "/tmp/automation-rules.json",
+        },
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile,
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        agentRunner: {
+          run: async (
+            request: GranolaAutomationAgentRequest,
+          ): Promise<GranolaAutomationAgentResult> => ({
+            dryRun: false,
+            model: "gpt-5-codex",
+            output: JSON.stringify({
+              markdown: "# PKM Notes\n\nCaptured for the team vault.",
+              summary: "Captured for the team vault",
+              title: "PKM Notes",
+            }),
+            prompt: request.prompt,
+            provider: "codex",
+          }),
+        },
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        automationArtefactStore: new MemoryAutomationArtefactStore(),
+        automationMatchStore: new MemoryAutomationMatchStore(),
+        automationRuleStore: new MemoryAutomationRuleStore([
+          {
+            actions: [
+              {
+                approvalMode: "auto",
+                id: "pipeline-notes",
+                kind: "agent",
+                pipeline: {
+                  kind: "notes",
+                },
+                prompt: "Write vault-ready notes",
+              },
+              {
+                id: "vault-sync",
+                kind: "pkm-sync",
+                sourceActionId: "pipeline-notes",
+                targetId: "obsidian-team",
+                trigger: "approval",
+              },
+            ],
+            id: "team-transcript",
+            name: "Team transcript ready",
+            when: {
+              eventKinds: ["transcript.ready"],
+              folderNames: ["Team"],
+              tags: ["team"],
+              transcriptLoaded: true,
+            },
+          },
+        ]),
+        automationRunStore: new MemoryAutomationRunStore(),
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+        pkmTargetStore: new MemoryPkmTargetStore([
+          {
+            folderSubdirectories: true,
+            id: "obsidian-team",
+            kind: "obsidian",
+            outputDir,
+          },
+        ]),
+      },
+      { surface: "server" },
+    );
+
+    await app.sync();
+
+    const writtenFile = join(outputDir, "Team", "Alpha Sync-notes.md");
+    const content = await readFile(writtenFile, "utf8");
+    expect(content).toContain('title: "PKM Notes"');
+    expect(content).toContain('meetingId: "doc-alpha-1111"');
+    expect(content).toContain("# PKM Notes");
+
+    const artefact = (await app.listAutomationArtefacts({ kind: "notes", limit: 10 })).artefacts[0];
+    const runs = await app.listAutomationRuns({ limit: 10 });
+    expect(runs.runs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionId: "vault-sync",
+          artefactIds: [artefact!.id],
+          result: `Synced PKM target obsidian-team to ${writtenFile}`,
           status: "completed",
         }),
       ]),

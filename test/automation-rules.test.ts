@@ -115,6 +115,13 @@ describe("automation rules", () => {
                 trigger: "approval",
               },
               {
+                id: "pkm-sync",
+                kind: "pkm-sync",
+                sourceActionId: "meeting-agent",
+                targetId: "obsidian-team",
+                trigger: "approval",
+              },
+              {
                 id: "post-approval-webhook",
                 kind: "webhook",
                 payload: "json",
@@ -168,6 +175,13 @@ describe("automation rules", () => {
             kind: "write-file",
             outputDir: "./approved",
             sourceActionId: "meeting-agent",
+            trigger: "approval",
+          }),
+          expect.objectContaining({
+            id: "pkm-sync",
+            kind: "pkm-sync",
+            sourceActionId: "meeting-agent",
+            targetId: "obsidian-team",
             trigger: "approval",
           }),
           expect.objectContaining({

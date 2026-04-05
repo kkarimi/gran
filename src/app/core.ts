@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { resolve as resolvePath } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 
 import {
   createDefaultAgentHarnessStore,
@@ -91,6 +91,7 @@ import {
   defaultMeetingIndexFilePath,
   type MeetingIndexStore,
 } from "../meeting-index.ts";
+import { createDefaultPkmTargetStore, type PkmTargetStore } from "../pkm-targets.ts";
 import { writeNotes } from "../notes.ts";
 import {
   defaultSyncEventsFilePath,
@@ -122,7 +123,12 @@ import type {
   NoteOutputFormat,
   TranscriptOutputFormat,
 } from "../types.ts";
-import { granolaCacheCandidates, writeTextFile } from "../utils.ts";
+import {
+  granolaCacheCandidates,
+  quoteYamlString,
+  sanitiseFilename,
+  writeTextFile,
+} from "../utils.ts";
 
 import type {
   GranolaAppApi,
@@ -136,6 +142,7 @@ import type {
   GranolaAutomationApprovalMode,
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
+  GranolaAutomationPkmSyncAction,
   GranolaAutomationActionRun,
   GranolaAutomationArtefactListOptions,
   GranolaAutomationArtefactUpdate,
@@ -166,6 +173,7 @@ import type {
   GranolaFolderListOptions,
   GranolaFolderListResult,
   GranolaMeetingSort,
+  GranolaPkmTarget,
   GranolaProcessingIssue,
   GranolaProcessingIssuesResult,
   GranolaProcessingIssueSeverity,
@@ -204,6 +212,7 @@ interface GranolaAppDependencies {
   granolaClient?: GranolaRemoteClient;
   meetingIndex?: MeetingSummaryRecord[];
   meetingIndexStore?: MeetingIndexStore;
+  pkmTargetStore?: PkmTargetStore;
   now?: () => Date;
   searchIndex?: GranolaSearchIndexEntry[];
   searchIndexStore?: SearchIndexStore;
@@ -618,6 +627,8 @@ export class GranolaApp implements GranolaAppApi {
           case "export-notes":
           case "export-transcript":
             return { ...action };
+          case "pkm-sync":
+            return { ...action };
           case "slack-message":
             return { ...action };
           case "webhook":
@@ -864,6 +875,12 @@ export class GranolaApp implements GranolaAppApi {
         nextAction: GranolaAutomationWebhookAction,
         context: AutomationActionContext,
       ) => await this.runAutomationWebhook(nextMatch, nextRule, nextAction, context),
+      runPkmSync: async (
+        nextMatch: GranolaAutomationMatch,
+        nextRule: GranolaAutomationRule,
+        nextAction: GranolaAutomationPkmSyncAction,
+        context: AutomationActionContext,
+      ) => await this.runAutomationPkmSync(nextMatch, nextRule, nextAction, context),
       writeFile: async (
         nextMatch: GranolaAutomationMatch,
         nextRule: GranolaAutomationRule,
@@ -2245,6 +2262,89 @@ export class GranolaApp implements GranolaAppApi {
     };
   }
 
+  private async readPkmTargets(): Promise<GranolaPkmTarget[]> {
+    if (!this.deps.pkmTargetStore) {
+      return [];
+    }
+
+    return (await this.deps.pkmTargetStore.readTargets()).map((target) => ({ ...target }));
+  }
+
+  private pkmFrontmatterEnabled(target: GranolaPkmTarget): boolean {
+    return target.frontmatter ?? target.kind === "obsidian";
+  }
+
+  private buildPkmFrontmatter(
+    target: GranolaPkmTarget,
+    artefact: GranolaAutomationArtefact,
+    match: GranolaAutomationMatch,
+  ): string {
+    if (!this.pkmFrontmatterEnabled(target)) {
+      return "";
+    }
+
+    const lines = [
+      "---",
+      `title: ${quoteYamlString(artefact.structured.title)}`,
+      `meetingId: ${quoteYamlString(match.meetingId)}`,
+      `artefactId: ${quoteYamlString(artefact.id)}`,
+      `artefactKind: ${quoteYamlString(artefact.kind)}`,
+      `ruleId: ${quoteYamlString(artefact.ruleId)}`,
+      `sourceActionId: ${quoteYamlString(artefact.actionId)}`,
+      `provider: ${quoteYamlString(artefact.provider)}`,
+      `model: ${quoteYamlString(artefact.model)}`,
+      "tags:",
+      ...match.tags.map((tag) => `  - ${quoteYamlString(tag)}`),
+      "folders:",
+      ...match.folders.map((folder) => `  - ${quoteYamlString(folder.name)}`),
+      "---",
+      "",
+    ];
+
+    return lines.join("\n");
+  }
+
+  private async runAutomationPkmSync(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: GranolaAutomationPkmSyncAction,
+    context: AutomationActionContext,
+  ): Promise<{
+    filePath: string;
+    targetId: string;
+  }> {
+    if (!context.artefact) {
+      throw new Error(`automation PKM sync action ${action.id} requires an artefact`);
+    }
+
+    const target = (await this.readPkmTargets()).find(
+      (candidate) => candidate.id === action.targetId,
+    );
+    if (!target) {
+      throw new Error(`automation PKM target not found: ${action.targetId}`);
+    }
+
+    const meetingTitle = match.title || context.artefact.structured.title;
+    const folderName = match.folders[0]?.name;
+    const outputDir =
+      target.folderSubdirectories && folderName
+        ? join(target.outputDir, sanitiseFilename(folderName, "folder"))
+        : target.outputDir;
+    const fileName = target.filenameTemplate?.trim()
+      ? target.filenameTemplate
+          .replaceAll("{{meeting.title}}", meetingTitle)
+          .replaceAll("{{artefact.kind}}", context.artefact.kind)
+          .replaceAll("{{artefact.title}}", context.artefact.structured.title)
+      : `${sanitiseFilename(`${meetingTitle}-${context.artefact.kind}`)}.md`;
+    const filePath = join(outputDir, sanitiseFilename(fileName, "meeting.md"));
+    const content = `${this.buildPkmFrontmatter(target, context.artefact, match)}${context.artefact.structured.markdown.trim()}\n`;
+    await writeTextFile(filePath, content);
+    return {
+      filePath,
+      targetId: target.id,
+    };
+  }
+
   private async buildAutomationAgentAttempt(
     match: GranolaAutomationMatch,
     rule: GranolaAutomationRule,
@@ -3204,6 +3304,7 @@ export async function createGranolaApp(
   const exportJobs = await exportJobStore.readJobs();
   const meetingIndexStore = createDefaultMeetingIndexStore();
   const meetingIndex = await meetingIndexStore.readIndex();
+  const pkmTargetStore = createDefaultPkmTargetStore(config.automation?.pkmTargetsFile);
   const searchIndexStore = createDefaultSearchIndexStore();
   const searchIndex = await searchIndexStore.readIndex();
   const syncEventStore = createDefaultSyncEventStore();
@@ -3235,6 +3336,7 @@ export async function createGranolaApp(
       meetingIndex,
       meetingIndexStore,
       now: options.now,
+      pkmTargetStore,
       searchIndex,
       searchIndexStore,
       syncEventStore,

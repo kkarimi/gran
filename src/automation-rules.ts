@@ -7,6 +7,7 @@ import type {
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
   GranolaAutomationPipelineConfig,
+  GranolaAutomationPkmSyncAction,
   GranolaAutomationSlackMessageAction,
   GranolaAutomationMatch,
   GranolaAutomationRule,
@@ -52,6 +53,8 @@ function cloneAction(action: GranolaAutomationAction): GranolaAutomationAction {
       };
     case "export-notes":
     case "export-transcript":
+      return { ...action };
+    case "pkm-sync":
       return { ...action };
     case "slack-message":
       return { ...action };
@@ -310,6 +313,29 @@ function parseAction(value: unknown, index: number): GranolaAutomationAction | u
             ? record.outputDir.trim()
             : undefined,
         scopedOutput: typeof record.scopedOutput === "boolean" ? record.scopedOutput : undefined,
+      };
+      return action;
+    }
+    case "pkm-sync": {
+      const targetId =
+        typeof record.targetId === "string" && record.targetId.trim()
+          ? record.targetId.trim()
+          : undefined;
+      if (!id || !targetId) {
+        return undefined;
+      }
+
+      const action: GranolaAutomationPkmSyncAction = {
+        enabled,
+        id,
+        kind,
+        name,
+        sourceActionId:
+          typeof record.sourceActionId === "string" && record.sourceActionId.trim()
+            ? record.sourceActionId.trim()
+            : undefined,
+        targetId,
+        trigger: parseTrigger(record.trigger),
       };
       return action;
     }
