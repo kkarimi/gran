@@ -99,6 +99,11 @@ import {
   type GranolaSearchIndexEntry,
   type SearchIndexStore,
 } from "../search-index.ts";
+import {
+  buildProcessingIssues,
+  collectPipelineRecoveryContexts,
+  parseProcessingIssueId,
+} from "../processing-health.ts";
 import { buildPipelineInstructions, parsePipelineOutput } from "../processing.ts";
 import { writeTranscripts } from "../transcripts.ts";
 import type {
@@ -148,6 +153,10 @@ import type {
   GranolaFolderListOptions,
   GranolaFolderListResult,
   GranolaMeetingSort,
+  GranolaProcessingIssue,
+  GranolaProcessingIssuesResult,
+  GranolaProcessingIssueSeverity,
+  GranolaProcessingRecoveryResult,
   GranolaMeetingBundle,
   GranolaMeetingListOptions,
   GranolaMeetingListResult,
@@ -793,6 +802,88 @@ export class GranolaApp implements GranolaAppApi {
     );
   }
 
+  private createRecoveryRunId(match: GranolaAutomationMatch, actionId: string): string {
+    const suffix = this.nowIso().replaceAll(/[-:.]/g, "").replace("T", "").replace("Z", "");
+    return `recovery:${match.meetingId}:${match.ruleId}:${actionId}:${suffix}`;
+  }
+
+  private automationActionHandlers() {
+    return {
+      exportNotes: async (
+        nextMatch: GranolaAutomationMatch,
+        nextAction: GranolaAutomationExportNotesAction,
+      ) => await this.runAutomationNotesAction(nextMatch, nextAction),
+      exportTranscripts: async (
+        nextMatch: GranolaAutomationMatch,
+        nextAction: GranolaAutomationExportTranscriptAction,
+      ) => await this.runAutomationTranscriptAction(nextMatch, nextAction),
+      nowIso: () => this.nowIso(),
+      runAgent: async (
+        nextMatch: GranolaAutomationMatch,
+        nextRule: GranolaAutomationRule,
+        nextAction: GranolaAutomationAgentAction,
+        run: GranolaAutomationActionRun,
+      ) => await this.runAutomationAgent(nextMatch, nextRule, nextAction, run),
+      runCommand: async (
+        nextMatch: GranolaAutomationMatch,
+        nextRule: GranolaAutomationRule,
+        nextAction: GranolaAutomationCommandAction,
+      ) => await this.runAutomationCommand(nextMatch, nextRule, nextAction),
+    };
+  }
+
+  private async currentMeetingSummariesForProcessing(): Promise<MeetingSummaryRecord[]> {
+    if (this.#meetingIndex.length > 0) {
+      return this.#meetingIndex.map((meeting) => cloneMeetingSummary(meeting));
+    }
+
+    const snapshot = await this.liveMeetingSnapshot({
+      forceRefresh: false,
+    });
+    return snapshot.meetings.map((meeting) => cloneMeetingSummary(meeting));
+  }
+
+  private async computeProcessingIssues(): Promise<GranolaProcessingIssue[]> {
+    const [meetings, rules] = await Promise.all([
+      this.currentMeetingSummariesForProcessing(),
+      this.loadAutomationRules(),
+    ]);
+    return buildProcessingIssues({
+      artefacts: this.#automationArtefacts.map((artefact) =>
+        this.cloneAutomationArtefact(artefact),
+      ),
+      meetings,
+      nowIso: this.nowIso(),
+      rules,
+      runs: this.#automationActionRuns.map((run) => this.cloneAutomationRun(run)),
+      syncState: cloneSyncState(this.#state.sync),
+    });
+  }
+
+  private async rerunPipelineContexts(
+    contexts: ReturnType<typeof collectPipelineRecoveryContexts>,
+  ): Promise<GranolaAutomationActionRun[]> {
+    const runs: GranolaAutomationActionRun[] = [];
+
+    for (const context of contexts) {
+      runs.push(
+        await executeAutomationAction(
+          this.cloneAutomationMatch(context.match),
+          context.rule,
+          context.action,
+          this.automationActionHandlers(),
+          {
+            runId: this.createRecoveryRunId(context.match, context.action.id),
+          },
+        ),
+      );
+    }
+
+    await this.appendAutomationRuns(runs);
+    this.emitStateUpdate();
+    return runs.map((run) => this.cloneAutomationRun(run));
+  }
+
   private createSyncRunId(): string {
     return `sync-${this.nowIso().replaceAll(/[-:.]/g, "").replace("T", "").replace("Z", "")}`;
   }
@@ -1240,6 +1331,34 @@ export class GranolaApp implements GranolaAppApi {
     return this.cloneAutomationArtefact(artefact);
   }
 
+  async listProcessingIssues(
+    options: {
+      limit?: number;
+      meetingId?: string;
+      severity?: GranolaProcessingIssueSeverity;
+    } = {},
+  ): Promise<GranolaProcessingIssuesResult> {
+    const limit = options.limit ?? 20;
+    const issues = (await this.computeProcessingIssues())
+      .filter((issue) => {
+        if (options.meetingId && issue.meetingId !== options.meetingId) {
+          return false;
+        }
+        if (options.severity && issue.severity !== options.severity) {
+          return false;
+        }
+        return true;
+      })
+      .slice(0, limit);
+
+    this.setUiState({
+      view: "idle",
+    });
+    return {
+      issues: issues.map((issue) => ({ ...issue })),
+    };
+  }
+
   async listAutomationRules(): Promise<GranolaAutomationRulesResult> {
     const rules = await this.loadAutomationRules({ forceRefresh: true });
     this.setUiState({
@@ -1385,6 +1504,112 @@ export class GranolaApp implements GranolaAppApi {
     };
 
     return await this.replaceAutomationArtefact(nextArtefact);
+  }
+
+  async recoverProcessingIssue(id: string): Promise<GranolaProcessingRecoveryResult> {
+    const issue = (await this.computeProcessingIssues()).find((candidate) => candidate.id === id);
+    if (!issue) {
+      throw new Error(`processing issue not found: ${id}`);
+    }
+
+    const parsed = parseProcessingIssueId(id);
+
+    if (parsed.kind === "sync-stale") {
+      await this.sync({
+        forceRefresh: true,
+        foreground: false,
+      });
+      return {
+        issue: { ...issue },
+        recoveredAt: this.nowIso(),
+        runCount: 0,
+        syncRan: true,
+      };
+    }
+
+    if (!parsed.meetingId) {
+      throw new Error(`processing issue is missing meeting context: ${id}`);
+    }
+
+    if (parsed.kind === "transcript-missing") {
+      await this.sync({
+        forceRefresh: true,
+        foreground: false,
+      });
+      const meetings = await this.currentMeetingSummariesForProcessing();
+      const meeting = meetings.find((candidate) => candidate.id === parsed.meetingId);
+      if (!meeting?.transcriptLoaded) {
+        return {
+          issue: { ...issue },
+          recoveredAt: this.nowIso(),
+          runCount: 0,
+          syncRan: true,
+        };
+      }
+
+      const contexts = collectPipelineRecoveryContexts(
+        await this.loadAutomationRules(),
+        meeting,
+        this.nowIso(),
+      );
+      const rerunCount = (await this.rerunPipelineContexts(contexts)).length;
+      return {
+        issue: { ...issue },
+        recoveredAt: this.nowIso(),
+        runCount: rerunCount,
+        syncRan: true,
+      };
+    }
+
+    const meetings = await this.currentMeetingSummariesForProcessing();
+    const meeting = meetings.find((candidate) => candidate.id === parsed.meetingId);
+    if (!meeting) {
+      throw new Error(`meeting not found for processing issue: ${parsed.meetingId}`);
+    }
+
+    if (parsed.kind === "artefact-stale" && parsed.ruleId && parsed.actionId) {
+      const latestArtefact = this.#automationArtefacts
+        .filter(
+          (artefact) =>
+            artefact.meetingId === parsed.meetingId &&
+            artefact.ruleId === parsed.ruleId &&
+            artefact.actionId === parsed.actionId &&
+            artefact.status !== "superseded",
+        )
+        .slice()
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+      if (latestArtefact) {
+        await this.rerunAutomationArtefact(latestArtefact.id);
+        return {
+          issue: { ...issue },
+          recoveredAt: this.nowIso(),
+          runCount: 1,
+          syncRan: false,
+        };
+      }
+    }
+
+    const contexts = collectPipelineRecoveryContexts(
+      await this.loadAutomationRules(),
+      meeting,
+      this.nowIso(),
+    ).filter((context) => {
+      if (parsed.ruleId && context.rule.id !== parsed.ruleId) {
+        return false;
+      }
+      if (parsed.actionId && context.action.id !== parsed.actionId) {
+        return false;
+      }
+      return true;
+    });
+
+    const rerunCount = (await this.rerunPipelineContexts(contexts)).length;
+    return {
+      issue: { ...issue },
+      recoveredAt: this.nowIso(),
+      runCount: rerunCount,
+      syncRan: false,
+    };
   }
 
   async rerunAutomationArtefact(id: string): Promise<GranolaAutomationArtefact> {

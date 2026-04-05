@@ -390,9 +390,19 @@ select {
   color: var(--error);
 }
 
+.job-card__status[data-status="error"] {
+  background: rgba(157, 44, 44, 0.12);
+  color: var(--error);
+}
+
 .job-card__status[data-status="completed"] {
   background: rgba(36, 107, 79, 0.12);
   color: var(--ok);
+}
+
+.job-card__status[data-status="warning"] {
+  background: rgba(163, 79, 47, 0.12);
+  color: var(--warm);
 }
 
 .job-card__status[data-status="approved"] {

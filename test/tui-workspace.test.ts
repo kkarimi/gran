@@ -382,6 +382,18 @@ function createWorkspaceHarness(
       title: string;
     }>;
     failNextRefresh?: boolean;
+    processingIssues?: Array<{
+      id: string;
+      kind:
+        | "artefact-stale"
+        | "pipeline-failed"
+        | "pipeline-missing"
+        | "sync-stale"
+        | "transcript-missing";
+      meetingId?: string;
+      severity: "error" | "warning";
+      title: string;
+    }>;
   } = {},
 ) {
   const host = new FakeTuiHost();
@@ -466,6 +478,14 @@ function createWorkspaceHarness(
     title: "Alpha Sync",
     transcriptLoaded: true,
   }));
+  const listProcessingIssues = vi.fn(async () => ({
+    issues: (options.processingIssues ?? []).map((issue) => ({
+      detail: "Needs recovery",
+      detectedAt: "2024-03-01T12:00:00.000Z",
+      recoverable: true,
+      ...issue,
+    })),
+  }));
   const resolveAutomationArtefact = vi.fn(async (id: string) => ({
     actionId: "pipeline-notes",
     actionName: "Pipeline notes",
@@ -506,6 +526,21 @@ function createWorkspaceHarness(
       title: "Alpha Sync Notes",
     },
     updatedAt: "2024-03-01T12:01:00.000Z",
+  }));
+
+  const recoverProcessingIssue = vi.fn(async (id: string) => ({
+    issue: {
+      detail: "Recovered in test",
+      detectedAt: "2024-03-01T12:00:00.000Z",
+      id,
+      kind: "sync-stale" as const,
+      recoverable: true,
+      severity: "error" as const,
+      title: "Sync needs attention",
+    },
+    recoveredAt: "2024-03-01T12:01:00.000Z",
+    runCount: 0,
+    syncRan: true,
   }));
 
   const app: GranolaTuiApp = {
@@ -593,6 +628,7 @@ function createWorkspaceHarness(
         ...artefact,
       })),
     })),
+    listProcessingIssues,
     listAutomationMatches: vi.fn(async () => ({ matches: [] })),
     listAutomationRuns: vi.fn(async () => ({
       runs: (options.automationRuns ?? []).map((run) => ({
@@ -617,6 +653,7 @@ function createWorkspaceHarness(
     listSyncEvents: vi.fn(async () => ({ events: [] })),
     loginAuth: vi.fn(async () => state.auth),
     logoutAuth: vi.fn(async () => state.auth),
+    recoverProcessingIssue,
     refreshAuth: vi.fn(async () => state.auth),
     resolveAutomationArtefact,
     resolveAutomationRun,
@@ -683,6 +720,8 @@ function createWorkspaceHarness(
     host,
     listFolders,
     listMeetings,
+    listProcessingIssues,
+    recoverProcessingIssue,
     resolveAutomationRun,
     resolveAutomationArtefact,
     state,
@@ -880,5 +919,32 @@ describe("GranolaTuiWorkspace", () => {
       "notes:sync-1:pipeline-notes",
       "approve",
     );
+  });
+
+  test("recovers processing issues from the automation overlay", async () => {
+    const harness = createWorkspaceHarness({
+      processingIssues: [
+        {
+          id: "sync-stale:::",
+          kind: "sync-stale",
+          severity: "error",
+          title: "Sync needs attention",
+        },
+      ],
+    });
+
+    await harness.workspace.initialise();
+    harness.workspace.handleInput("u");
+
+    const overlay = harness.host.overlayComponent;
+    expect(overlay).toBeInstanceOf(GranolaTuiAutomationOverlay);
+    if (!(overlay instanceof GranolaTuiAutomationOverlay)) {
+      throw new Error("expected automation overlay");
+    }
+
+    overlay.handleInput("\n");
+    await harness.flush();
+
+    expect(harness.recoverProcessingIssue).toHaveBeenCalledWith("sync-stale:::");
   });
 });

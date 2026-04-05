@@ -369,6 +369,26 @@ describe("GranolaServerClient", () => {
         }),
       }),
     );
+    const processingIssues = await client.listProcessingIssues({ limit: 5 });
+    expect(processingIssues.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "transcript-missing",
+        }),
+      ]),
+    );
+    const transcriptIssue = processingIssues.issues.find(
+      (issue) => issue.kind === "transcript-missing",
+    );
+    expect(await client.recoverProcessingIssue(transcriptIssue!.id)).toEqual(
+      expect.objectContaining({
+        issue: expect.objectContaining({
+          id: transcriptIssue!.id,
+          kind: "transcript-missing",
+        }),
+        syncRan: true,
+      }),
+    );
 
     const meeting = await client.findMeeting("Alpha Sync");
     expect(meeting).toEqual(

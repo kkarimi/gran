@@ -12,6 +12,7 @@ import type {
   GranolaExportScope,
   GranolaMeetingBundle,
   GranolaMeetingSort,
+  GranolaProcessingIssue,
   MeetingRecord,
   MeetingSummaryRecord,
 } from "../app/index.ts";
@@ -109,6 +110,12 @@ interface AutomationRunsPanelProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   runs: GranolaAutomationActionRun[];
+}
+
+interface ProcessingIssuesPanelProps {
+  issues: GranolaProcessingIssue[];
+  onOpenMeeting: (meetingId: string) => void;
+  onRecover: (id: string) => void;
 }
 
 interface AutomationArtefactsPanelProps {
@@ -869,6 +876,65 @@ export function AutomationRunsPanel(props: AutomationRunsPanelProps): JSX.Elemen
                         Reject
                       </button>
                     </>
+                  </Show>
+                </div>
+              </article>
+            )}
+          </For>
+        </Show>
+      </div>
+    </section>
+  );
+}
+
+export function ProcessingIssuesPanel(props: ProcessingIssuesPanelProps): JSX.Element {
+  return (
+    <section class="jobs-panel">
+      <div class="jobs-panel__head">
+        <h3>Processing Health</h3>
+        <p>Catch stale syncs, missing transcripts, and failed or outdated note pipelines.</p>
+      </div>
+      <div class="jobs-list">
+        <Show
+          when={props.issues.length > 0}
+          fallback={<div class="job-empty">No processing issues detected.</div>}
+        >
+          <For each={props.issues.slice(0, 8)}>
+            {(issue) => (
+              <article class="job-card">
+                <div class="job-card__head">
+                  <div>
+                    <div class="job-card__title">{issue.title}</div>
+                    <div class="job-card__meta">{issue.id}</div>
+                  </div>
+                  <div class="job-card__status" data-status={issue.severity}>
+                    {issue.severity}
+                  </div>
+                </div>
+                <div class="job-card__meta">{issue.kind}</div>
+                <div class="job-card__meta">{issue.detail}</div>
+                <div class="job-card__actions">
+                  <Show when={issue.meetingId}>
+                    <button
+                      class="button button--secondary"
+                      onClick={() => {
+                        props.onOpenMeeting(issue.meetingId!);
+                      }}
+                      type="button"
+                    >
+                      Open Meeting
+                    </button>
+                  </Show>
+                  <Show when={issue.recoverable}>
+                    <button
+                      class="button button--secondary"
+                      onClick={() => {
+                        props.onRecover(issue.id);
+                      }}
+                      type="button"
+                    >
+                      Recover
+                    </button>
                   </Show>
                 </div>
               </article>

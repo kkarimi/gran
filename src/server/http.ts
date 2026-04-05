@@ -20,6 +20,7 @@ import type {
   GranolaAppAuthMode,
   GranolaAppStateEvent,
   GranolaMeetingSort,
+  GranolaProcessingIssueSeverity,
   NoteOutputFormat,
   TranscriptOutputFormat,
 } from "../app/index.ts";
@@ -129,6 +130,21 @@ function parseAutomationArtefactStatus(
       throw new Error(
         "invalid automation artefact status: expected approved, generated, rejected, or superseded",
       );
+  }
+}
+
+function parseProcessingIssueSeverity(
+  value: string | null,
+): GranolaProcessingIssueSeverity | undefined {
+  switch (value) {
+    case null:
+    case "":
+      return undefined;
+    case "error":
+    case "warning":
+      return value;
+    default:
+      throw new Error("invalid processing severity: expected error or warning");
   }
 }
 
@@ -358,6 +374,7 @@ export async function startGranolaServer(
       exports: true,
       folders: true,
       meetingOpen: true,
+      processing: true,
       sync: true,
       webClient: enableWebClient,
     },
@@ -542,6 +559,19 @@ export async function startGranolaServer(
         return;
       }
 
+      if (method === "GET" && path === granolaTransportPaths.processingIssues) {
+        sendJson(
+          response,
+          await app.listProcessingIssues({
+            limit: parseInteger(url.searchParams.get("limit")),
+            meetingId: url.searchParams.get("meetingId")?.trim() || undefined,
+            severity: parseProcessingIssueSeverity(url.searchParams.get("severity")),
+          }),
+          { headers: originHeaders },
+        );
+        return;
+      }
+
       if (
         method === "POST" &&
         path.endsWith("/update") &&
@@ -608,6 +638,18 @@ export async function startGranolaServer(
           path.slice(`${granolaTransportPaths.automationArtefacts}/`.length, -"/rerun".length),
         );
         sendJson(response, await app.rerunAutomationArtefact(id), { headers: originHeaders });
+        return;
+      }
+
+      if (
+        method === "POST" &&
+        path.endsWith("/recover") &&
+        path.startsWith(`${granolaTransportPaths.processingIssues}/`)
+      ) {
+        const id = decodeURIComponent(
+          path.slice(`${granolaTransportPaths.processingIssues}/`.length, -"/recover".length),
+        );
+        sendJson(response, await app.recoverProcessingIssue(id), { headers: originHeaders });
         return;
       }
 

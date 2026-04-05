@@ -4,6 +4,7 @@ import {
   type GranolaAutomationActionRun,
   type GranolaAutomationMatch,
   type GranolaAutomationRule,
+  type GranolaProcessingIssue,
 } from "../app/index.ts";
 import { loadConfig } from "../config.ts";
 import { toJson, toYaml } from "../render.ts";
@@ -17,13 +18,15 @@ function automationHelp(): string {
   return `Granola automation
 
 Usage:
-  granola automation <rules|matches|runs|artefacts|approve|reject|approve-artefact|reject-artefact|rerun> [options]
+  granola automation <rules|matches|runs|artefacts|health|recover|approve|reject|approve-artefact|reject-artefact|rerun> [options]
 
 Subcommands:
   rules               List configured automation rules
   matches             Show recent rule matches from sync events
   runs                Show recent automation action runs
   artefacts           Show generated note and enrichment artefacts
+  health              Show processing-health issues and recovery candidates
+  recover <issue-id>  Recover a processing-health issue
   approve <id>        Approve a pending ask-user action run
   reject <id>         Reject a pending ask-user action run
   approve-artefact <id>
@@ -37,6 +40,7 @@ Options:
   --limit <n>         Number of matches to show (default: 20)
   --kind <value>      notes or enrichment
   --meeting <id>      Filter artefacts to one meeting id
+  --severity <value>  error or warning
   --status <value>    completed, failed, pending, skipped
   --note <text>       Note to store with approve/reject decisions
   --rules <path>      Path to automation rules JSON
@@ -203,6 +207,47 @@ function renderArtefacts(artefacts: GranolaAutomationArtefact[], format: Automat
   return `${[header, ...lines].join("\n")}\n`;
 }
 
+function parseSeverity(
+  value: string | boolean | undefined,
+): GranolaProcessingIssue["severity"] | undefined {
+  switch (value) {
+    case undefined:
+      return undefined;
+    case "error":
+    case "warning":
+      return value;
+    default:
+      throw new Error("invalid processing severity: expected error or warning");
+  }
+}
+
+function renderProcessingIssues(
+  issues: GranolaProcessingIssue[],
+  format: AutomationFormat,
+): string {
+  if (format === "json") {
+    return toJson({ issues });
+  }
+
+  if (format === "yaml") {
+    return toYaml({ issues });
+  }
+
+  if (issues.length === 0) {
+    return "No processing issues detected\n";
+  }
+
+  const header = "SEVERITY  KIND                 TITLE";
+  const lines = issues.map((issue) => {
+    const severity = issue.severity.padEnd(9).slice(0, 9);
+    const kind = issue.kind.padEnd(20).slice(0, 20);
+    const tail = [issue.title, issue.detail].filter(Boolean).join(" - ");
+    return `${severity} ${kind} ${tail}`;
+  });
+
+  return `${[header, ...lines].join("\n")}\n`;
+}
+
 function renderRuns(runs: GranolaAutomationActionRun[], format: AutomationFormat): string {
   if (format === "json") {
     return toJson({ runs });
@@ -239,6 +284,7 @@ export const automationCommand: CommandDefinition = {
     limit: { type: "string" },
     meeting: { type: "string" },
     note: { type: "string" },
+    severity: { type: "string" },
     status: { type: "string" },
     timeout: { type: "string" },
   },
@@ -285,6 +331,28 @@ export const automationCommand: CommandDefinition = {
           status: parseArtefactStatus(commandFlags.status),
         });
         console.log(renderArtefacts(result.artefacts, format).trimEnd());
+        return 0;
+      }
+      case "health": {
+        const result = await app.listProcessingIssues({
+          limit: parseLimit(commandFlags.limit),
+          meetingId:
+            typeof commandFlags.meeting === "string" ? commandFlags.meeting.trim() : undefined,
+          severity: parseSeverity(commandFlags.severity),
+        });
+        console.log(renderProcessingIssues(result.issues, format).trimEnd());
+        return 0;
+      }
+      case "recover": {
+        const id = commandArgs[1]?.trim();
+        if (!id) {
+          throw new Error("missing processing issue id for recover");
+        }
+
+        const result = await app.recoverProcessingIssue(id);
+        console.log(
+          `Recovered ${result.issue.kind} for ${result.issue.title} (${result.issue.id})`,
+        );
         return 0;
       }
       case "approve":
@@ -338,7 +406,7 @@ export const automationCommand: CommandDefinition = {
         return 1;
       default:
         throw new Error(
-          "invalid automation command: expected rules, matches, runs, artefacts, approve, reject, approve-artefact, reject-artefact, or rerun",
+          "invalid automation command: expected rules, matches, runs, artefacts, health, recover, approve, reject, approve-artefact, reject-artefact, or rerun",
         );
     }
   },

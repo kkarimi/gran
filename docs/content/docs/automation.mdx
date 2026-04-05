@@ -226,6 +226,14 @@ granola automation reject-artefact <artefact-id> --note "needs tighter action it
 granola automation rerun <artefact-id>
 ```
 
+Inspect recovery candidates and trigger explicit recovery flows:
+
+```bash
+granola automation health
+granola automation health --severity error
+granola automation recover <issue-id>
+```
+
 ## How It Works
 
 `granola sync` and `granola sync --watch` enrich each durable sync event with the meeting title,
@@ -242,11 +250,21 @@ Pipeline artefacts also keep their own audit trail. Generated candidates can be 
 rejected, and rerun later, and every step is appended to the artefact history so the review queue
 can show what changed and why.
 
+Processing health sits next to that audit trail. The toolkit detects:
+
+- stale sync state
+- meetings that still have no transcript after a grace period
+- failed pipeline runs
+- meetings whose latest artefact is missing or older than the meeting itself
+
+Each issue gets a durable id, and recovery can either re-run sync, re-run a matching pipeline, or
+replay the latest artefact pipeline depending on the failure type.
+
 ## Surface Support
 
-- CLI: inspect rules, matches, runs, and generated artefacts, replay pipelines, resolve pending `ask-user` runs, and approve or reject generated artefacts
-- Web: browse recent automation runs, review generated artefacts against the current meeting notes, edit them inline, and approve, reject, or rerun them
-- TUI: open the automation review overlay with `u` to approve, reject, or rerun generated artefacts and pending `ask-user` runs
+- CLI: inspect rules, matches, runs, generated artefacts, and processing-health issues; recover issues, replay pipelines, resolve pending `ask-user` runs, and approve or reject generated artefacts
+- Web: browse processing-health issues, trigger recovery, review generated artefacts against the current meeting notes, edit them inline, and approve, reject, or rerun them
+- TUI: open the automation review overlay with `u` to recover health issues and approve, reject, or rerun generated artefacts and pending `ask-user` runs
 
 ## Notes on Exports
 

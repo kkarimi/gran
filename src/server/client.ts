@@ -24,6 +24,8 @@ import type {
   GranolaMeetingListOptions,
   GranolaMeetingListResult,
   GranolaNotesExportResult,
+  GranolaProcessingIssueSeverity,
+  GranolaProcessingRecoveryResult,
   GranolaAutomationRunsResult,
   GranolaTranscriptsExportResult,
   NoteOutputFormat,
@@ -45,6 +47,8 @@ import {
   granolaMeetingPath,
   granolaMeetingResolvePath,
   granolaMeetingsPath,
+  granolaProcessingIssueRecoverPath,
+  granolaProcessingIssuesPath,
   granolaTransportPaths,
   GRANOLA_TRANSPORT_PROTOCOL_VERSION,
   type GranolaServerInfo,
@@ -229,6 +233,12 @@ export class GranolaServerClient implements GranolaAppApi {
     return await this.requestJson(granolaAutomationArtefactsPath(options));
   }
 
+  async listProcessingIssues(
+    options: { limit?: number; meetingId?: string; severity?: GranolaProcessingIssueSeverity } = {},
+  ): Promise<import("../app/index.ts").GranolaProcessingIssuesResult> {
+    return await this.requestJson(granolaProcessingIssuesPath(options));
+  }
+
   async getAutomationArtefact(id: string): Promise<GranolaAutomationArtefact> {
     return await this.requestJson(granolaAutomationArtefactPath(id));
   }
@@ -276,6 +286,12 @@ export class GranolaServerClient implements GranolaAppApi {
       headers: {
         "content-type": "application/json",
       },
+      method: "POST",
+    });
+  }
+
+  async recoverProcessingIssue(id: string): Promise<GranolaProcessingRecoveryResult> {
+    return await this.requestJson(granolaProcessingIssueRecoverPath(id), {
       method: "POST",
     });
   }

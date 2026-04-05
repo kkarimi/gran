@@ -1189,6 +1189,170 @@ describe("GranolaApp", () => {
     expect(runAgent).toHaveBeenCalledTimes(4);
   });
 
+  test("detects failed processing issues and recovers them", async () => {
+    const runAgent = vi.fn(
+      async (): Promise<GranolaAutomationAgentResult> => ({
+        command: "codex exec --json",
+        dryRun: false,
+        model: "gpt-5-codex",
+        output: JSON.stringify({
+          markdown: "# Alpha Sync\n\nRecovered notes",
+          summary: "Recovered notes",
+          title: "Alpha Sync Notes",
+        }),
+        prompt: "Recover the failed notes pipeline",
+        provider: "codex",
+      }),
+    );
+    const app = new GranolaApp(
+      {
+        agents: {
+          codexCommand: "codex",
+          defaultProvider: "codex",
+          dryRun: false,
+          harnessesFile: "/tmp/agent-harnesses.json",
+          maxRetries: 1,
+          openaiBaseUrl: "https://api.openai.com/v1",
+          openrouterBaseUrl: "https://openrouter.ai/api/v1",
+          timeoutMs: 30_000,
+        },
+        automation: {
+          artefactsFile: "/tmp/automation-artefacts.json",
+          rulesFile: "/tmp/automation-rules.json",
+        },
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "/tmp/cache.json",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        agentRunner: {
+          run: runAgent,
+        },
+        auth: {
+          mode: "stored-session",
+          refreshAvailable: true,
+          storedSessionAvailable: true,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        automationRules: [
+          {
+            actions: [
+              {
+                id: "pipeline-notes",
+                kind: "agent",
+                pipeline: {
+                  kind: "notes",
+                },
+                prompt: "Turn the transcript into concise notes.",
+              },
+            ],
+            id: "team-transcript",
+            name: "Team transcript ready",
+            when: {
+              eventKinds: ["transcript.ready"],
+              transcriptLoaded: true,
+            },
+          },
+        ],
+        automationRuns: [
+          {
+            actionId: "pipeline-notes",
+            actionKind: "agent",
+            actionName: "pipeline-notes",
+            error: "provider timeout",
+            eventId: "sync-1:transcript.ready",
+            eventKind: "transcript.ready",
+            folders: [],
+            id: "sync-1:team-transcript:pipeline-notes",
+            matchId: "sync-1:team-transcript",
+            matchedAt: "2024-03-01T12:30:00.000Z",
+            meetingId: "doc-alpha-1111",
+            ruleId: "team-transcript",
+            ruleName: "Team transcript ready",
+            startedAt: "2024-03-01T12:30:00.000Z",
+            status: "failed",
+            tags: ["team", "alpha"],
+            title: "Alpha Sync",
+            transcriptLoaded: true,
+          },
+        ],
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        meetingIndex: [
+          {
+            createdAt: "2024-01-01T09:00:00Z",
+            folders: [
+              {
+                createdAt: "2024-01-01T08:00:00Z",
+                documentCount: 1,
+                id: "folder-team-1111",
+                isFavourite: true,
+                name: "Team",
+                updatedAt: "2024-01-04T10:00:00Z",
+              },
+            ],
+            id: "doc-alpha-1111",
+            noteContentSource: "notes",
+            tags: ["team", "alpha"],
+            title: "Alpha Sync",
+            transcriptLoaded: true,
+            transcriptSegmentCount: 1,
+            updatedAt: "2024-03-01T12:35:00.000Z",
+          },
+        ],
+        now: () => new Date("2024-03-01T13:00:00.000Z"),
+        syncState: {
+          eventCount: 0,
+          lastChanges: [],
+          lastCompletedAt: "2024-03-01T12:45:00.000Z",
+          running: false,
+        },
+      },
+      { surface: "server" },
+    );
+
+    const issues = await app.listProcessingIssues();
+    const failedIssue = issues.issues.find((issue) => issue.kind === "pipeline-failed");
+    expect(failedIssue).toEqual(
+      expect.objectContaining({
+        actionId: "pipeline-notes",
+        meetingId: "doc-alpha-1111",
+      }),
+    );
+
+    const recovery = await app.recoverProcessingIssue(failedIssue!.id);
+    expect(recovery).toEqual(
+      expect.objectContaining({
+        runCount: 1,
+        syncRan: false,
+      }),
+    );
+    expect(runAgent).toHaveBeenCalledTimes(1);
+
+    const artefacts = await app.listAutomationArtefacts({ kind: "notes", limit: 10 });
+    expect(artefacts.artefacts).toEqual([
+      expect.objectContaining({
+        kind: "notes",
+        status: "generated",
+        structured: expect.objectContaining({
+          summary: "Recovered notes",
+          title: "Alpha Sync Notes",
+        }),
+      }),
+    ]);
+  });
+
   test("exports folder-scoped notes into a stable folder output and reruns with the same scope", async () => {
     const outputDir = await mkdtemp(join(tmpdir(), "granola-app-folder-notes-"));
     const jobStore = new MemoryExportJobStore();

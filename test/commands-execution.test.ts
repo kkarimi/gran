@@ -753,6 +753,49 @@ describe("command execution", () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining("generated"));
   });
 
+  test("automation health prints recovery candidates", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      listProcessingIssues: vi.fn(async () => ({
+        issues: [
+          {
+            detail: "The latest pipeline run failed",
+            detectedAt: "2024-03-01T12:05:00.000Z",
+            id: "pipeline-failed:doc-alpha-1111:team-transcript:pipeline-notes",
+            kind: "pipeline-failed" as const,
+            meetingId: "doc-alpha-1111",
+            recoverable: true,
+            ruleId: "team-transcript",
+            severity: "error" as const,
+            title: "Pipeline failed: Alpha Sync",
+          },
+        ],
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await automationCommand.run(
+      makeContext({
+        commandArgs: ["health"],
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.listProcessingIssues).toHaveBeenCalledWith({
+      limit: 20,
+      meetingId: undefined,
+      severity: undefined,
+    });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("pipeline-failed"));
+  });
+
   test("automation approve resolves a pending run", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const app = {
@@ -800,6 +843,50 @@ describe("command execution", () => {
       note: "Approved from CLI",
     });
     expect(log).toHaveBeenCalledWith("Approved Review transcript for Alpha Sync (sync-1:1:review)");
+  });
+
+  test("automation recover re-runs a processing issue", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      recoverProcessingIssue: vi.fn(async () => ({
+        issue: {
+          detail: "The latest pipeline run failed",
+          detectedAt: "2024-03-01T12:05:00.000Z",
+          id: "pipeline-failed:doc-alpha-1111:team-transcript:pipeline-notes",
+          kind: "pipeline-failed" as const,
+          meetingId: "doc-alpha-1111",
+          recoverable: true,
+          ruleId: "team-transcript",
+          severity: "error" as const,
+          title: "Pipeline failed: Alpha Sync",
+        },
+        recoveredAt: "2024-03-01T12:10:00.000Z",
+        runCount: 1,
+        syncRan: false,
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await automationCommand.run(
+      makeContext({
+        commandArgs: ["recover", "pipeline-failed:doc-alpha-1111:team-transcript:pipeline-notes"],
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.recoverProcessingIssue).toHaveBeenCalledWith(
+      "pipeline-failed:doc-alpha-1111:team-transcript:pipeline-notes",
+    );
+    expect(log).toHaveBeenCalledWith(
+      "Recovered pipeline-failed for Pipeline failed: Alpha Sync (pipeline-failed:doc-alpha-1111:team-transcript:pipeline-notes)",
+    );
   });
 
   test("automation approve-artefact resolves a generated artefact", async () => {

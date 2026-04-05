@@ -24,6 +24,13 @@ export type GranolaAutomationArtefactHistoryAction =
   | "rejected"
   | "rerun";
 export type GranolaAutomationArtefactStatus = "approved" | "generated" | "rejected" | "superseded";
+export type GranolaProcessingIssueKind =
+  | "artefact-stale"
+  | "pipeline-failed"
+  | "pipeline-missing"
+  | "sync-stale"
+  | "transcript-missing";
+export type GranolaProcessingIssueSeverity = "error" | "warning";
 export type GranolaSyncEventKind =
   | "meeting.changed"
   | "meeting.created"
@@ -510,6 +517,30 @@ export interface GranolaAutomationArtefactUpdate {
   title?: string;
 }
 
+export interface GranolaProcessingIssue {
+  actionId?: string;
+  detail: string;
+  detectedAt: string;
+  id: string;
+  kind: GranolaProcessingIssueKind;
+  meetingId?: string;
+  recoverable: boolean;
+  ruleId?: string;
+  severity: GranolaProcessingIssueSeverity;
+  title: string;
+}
+
+export interface GranolaProcessingIssuesResult {
+  issues: GranolaProcessingIssue[];
+}
+
+export interface GranolaProcessingRecoveryResult {
+  issue: GranolaProcessingIssue;
+  recoveredAt: string;
+  runCount: number;
+  syncRan: boolean;
+}
+
 export interface GranolaAppStateEvent {
   state: GranolaAppState;
   timestamp: string;
@@ -526,6 +557,11 @@ export interface GranolaAppApi {
   listAutomationArtefacts(
     options?: GranolaAutomationArtefactListOptions,
   ): Promise<GranolaAutomationArtefactsResult>;
+  listProcessingIssues(options?: {
+    limit?: number;
+    meetingId?: string;
+    severity?: GranolaProcessingIssueSeverity;
+  }): Promise<GranolaProcessingIssuesResult>;
   listAutomationMatches(options?: { limit?: number }): Promise<GranolaAutomationMatchesResult>;
   listAutomationRuns(options?: {
     limit?: number;
@@ -536,6 +572,7 @@ export interface GranolaAppApi {
   inspectSync(): Promise<GranolaAppSyncState>;
   loginAuth(options?: { apiKey?: string; supabasePath?: string }): Promise<GranolaAppAuthState>;
   logoutAuth(): Promise<GranolaAppAuthState>;
+  recoverProcessingIssue(id: string): Promise<GranolaProcessingRecoveryResult>;
   resolveAutomationArtefact(
     id: string,
     decision: "approve" | "reject",

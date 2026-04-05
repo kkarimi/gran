@@ -19,6 +19,7 @@ import type {
   GranolaAppAuthState,
   GranolaAppStateEvent,
   GranolaMeetingBundle,
+  GranolaProcessingIssue,
   MeetingSummaryRecord,
   MeetingSummarySource,
 } from "../app/index.ts";
@@ -91,6 +92,7 @@ export class GranolaTuiWorkspace implements Component {
   #appState: GranolaAppState;
   #activePane: GranolaTuiFocusPane = "meetings";
   #automationArtefacts: GranolaAutomationArtefact[] = [];
+  #processingIssues: GranolaProcessingIssue[] = [];
   #automationRuns: GranolaAutomationActionRun[] = [];
   #detailError = "";
   #detailScroll = 0;
@@ -131,6 +133,7 @@ export class GranolaTuiWorkspace implements Component {
 
     await this.loadAutomationRuns();
     await this.loadAutomationArtefacts();
+    await this.loadProcessingIssues();
     await this.loadFolders({
       setStatus: false,
     });
@@ -163,6 +166,7 @@ export class GranolaTuiWorkspace implements Component {
 
     void this.loadAutomationRuns();
     void this.loadAutomationArtefacts();
+    void this.loadProcessingIssues();
 
     if (
       this.#meetingSource === "index" &&
@@ -289,6 +293,16 @@ export class GranolaTuiWorkspace implements Component {
       this.tui.requestRender();
     } catch {
       // Automation visibility should not break the rest of the workspace.
+    }
+  }
+
+  private async loadProcessingIssues(): Promise<void> {
+    try {
+      const result = await this.app.listProcessingIssues({ limit: 20 });
+      this.#processingIssues = [...result.issues];
+      this.tui.requestRender();
+    } catch {
+      // Processing visibility should not break the rest of the workspace.
     }
   }
 
@@ -742,6 +756,7 @@ export class GranolaTuiWorkspace implements Component {
 
     const overlay = new GranolaTuiAutomationOverlay({
       artefacts: this.#automationArtefacts,
+      issues: this.#processingIssues,
       onApproveArtefact: async (id) => {
         closeOverlay();
         await this.app.resolveAutomationArtefact(id, "approve");
@@ -766,6 +781,18 @@ export class GranolaTuiWorkspace implements Component {
         await this.app.resolveAutomationRun(id, "reject");
         await this.loadAutomationRuns();
         this.setStatus("Automation rejected");
+      },
+      onRecoverIssue: async (id) => {
+        closeOverlay();
+        const result = await this.app.recoverProcessingIssue(id);
+        await this.loadProcessingIssues();
+        await this.loadAutomationArtefacts();
+        await this.loadAutomationRuns();
+        this.setStatus(
+          result.runCount > 0
+            ? `Recovered ${result.issue.kind} and re-ran ${result.runCount} pipeline${result.runCount === 1 ? "" : "s"}`
+            : `Recovered ${result.issue.kind}`,
+        );
       },
       onRerunArtefact: async (id) => {
         closeOverlay();

@@ -45,6 +45,7 @@ import {
   RecentMeetingsPanel,
   SavedFiltersPanel,
   SecurityPanel,
+  ProcessingIssuesPanel,
   ToolbarFilters,
   type WebStatusTone,
   Workspace,
@@ -69,6 +70,8 @@ interface GranolaWebAppState {
   listError: string;
   meetingSource: MeetingSummarySource;
   meetings: MeetingSummaryRecord[];
+  processingIssueError: string;
+  processingIssues: import("../app/index.ts").GranolaProcessingIssue[];
   quickOpen: string;
   recentMeetings: WebWorkspacePreferences["recentMeetings"];
   savedFilters: WebWorkspacePreferences["savedFilters"];
@@ -129,6 +132,8 @@ export function App() {
     listError: "",
     meetingSource: "live",
     meetings: [],
+    processingIssueError: "",
+    processingIssues: [],
     quickOpen: "",
     recentMeetings: initialPreferences.recentMeetings,
     savedFilters: initialPreferences.savedFilters,
@@ -307,6 +312,21 @@ export function App() {
     }
   };
 
+  const loadProcessingIssues = async () => {
+    if (!client) {
+      return;
+    }
+
+    try {
+      setState("processingIssueError", "");
+      const result = await client.listProcessingIssues({ limit: 20 });
+      setState("processingIssues", result.issues);
+    } catch (error) {
+      setState("processingIssueError", error instanceof Error ? error.message : String(error));
+      setState("processingIssues", []);
+    }
+  };
+
   const loadMeeting = async (meetingId: string) => {
     if (!client) {
       return;
@@ -393,6 +413,7 @@ export function App() {
       loadFolders(forceRefresh),
       loadAutomationRuns(),
       loadAutomationArtefacts(),
+      loadProcessingIssues(),
       mergeAuthState(),
     ]);
     await loadMeetings({ refresh: forceRefresh });
@@ -698,6 +719,27 @@ export function App() {
     }
   };
 
+  const recoverProcessingIssue = async (id: string) => {
+    if (!client) {
+      return;
+    }
+
+    setStatus("Recovering processing issue…", "busy");
+    try {
+      const result = await client.recoverProcessingIssue(id);
+      await refreshAll();
+      setStatus(
+        result.runCount > 0
+          ? `Recovered ${result.issue.kind} and re-ran ${result.runCount} pipeline${result.runCount === 1 ? "" : "s"}`
+          : `Recovered ${result.issue.kind}`,
+        "ok",
+      );
+    } catch (error) {
+      setState("processingIssueError", error instanceof Error ? error.message : String(error));
+      setStatus("Recovery failed", "error");
+    }
+  };
+
   const selectAutomationArtefact = async (id: string) => {
     if (!client) {
       return;
@@ -839,6 +881,8 @@ export function App() {
       folders: [],
       listError: "",
       meetings: [],
+      processingIssueError: "",
+      processingIssues: [],
       reviewNote: "",
       selectedAutomationArtefactId: null,
       selectedFolderId: null,
@@ -870,6 +914,7 @@ export function App() {
 
     void loadAutomationRuns();
     void loadAutomationArtefacts();
+    void loadProcessingIssues();
   });
 
   onMount(() => {
@@ -1081,6 +1126,15 @@ export function App() {
             void resolveAutomationRun(runId, "reject");
           }}
           runs={state.automationRuns}
+        />
+        <ProcessingIssuesPanel
+          issues={state.processingIssues}
+          onOpenMeeting={(meetingId) => {
+            void loadMeeting(meetingId);
+          }}
+          onRecover={(issueId) => {
+            void recoverProcessingIssue(issueId);
+          }}
         />
         <AutomationArtefactsPanel
           artefacts={state.automationArtefacts}

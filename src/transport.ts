@@ -5,6 +5,7 @@ import type {
   GranolaExportJobsListOptions,
   GranolaFolderListOptions,
   GranolaMeetingListOptions,
+  GranolaProcessingIssueSeverity,
 } from "./app/index.ts";
 import type { GranolaToolkitSessionStoreKind } from "./persistence/layout.ts";
 
@@ -19,6 +20,7 @@ export interface GranolaServerInfo {
     exports: boolean;
     folders: boolean;
     meetingOpen: boolean;
+    processing: boolean;
     sync: boolean;
     webClient: boolean;
   };
@@ -55,6 +57,7 @@ export const granolaTransportPaths = {
   health: "/health",
   meetingResolve: "/meetings/resolve",
   meetings: "/meetings",
+  processingIssues: "/processing/issues",
   root: "/",
   serverInfo: "/server/info",
   syncRun: "/sync",
@@ -179,6 +182,24 @@ export function granolaAutomationArtefactDecisionPath(
 
 export function granolaAutomationArtefactUpdatePath(id: string): string {
   return `${granolaAutomationArtefactPath(id)}/update`;
+}
+
+export function granolaProcessingIssuesPath(
+  options: {
+    limit?: number;
+    meetingId?: string;
+    severity?: GranolaProcessingIssueSeverity;
+  } = {},
+): string {
+  return appendSearchParams(granolaTransportPaths.processingIssues, {
+    limit: options.limit,
+    meetingId: options.meetingId,
+    severity: options.severity,
+  });
+}
+
+export function granolaProcessingIssueRecoverPath(id: string): string {
+  return `${granolaTransportPaths.processingIssues}/${encodeURIComponent(id)}/recover`;
 }
 
 export function granolaExportJobRerunPath(id: string): string {

@@ -82,5 +82,10 @@ export type {
   GranolaMeetingListOptions,
   GranolaMeetingListResult,
   GranolaNotesExportResult,
+  GranolaProcessingIssue,
+  GranolaProcessingIssueKind,
+  GranolaProcessingIssuesResult,
+  GranolaProcessingIssueSeverity,
+  GranolaProcessingRecoveryResult,
   GranolaTranscriptsExportResult,
 } from "./types.ts";
