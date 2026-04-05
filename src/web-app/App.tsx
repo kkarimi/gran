@@ -22,6 +22,7 @@ import type {
   MeetingSummaryRecord,
   MeetingSummarySource,
 } from "../app/index.ts";
+import { buildGranolaReviewInbox, summariseGranolaReviewInbox } from "../review-inbox.ts";
 import { createGranolaServerClient, type GranolaServerClient } from "../server/client.ts";
 import { granolaTransportPaths } from "../transport.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
@@ -44,16 +45,16 @@ import {
 import {
   AppStatePanel,
   ArtefactReviewPanel,
-  AutomationArtefactsPanel,
-  AutomationRunsPanel,
   AuthPanel,
   ExportJobsPanel,
   FolderList,
+  IssueReviewPanel,
   MeetingList,
   RecentMeetingsPanel,
+  ReviewInboxPanel,
+  RunReviewPanel,
   SavedFiltersPanel,
   SecurityPanel,
-  ProcessingIssuesPanel,
   ToolbarFilters,
   type WebStatusTone,
   Workspace,
@@ -107,6 +108,7 @@ interface GranolaWebAppState {
   selectedMeetingBundle: GranolaMeetingBundle | null;
   selectedMeetingId: string | null;
   selectedMeeting: MeetingRecord | null;
+  selectedReviewInboxKey: string | null;
   reviewNote: string;
   controlPanelTab: ControlPanelTab;
   serverLocked: boolean;
@@ -180,6 +182,7 @@ export function App() {
     selectedMeetingBundle: null,
     selectedMeetingId: startup.meetingId || null,
     selectedMeeting: null,
+    selectedReviewInboxKey: null,
     reviewNote: "",
     controlPanelTab: "overview",
     serverLocked: browserConfig().passwordRequired,
@@ -312,6 +315,14 @@ export function App() {
     }
   };
 
+  const applySelectedArtefactDrafts = (artefact: GranolaAutomationArtefact | null) => {
+    setState("selectedAutomationArtefactId", artefact?.id ?? null);
+    setState("automationArtefactDraftTitle", artefact?.structured.title ?? "");
+    setState("automationArtefactDraftSummary", artefact?.structured.summary ?? "");
+    setState("automationArtefactDraftMarkdown", artefact?.structured.markdown ?? "");
+    setState("reviewNote", "");
+  };
+
   const syncSelectedArtefact = (
     artefacts: GranolaAutomationArtefact[],
     options: {
@@ -333,11 +344,7 @@ export function App() {
       artefacts.find((candidate) => candidate.status === "generated") ??
       artefacts[0];
 
-    setState("selectedAutomationArtefactId", preferred?.id ?? null);
-    setState("automationArtefactDraftTitle", preferred?.structured.title ?? "");
-    setState("automationArtefactDraftSummary", preferred?.structured.summary ?? "");
-    setState("automationArtefactDraftMarkdown", preferred?.structured.markdown ?? "");
-    setState("reviewNote", "");
+    applySelectedArtefactDrafts(preferred ?? null);
   };
 
   const loadAutomationArtefacts = async (
@@ -438,6 +445,35 @@ export function App() {
       setState("harnessExplanations", []);
       setState("harnessTestResult", null);
     }
+  };
+
+  const reviewInboxItems = () =>
+    buildGranolaReviewInbox({
+      artefacts: state.automationArtefacts,
+      issues: state.processingIssues,
+      runs: state.automationRuns,
+    });
+
+  const reviewInboxSummary = () => summariseGranolaReviewInbox(reviewInboxItems());
+
+  const selectedReviewInboxItem = () =>
+    reviewInboxItems().find((item) => item.key === state.selectedReviewInboxKey) ??
+    reviewInboxItems()[0] ??
+    null;
+
+  const selectedReviewIssue = () => {
+    const item = selectedReviewInboxItem();
+    return item?.kind === "issue" ? item.issue : null;
+  };
+
+  const selectedReviewRun = () => {
+    const item = selectedReviewInboxItem();
+    return item?.kind === "run" ? item.run : null;
+  };
+
+  const selectedReviewArtefact = () => {
+    const item = selectedReviewInboxItem();
+    return item?.kind === "artefact" ? item.artefact : selectedAutomationArtefact();
   };
 
   const updateHarness = (nextHarness: GranolaAgentHarness) => {
@@ -1027,6 +1063,28 @@ export function App() {
     }
   };
 
+  const selectReviewInboxItem = async (key: string) => {
+    setState("selectedReviewInboxKey", key);
+    const item = reviewInboxItems().find((candidate) => candidate.key === key);
+    if (!item) {
+      return;
+    }
+
+    try {
+      if (item.kind === "artefact") {
+        await selectAutomationArtefact(item.artefact.id);
+        return;
+      }
+
+      if (item.meetingId && item.meetingId !== state.selectedMeetingId) {
+        await loadMeeting(item.meetingId);
+      }
+    } catch (error) {
+      setState("detailError", error instanceof Error ? error.message : String(error));
+      setStatus("Unable to open review item", "error");
+    }
+  };
+
   const selectAutomationArtefact = async (id: string) => {
     if (!client) {
       return;
@@ -1036,11 +1094,8 @@ export function App() {
       const artefact =
         state.automationArtefacts.find((candidate) => candidate.id === id) ??
         (await client.getAutomationArtefact(id));
-      setState("selectedAutomationArtefactId", artefact.id);
-      setState("automationArtefactDraftTitle", artefact.structured.title);
-      setState("automationArtefactDraftSummary", artefact.structured.summary ?? "");
-      setState("automationArtefactDraftMarkdown", artefact.structured.markdown);
-      setState("reviewNote", "");
+      setState("selectedReviewInboxKey", `artefact:${artefact.id}`);
+      applySelectedArtefactDrafts(artefact);
       if (artefact.meetingId !== state.selectedMeetingId) {
         await loadMeeting(artefact.meetingId);
       }
@@ -1219,6 +1274,25 @@ export function App() {
     void loadProcessingIssues();
   });
 
+  createEffect(() => {
+    const current =
+      reviewInboxItems().find((item) => item.key === state.selectedReviewInboxKey) ??
+      reviewInboxItems()[0] ??
+      null;
+    const nextKey = current?.key ?? null;
+
+    if (nextKey !== state.selectedReviewInboxKey) {
+      setState("selectedReviewInboxKey", nextKey);
+    }
+
+    if (
+      current?.kind === "artefact" &&
+      current.artefact.id !== state.selectedAutomationArtefactId
+    ) {
+      applySelectedArtefactDrafts(current.artefact);
+    }
+  });
+
   onMount(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
@@ -1263,7 +1337,7 @@ export function App() {
     { id: "overview", label: "Overview" },
     { id: "auth", label: "Auth" },
     { id: "pipelines", label: "Pipelines" },
-    { id: "review", label: "Review" },
+    { id: "review", label: "Inbox" },
   ];
 
   return (
@@ -1490,15 +1564,6 @@ export function App() {
                       void rerunJob(jobId);
                     }}
                   />
-                  <ProcessingIssuesPanel
-                    issues={state.processingIssues}
-                    onOpenMeeting={(meetingId) => {
-                      void loadMeeting(meetingId);
-                    }}
-                    onRecover={(issueId) => {
-                      void recoverProcessingIssue(issueId);
-                    }}
-                  />
                 </section>
               </Show>
               <Show when={state.controlPanelTab === "auth"}>
@@ -1574,60 +1639,78 @@ export function App() {
                     testKind={state.harnessTestKind}
                     testResult={state.harnessTestResult}
                   />
-                  <AutomationRunsPanel
-                    onApprove={(runId) => {
-                      void resolveAutomationRun(runId, "approve");
-                    }}
-                    onReject={(runId) => {
-                      void resolveAutomationRun(runId, "reject");
-                    }}
-                    runs={state.automationRuns}
-                  />
                 </section>
               </Show>
               <Show when={state.controlPanelTab === "review"}>
                 <section class="control-deck__panel">
-                  <AutomationArtefactsPanel
-                    artefacts={state.automationArtefacts}
-                    onSelect={(artefactId) => {
-                      setState("controlPanelTab", "review");
-                      void selectAutomationArtefact(artefactId);
+                  <ReviewInboxPanel
+                    items={reviewInboxItems()}
+                    onSelect={(key) => {
+                      void selectReviewInboxItem(key);
                     }}
-                    selectedArtefactId={state.selectedAutomationArtefactId}
+                    selectedKey={state.selectedReviewInboxKey}
+                    summary={reviewInboxSummary()}
                   />
-                  <ArtefactReviewPanel
-                    artefact={selectedAutomationArtefact()}
-                    bundle={state.selectedMeetingBundle}
-                    draftMarkdown={state.automationArtefactDraftMarkdown}
-                    draftSummary={state.automationArtefactDraftSummary}
-                    draftTitle={state.automationArtefactDraftTitle}
-                    error={state.automationArtefactError}
-                    onApprove={() => {
-                      void resolveAutomationArtefact("approve");
-                    }}
-                    onDraftMarkdownChange={(value) => {
-                      setState("automationArtefactDraftMarkdown", value);
-                    }}
-                    onDraftSummaryChange={(value) => {
-                      setState("automationArtefactDraftSummary", value);
-                    }}
-                    onDraftTitleChange={(value) => {
-                      setState("automationArtefactDraftTitle", value);
-                    }}
-                    onReject={() => {
-                      void resolveAutomationArtefact("reject");
-                    }}
-                    onRerun={() => {
-                      void rerunAutomationArtefact();
-                    }}
-                    onReviewNoteChange={(value) => {
-                      setState("reviewNote", value);
-                    }}
-                    onSave={() => {
-                      void saveAutomationArtefact();
-                    }}
-                    reviewNote={state.reviewNote}
-                  />
+                  <Show when={selectedReviewInboxItem()?.kind === "issue"}>
+                    <IssueReviewPanel
+                      issue={selectedReviewIssue()}
+                      onOpenMeeting={(meetingId) => {
+                        void loadMeeting(meetingId);
+                      }}
+                      onRecover={(issueId) => {
+                        void recoverProcessingIssue(issueId);
+                      }}
+                    />
+                  </Show>
+                  <Show when={selectedReviewInboxItem()?.kind === "run"}>
+                    <RunReviewPanel
+                      onApprove={(runId) => {
+                        void resolveAutomationRun(runId, "approve");
+                      }}
+                      onOpenMeeting={(meetingId) => {
+                        void loadMeeting(meetingId);
+                      }}
+                      onReject={(runId) => {
+                        void resolveAutomationRun(runId, "reject");
+                      }}
+                      run={selectedReviewRun()}
+                    />
+                  </Show>
+                  <Show when={selectedReviewInboxItem()?.kind === "artefact"}>
+                    <ArtefactReviewPanel
+                      artefact={selectedReviewArtefact()}
+                      bundle={state.selectedMeetingBundle}
+                      draftMarkdown={state.automationArtefactDraftMarkdown}
+                      draftSummary={state.automationArtefactDraftSummary}
+                      draftTitle={state.automationArtefactDraftTitle}
+                      error={state.automationArtefactError}
+                      onApprove={() => {
+                        void resolveAutomationArtefact("approve");
+                      }}
+                      onDraftMarkdownChange={(value) => {
+                        setState("automationArtefactDraftMarkdown", value);
+                      }}
+                      onDraftSummaryChange={(value) => {
+                        setState("automationArtefactDraftSummary", value);
+                      }}
+                      onDraftTitleChange={(value) => {
+                        setState("automationArtefactDraftTitle", value);
+                      }}
+                      onReject={() => {
+                        void resolveAutomationArtefact("reject");
+                      }}
+                      onRerun={() => {
+                        void rerunAutomationArtefact();
+                      }}
+                      onReviewNoteChange={(value) => {
+                        setState("reviewNote", value);
+                      }}
+                      onSave={() => {
+                        void saveAutomationArtefact();
+                      }}
+                      reviewNote={state.reviewNote}
+                    />
+                  </Show>
                 </section>
               </Show>
             </div>

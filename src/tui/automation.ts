@@ -12,6 +12,7 @@ import type {
   GranolaAutomationArtefact,
   GranolaProcessingIssue,
 } from "../app/index.ts";
+import { buildGranolaReviewInbox, summariseGranolaReviewInbox } from "../review-inbox.ts";
 
 import { granolaTuiTheme } from "./theme.ts";
 
@@ -27,20 +28,6 @@ interface GranolaTuiAutomationOverlayOptions {
   onRerunArtefact: (id: string) => Promise<void> | void;
   runs: GranolaAutomationActionRun[];
 }
-
-type GranolaTuiAutomationOverlayItem =
-  | {
-      issue: GranolaProcessingIssue;
-      kind: "issue";
-    }
-  | {
-      artefact: GranolaAutomationArtefact;
-      kind: "artefact";
-    }
-  | {
-      kind: "run";
-      run: GranolaAutomationActionRun;
-    };
 
 function padLine(text: string, width: number): string {
   const clipped = truncateToWidth(text, width, "");
@@ -98,24 +85,15 @@ export class GranolaTuiAutomationOverlay implements Component, Focusable {
 
   invalidate(): void {}
 
-  private get items(): GranolaTuiAutomationOverlayItem[] {
-    return [
-      ...this.options.issues.map((issue) => ({
-        issue,
-        kind: "issue" as const,
-      })),
-      ...this.options.artefacts.map((artefact) => ({
-        artefact,
-        kind: "artefact" as const,
-      })),
-      ...this.options.runs.map((run) => ({
-        kind: "run" as const,
-        run,
-      })),
-    ];
+  private get items() {
+    return buildGranolaReviewInbox({
+      artefacts: this.options.artefacts,
+      issues: this.options.issues,
+      runs: this.options.runs,
+    });
   }
 
-  private get selected(): GranolaTuiAutomationOverlayItem | undefined {
+  private get selected() {
     return this.items[this.#selectedIndex];
   }
 
@@ -174,44 +152,39 @@ export class GranolaTuiAutomationOverlay implements Component, Focusable {
     const innerWidth = Math.max(1, bodyWidth - 4);
     const maxRuns = 6;
     const lines: string[] = [];
+    const summary = summariseGranolaReviewInbox(this.items);
 
     lines.push(`+${"-".repeat(bodyWidth - 2)}+`);
-    lines.push(frameLine(granolaTuiTheme.strong("Automation Review"), bodyWidth));
+    lines.push(frameLine(granolaTuiTheme.strong("Review Inbox"), bodyWidth));
     lines.push(frameLine("Enter/a approve  r reject  e rerun artefact  Esc close", bodyWidth));
+    lines.push(
+      frameLine(
+        granolaTuiTheme.dim(
+          `${summary.total} items · ${summary.issues} issues · ${summary.artefacts} artefacts · ${summary.runs} approvals`,
+        ),
+        bodyWidth,
+      ),
+    );
     lines.push(frameLine("", bodyWidth));
 
     if (this.items.length === 0) {
-      lines.push(frameLine(granolaTuiTheme.dim("No automation review items yet."), bodyWidth));
+      lines.push(frameLine(granolaTuiTheme.dim("No review items waiting."), bodyWidth));
     } else {
       for (const [index, item] of this.items.slice(0, maxRuns).entries()) {
         const selected = index === this.#selectedIndex;
-        const title =
+        const title = `${selected ? ">" : " "} ${item.title} · ${
           item.kind === "issue"
-            ? `${selected ? ">" : " "} ${item.issue.title} · ${issueSeverityLabel(item.issue)}`
+            ? issueSeverityLabel(item.issue)
             : item.kind === "artefact"
-              ? `${selected ? ">" : " "} ${item.artefact.structured.title} · ${artefactStatusLabel(item.artefact)}`
-              : `${selected ? ">" : " "} ${item.run.actionName} · ${statusLabel(item.run)}`;
+              ? artefactStatusLabel(item.artefact)
+              : statusLabel(item.run)
+        }`;
         lines.push(frameLine(selected ? granolaTuiTheme.selected(title) : title, bodyWidth));
         lines.push(
-          frameLine(
-            item.kind === "issue"
-              ? `  ${item.issue.kind} · ${item.issue.meetingId ?? "global"}`
-              : item.kind === "artefact"
-                ? `  ${item.artefact.ruleName} · ${item.artefact.meetingId}`
-                : `  ${item.run.ruleName} · ${item.run.title}`,
-            bodyWidth,
-          ),
+          frameLine(`  ${item.subtitle}${item.meetingId ? ` · ${item.meetingId}` : ""}`, bodyWidth),
         );
 
-        const details =
-          item.kind === "issue"
-            ? item.issue.detail
-            : item.kind === "artefact"
-              ? item.artefact.structured.summary ||
-                item.artefact.structured.markdown ||
-                item.artefact.id
-              : item.run.prompt || item.run.result || item.run.error || item.run.eventKind;
-        for (const line of wrapDetails(`  ${details}`, innerWidth).slice(0, 2)) {
+        for (const line of wrapDetails(`  ${item.summary}`, innerWidth).slice(0, 2)) {
           lines.push(frameLine(line, bodyWidth));
         }
 
@@ -221,7 +194,7 @@ export class GranolaTuiAutomationOverlay implements Component, Focusable {
 
     lines.push(
       frameLine(
-        granolaTuiTheme.dim("Health issues are listed before artefacts and pending ask-user runs."),
+        granolaTuiTheme.dim("Issues stay first, then generated artefacts, then pending approvals."),
         bodyWidth,
       ),
     );

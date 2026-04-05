@@ -810,7 +810,7 @@ export class GranolaTuiWorkspace implements Component {
       minWidth: 56,
       width: "76%",
     });
-    this.setStatus("Automation review");
+    this.setStatus("Review inbox");
   }
 
   handleInput(data: string): void {

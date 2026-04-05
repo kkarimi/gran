@@ -26,10 +26,13 @@ test.describe("toolkit web workspace", () => {
       timeout: 20_000,
     });
     await expect(page.getByRole("button", { name: "Overview" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Inbox" })).toBeVisible();
     await expect(page.getByText("Recent Export Jobs")).toBeVisible();
     await page.getByRole("button", { name: "Auth" }).click();
     await expect(page.getByText("Auth Session")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save API key" })).toBeVisible();
+    await page.getByRole("button", { name: "Inbox" }).click();
+    await expect(page.getByText("Review Inbox")).toBeVisible();
     await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export Notes" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export Transcripts" })).toBeVisible();
