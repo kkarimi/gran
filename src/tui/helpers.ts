@@ -232,11 +232,13 @@ export function buildGranolaTuiSummary(
       : state.sync.lastCompletedAt
         ? `synced ${state.sync.lastCompletedAt.slice(11, 16)}`
         : "sync idle";
-  const automation = state.automation.pendingRunCount
-    ? `${state.automation.pendingRunCount} pending`
-    : state.automation.runCount
-      ? `${state.automation.runCount} runs`
-      : "automation idle";
+  const automation = state.automation.pendingArtefactCount
+    ? `${state.automation.pendingArtefactCount} artefacts pending`
+    : state.automation.pendingRunCount
+      ? `${state.automation.pendingRunCount} runs pending`
+      : state.automation.runCount
+        ? `${state.automation.runCount} runs`
+        : "automation idle";
 
   return `auth ${authMode} | ${documents} | ${folders} | ${cache} | ${index} | ${sync} | ${automation} | source ${meetingSource}`;
 }

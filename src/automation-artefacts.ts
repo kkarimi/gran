@@ -5,6 +5,8 @@ import type {
   GranolaAutomationArtefact,
   GranolaAutomationArtefactActionItem,
   GranolaAutomationArtefactAttempt,
+  GranolaAutomationArtefactHistoryAction,
+  GranolaAutomationArtefactHistoryEntry,
   GranolaAutomationArtefactKind,
   GranolaAutomationArtefactSection,
   GranolaAutomationArtefactStatus,
@@ -23,6 +25,12 @@ interface AutomationArtefactsFile {
 
 function cloneAttempt(attempt: GranolaAutomationArtefactAttempt): GranolaAutomationArtefactAttempt {
   return { ...attempt };
+}
+
+function cloneHistoryEntry(
+  entry: GranolaAutomationArtefactHistoryEntry,
+): GranolaAutomationArtefactHistoryEntry {
+  return { ...entry };
 }
 
 function cloneSection(section: GranolaAutomationArtefactSection): GranolaAutomationArtefactSection {
@@ -53,7 +61,42 @@ function cloneArtefact(artefact: GranolaAutomationArtefact): GranolaAutomationAr
   return {
     ...artefact,
     attempts: artefact.attempts.map((attempt) => cloneAttempt(attempt)),
+    history: artefact.history.map((entry) => cloneHistoryEntry(entry)),
     structured: cloneStructured(artefact.structured),
+  };
+}
+
+function normaliseHistoryAction(
+  value: unknown,
+): GranolaAutomationArtefactHistoryAction | undefined {
+  switch (value) {
+    case "approved":
+    case "edited":
+    case "generated":
+    case "rejected":
+    case "rerun":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function normaliseHistoryEntry(value: unknown): GranolaAutomationArtefactHistoryEntry | undefined {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const action = normaliseHistoryAction(record.action);
+  const at = stringValue(record.at).trim();
+  if (!action || !at) {
+    return undefined;
+  }
+
+  return {
+    action,
+    at,
+    note: stringValue(record.note).trim() || undefined,
   };
 }
 
@@ -222,6 +265,16 @@ function normaliseArtefact(value: unknown): GranolaAutomationArtefact | undefine
       : [],
     createdAt,
     eventId,
+    history: Array.isArray(record.history)
+      ? record.history
+          .map((entry) => normaliseHistoryEntry(entry))
+          .filter((entry): entry is GranolaAutomationArtefactHistoryEntry => Boolean(entry))
+      : [
+          {
+            action: "generated",
+            at: createdAt,
+          },
+        ],
     id,
     kind,
     matchId,

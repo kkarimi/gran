@@ -352,6 +352,17 @@ select {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.job-card--button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.job-card--button[data-selected="true"] {
+  border-color: rgba(13, 106, 109, 0.26);
+  background: var(--panel-strong);
+}
+
 .job-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -382,6 +393,26 @@ select {
 .job-card__status[data-status="completed"] {
   background: rgba(36, 107, 79, 0.12);
   color: var(--ok);
+}
+
+.job-card__status[data-status="approved"] {
+  background: rgba(36, 107, 79, 0.12);
+  color: var(--ok);
+}
+
+.job-card__status[data-status="generated"] {
+  background: rgba(163, 79, 47, 0.12);
+  color: var(--warm);
+}
+
+.job-card__status[data-status="rejected"] {
+  background: rgba(157, 44, 44, 0.12);
+  color: var(--error);
+}
+
+.job-card__status[data-status="superseded"] {
+  background: rgba(93, 107, 119, 0.12);
+  color: var(--muted);
 }
 
 .workspace-tabs {
@@ -465,6 +496,21 @@ select {
   overflow: auto;
 }
 
+.review-panel {
+  padding: 0 24px 24px;
+}
+
+.review-body {
+  display: grid;
+  gap: 18px;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
 .workspace-grid {
   display: grid;
   grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
@@ -494,6 +540,30 @@ select {
   line-height: 1.55;
 }
 
+.field-input--plain,
+.review-textarea {
+  width: 100%;
+  margin-top: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+}
+
+.review-textarea {
+  min-height: 220px;
+  resize: vertical;
+}
+
+.review-textarea--summary {
+  min-height: 96px;
+}
+
+.review-history {
+  margin-bottom: 0;
+}
+
 .empty {
   margin: 24px;
   padding: 24px;
@@ -504,6 +574,7 @@ select {
 
 @media (max-width: 1024px) {
   .shell,
+  .review-grid,
   .workspace-grid {
     grid-template-columns: 1fr;
   }

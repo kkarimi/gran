@@ -7,16 +7,30 @@ import {
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
 
-import type { GranolaAutomationActionRun } from "../app/index.ts";
+import type { GranolaAutomationActionRun, GranolaAutomationArtefact } from "../app/index.ts";
 
 import { granolaTuiTheme } from "./theme.ts";
 
 interface GranolaTuiAutomationOverlayOptions {
-  onApprove: (id: string) => Promise<void> | void;
+  artefacts: GranolaAutomationArtefact[];
+  onApproveArtefact: (id: string) => Promise<void> | void;
+  onApproveRun: (id: string) => Promise<void> | void;
   onCancel: () => void;
-  onReject: (id: string) => Promise<void> | void;
+  onRejectArtefact: (id: string) => Promise<void> | void;
+  onRejectRun: (id: string) => Promise<void> | void;
+  onRerunArtefact: (id: string) => Promise<void> | void;
   runs: GranolaAutomationActionRun[];
 }
+
+type GranolaTuiAutomationOverlayItem =
+  | {
+      artefact: GranolaAutomationArtefact;
+      kind: "artefact";
+    }
+  | {
+      kind: "run";
+      run: GranolaAutomationActionRun;
+    };
 
 function padLine(text: string, width: number): string {
   const clipped = truncateToWidth(text, width, "");
@@ -46,6 +60,20 @@ function statusLabel(run: GranolaAutomationActionRun): string {
   }
 }
 
+function artefactStatusLabel(artefact: GranolaAutomationArtefact): string {
+  switch (artefact.status) {
+    case "approved":
+      return granolaTuiTheme.info(artefact.status);
+    case "generated":
+      return granolaTuiTheme.warning(artefact.status);
+    case "rejected":
+      return granolaTuiTheme.error(artefact.status);
+    case "superseded":
+    default:
+      return granolaTuiTheme.dim(artefact.status);
+  }
+}
+
 export class GranolaTuiAutomationOverlay implements Component, Focusable {
   focused = false;
   #selectedIndex = 0;
@@ -54,8 +82,21 @@ export class GranolaTuiAutomationOverlay implements Component, Focusable {
 
   invalidate(): void {}
 
-  private get selected(): GranolaAutomationActionRun | undefined {
-    return this.options.runs[this.#selectedIndex];
+  private get items(): GranolaTuiAutomationOverlayItem[] {
+    return [
+      ...this.options.artefacts.map((artefact) => ({
+        artefact,
+        kind: "artefact" as const,
+      })),
+      ...this.options.runs.map((run) => ({
+        kind: "run" as const,
+        run,
+      })),
+    ];
+  }
+
+  private get selected(): GranolaTuiAutomationOverlayItem | undefined {
+    return this.items[this.#selectedIndex];
   }
 
   handleInput(data: string): void {
@@ -70,20 +111,34 @@ export class GranolaTuiAutomationOverlay implements Component, Focusable {
     }
 
     if (matchesKey(data, "down")) {
-      this.#selectedIndex = Math.min(this.options.runs.length - 1, this.#selectedIndex + 1);
+      this.#selectedIndex = Math.min(this.items.length - 1, this.#selectedIndex + 1);
       return;
     }
 
     if (matchesKey(data, "enter") || matchesKey(data, "a")) {
-      if (this.selected?.status === "pending") {
-        void this.options.onApprove(this.selected.id);
+      if (this.selected?.kind === "run" && this.selected.run.status === "pending") {
+        void this.options.onApproveRun(this.selected.run.id);
+      }
+      if (this.selected?.kind === "artefact" && this.selected.artefact.status !== "superseded") {
+        void this.options.onApproveArtefact(this.selected.artefact.id);
       }
       return;
     }
 
     if (matchesKey(data, "r")) {
-      if (this.selected?.status === "pending") {
-        void this.options.onReject(this.selected.id);
+      if (this.selected?.kind === "run" && this.selected.run.status === "pending") {
+        void this.options.onRejectRun(this.selected.run.id);
+        return;
+      }
+      if (this.selected?.kind === "artefact" && this.selected.artefact.status !== "superseded") {
+        void this.options.onRejectArtefact(this.selected.artefact.id);
+      }
+      return;
+    }
+
+    if (matchesKey(data, "e")) {
+      if (this.selected?.kind === "artefact") {
+        void this.options.onRerunArtefact(this.selected.artefact.id);
       }
     }
   }
@@ -95,22 +150,35 @@ export class GranolaTuiAutomationOverlay implements Component, Focusable {
     const lines: string[] = [];
 
     lines.push(`+${"-".repeat(bodyWidth - 2)}+`);
-    lines.push(frameLine(granolaTuiTheme.strong("Automation Runs"), bodyWidth));
-    lines.push(
-      frameLine("Pending runs can be approved with Enter/a or rejected with r.", bodyWidth),
-    );
+    lines.push(frameLine(granolaTuiTheme.strong("Automation Review"), bodyWidth));
+    lines.push(frameLine("Enter/a approve  r reject  e rerun artefact  Esc close", bodyWidth));
     lines.push(frameLine("", bodyWidth));
 
-    if (this.options.runs.length === 0) {
-      lines.push(frameLine(granolaTuiTheme.dim("No automation runs yet."), bodyWidth));
+    if (this.items.length === 0) {
+      lines.push(frameLine(granolaTuiTheme.dim("No automation review items yet."), bodyWidth));
     } else {
-      for (const [index, run] of this.options.runs.slice(0, maxRuns).entries()) {
+      for (const [index, item] of this.items.slice(0, maxRuns).entries()) {
         const selected = index === this.#selectedIndex;
-        const title = `${selected ? ">" : " "} ${run.actionName} · ${statusLabel(run)}`;
+        const title =
+          item.kind === "artefact"
+            ? `${selected ? ">" : " "} ${item.artefact.structured.title} · ${artefactStatusLabel(item.artefact)}`
+            : `${selected ? ">" : " "} ${item.run.actionName} · ${statusLabel(item.run)}`;
         lines.push(frameLine(selected ? granolaTuiTheme.selected(title) : title, bodyWidth));
-        lines.push(frameLine(`  ${run.ruleName} · ${run.title}`, bodyWidth));
+        lines.push(
+          frameLine(
+            item.kind === "artefact"
+              ? `  ${item.artefact.ruleName} · ${item.artefact.meetingId}`
+              : `  ${item.run.ruleName} · ${item.run.title}`,
+            bodyWidth,
+          ),
+        );
 
-        const details = run.prompt || run.result || run.error || run.eventKind;
+        const details =
+          item.kind === "artefact"
+            ? item.artefact.structured.summary ||
+              item.artefact.structured.markdown ||
+              item.artefact.id
+            : item.run.prompt || item.run.result || item.run.error || item.run.eventKind;
         for (const line of wrapDetails(`  ${details}`, innerWidth).slice(0, 2)) {
           lines.push(frameLine(line, bodyWidth));
         }
@@ -119,7 +187,12 @@ export class GranolaTuiAutomationOverlay implements Component, Focusable {
       }
     }
 
-    lines.push(frameLine(granolaTuiTheme.dim("Esc close"), bodyWidth));
+    lines.push(
+      frameLine(
+        granolaTuiTheme.dim("Artefacts are listed before pending ask-user runs."),
+        bodyWidth,
+      ),
+    );
     lines.push(`+${"-".repeat(bodyWidth - 2)}+`);
     return lines;
   }

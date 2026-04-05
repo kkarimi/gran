@@ -13,6 +13,7 @@ import {
 import type {
   FolderSummaryRecord,
   GranolaAutomationActionRun,
+  GranolaAutomationArtefact,
   GranolaAppApi,
   GranolaAppState,
   GranolaAppAuthState,
@@ -89,6 +90,7 @@ export class GranolaTuiWorkspace implements Component {
 
   #appState: GranolaAppState;
   #activePane: GranolaTuiFocusPane = "meetings";
+  #automationArtefacts: GranolaAutomationArtefact[] = [];
   #automationRuns: GranolaAutomationActionRun[] = [];
   #detailError = "";
   #detailScroll = 0;
@@ -128,6 +130,7 @@ export class GranolaTuiWorkspace implements Component {
     });
 
     await this.loadAutomationRuns();
+    await this.loadAutomationArtefacts();
     await this.loadFolders({
       setStatus: false,
     });
@@ -159,6 +162,7 @@ export class GranolaTuiWorkspace implements Component {
     this.#selectedMeetingId = event.state.ui.selectedMeetingId ?? this.#selectedMeetingId;
 
     void this.loadAutomationRuns();
+    void this.loadAutomationArtefacts();
 
     if (
       this.#meetingSource === "index" &&
@@ -272,6 +276,16 @@ export class GranolaTuiWorkspace implements Component {
     try {
       const result = await this.app.listAutomationRuns({ limit: 20 });
       this.#automationRuns = [...result.runs];
+      this.tui.requestRender();
+    } catch {
+      // Automation visibility should not break the rest of the workspace.
+    }
+  }
+
+  private async loadAutomationArtefacts(): Promise<void> {
+    try {
+      const result = await this.app.listAutomationArtefacts({ limit: 20 });
+      this.#automationArtefacts = [...result.artefacts];
       this.tui.requestRender();
     } catch {
       // Automation visibility should not break the rest of the workspace.
@@ -727,18 +741,38 @@ export class GranolaTuiWorkspace implements Component {
     };
 
     const overlay = new GranolaTuiAutomationOverlay({
-      onApprove: async (id) => {
+      artefacts: this.#automationArtefacts,
+      onApproveArtefact: async (id) => {
+        closeOverlay();
+        await this.app.resolveAutomationArtefact(id, "approve");
+        await this.loadAutomationArtefacts();
+        this.setStatus("Artefact approved");
+      },
+      onApproveRun: async (id) => {
         closeOverlay();
         await this.app.resolveAutomationRun(id, "approve");
         await this.loadAutomationRuns();
         this.setStatus("Automation approved");
       },
       onCancel: closeOverlay,
-      onReject: async (id) => {
+      onRejectArtefact: async (id) => {
+        closeOverlay();
+        await this.app.resolveAutomationArtefact(id, "reject");
+        await this.loadAutomationArtefacts();
+        this.setStatus("Artefact rejected");
+      },
+      onRejectRun: async (id) => {
         closeOverlay();
         await this.app.resolveAutomationRun(id, "reject");
         await this.loadAutomationRuns();
         this.setStatus("Automation rejected");
+      },
+      onRerunArtefact: async (id) => {
+        closeOverlay();
+        await this.app.rerunAutomationArtefact(id);
+        await this.loadAutomationArtefacts();
+        await this.loadAutomationRuns();
+        this.setStatus("Artefact rerun complete");
       },
       runs: this.#automationRuns,
     });
@@ -749,7 +783,7 @@ export class GranolaTuiWorkspace implements Component {
       minWidth: 56,
       width: "76%",
     });
-    this.setStatus("Automation runs");
+    this.setStatus("Automation review");
   }
 
   handleInput(data: string): void {

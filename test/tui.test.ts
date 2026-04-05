@@ -201,6 +201,7 @@ describe("buildGranolaTuiSummary", () => {
         automation: {
           artefactCount: 0,
           loaded: true,
+          pendingArtefactCount: 0,
           pendingRunCount: 0,
           matchCount: 0,
           matchesFile: "/tmp/automation-matches.jsonl",

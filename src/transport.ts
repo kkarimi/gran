@@ -166,6 +166,21 @@ export function granolaAutomationArtefactRerunPath(id: string): string {
   return `${granolaTransportPaths.automationArtefacts}/${encodeURIComponent(id)}/rerun`;
 }
 
+export function granolaAutomationArtefactPath(id: string): string {
+  return `${granolaTransportPaths.automationArtefacts}/${encodeURIComponent(id)}`;
+}
+
+export function granolaAutomationArtefactDecisionPath(
+  id: string,
+  decision: "approve" | "reject",
+): string {
+  return `${granolaAutomationArtefactPath(id)}/${decision}`;
+}
+
+export function granolaAutomationArtefactUpdatePath(id: string): string {
+  return `${granolaAutomationArtefactPath(id)}/update`;
+}
+
 export function granolaExportJobRerunPath(id: string): string {
   return `${granolaTransportPaths.exportJobs}/${encodeURIComponent(id)}/rerun`;
 }

@@ -17,6 +17,12 @@ function buildArtefact(
     attempts: [],
     createdAt: "2024-03-01T12:00:00.000Z",
     eventId: "sync-1",
+    history: [
+      {
+        action: "generated",
+        at: "2024-03-01T12:00:00.000Z",
+      },
+    ],
     id,
     kind: "notes",
     matchId: "sync-1:team-transcript",

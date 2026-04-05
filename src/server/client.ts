@@ -2,6 +2,7 @@ import type {
   GranolaAutomationArtefact,
   GranolaAutomationArtefactKind,
   GranolaAutomationArtefactStatus,
+  GranolaAutomationArtefactUpdate,
   FolderRecord,
   GranolaAppApi,
   GranolaAutomationActionRun,
@@ -29,7 +30,10 @@ import type {
   TranscriptOutputFormat,
 } from "../app/index.ts";
 import {
+  granolaAutomationArtefactDecisionPath,
+  granolaAutomationArtefactPath,
   granolaAutomationArtefactRerunPath,
+  granolaAutomationArtefactUpdatePath,
   granolaAutomationArtefactsPath,
   granolaAutomationRunDecisionPath,
   granolaAutomationRunsPath,
@@ -225,6 +229,10 @@ export class GranolaServerClient implements GranolaAppApi {
     return await this.requestJson(granolaAutomationArtefactsPath(options));
   }
 
+  async getAutomationArtefact(id: string): Promise<GranolaAutomationArtefact> {
+    return await this.requestJson(granolaAutomationArtefactPath(id));
+  }
+
   async listAutomationRules(): Promise<import("../app/index.ts").GranolaAutomationRulesResult> {
     return await this.requestJson(granolaTransportPaths.automationRules);
   }
@@ -251,6 +259,33 @@ export class GranolaServerClient implements GranolaAppApi {
   ): Promise<GranolaAutomationActionRun> {
     return await this.requestJson(granolaAutomationRunDecisionPath(id, decision), {
       body: JSON.stringify(options),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+  }
+
+  async resolveAutomationArtefact(
+    id: string,
+    decision: "approve" | "reject",
+    options: { note?: string } = {},
+  ): Promise<GranolaAutomationArtefact> {
+    return await this.requestJson(granolaAutomationArtefactDecisionPath(id, decision), {
+      body: JSON.stringify(options),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+  }
+
+  async updateAutomationArtefact(
+    id: string,
+    patch: GranolaAutomationArtefactUpdate,
+  ): Promise<GranolaAutomationArtefact> {
+    return await this.requestJson(granolaAutomationArtefactUpdatePath(id), {
+      body: JSON.stringify(patch),
       headers: {
         "content-type": "application/json",
       },

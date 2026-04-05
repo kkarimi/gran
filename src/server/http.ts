@@ -542,6 +542,51 @@ export async function startGranolaServer(
         return;
       }
 
+      if (
+        method === "POST" &&
+        path.endsWith("/update") &&
+        path.startsWith(`${granolaTransportPaths.automationArtefacts}/`)
+      ) {
+        const id = decodeURIComponent(
+          path.slice(`${granolaTransportPaths.automationArtefacts}/`.length, -"/update".length),
+        );
+        const body = await readJsonBody(request);
+        sendJson(
+          response,
+          await app.updateAutomationArtefact(id, {
+            markdown: typeof body.markdown === "string" ? body.markdown : undefined,
+            note: typeof body.note === "string" ? body.note : undefined,
+            summary: typeof body.summary === "string" ? body.summary : undefined,
+            title: typeof body.title === "string" ? body.title : undefined,
+          }),
+          { headers: originHeaders },
+        );
+        return;
+      }
+
+      if (
+        method === "POST" &&
+        (path.endsWith("/approve") || path.endsWith("/reject")) &&
+        path.startsWith(`${granolaTransportPaths.automationArtefacts}/`)
+      ) {
+        const decision = path.endsWith("/approve") ? "approve" : "reject";
+        const id = decodeURIComponent(
+          path.slice(
+            `${granolaTransportPaths.automationArtefacts}/`.length,
+            -`/${decision}`.length,
+          ),
+        );
+        const body = await readJsonBody(request);
+        sendJson(
+          response,
+          await app.resolveAutomationArtefact(id, decision, {
+            note: typeof body.note === "string" ? body.note : undefined,
+          }),
+          { headers: originHeaders },
+        );
+        return;
+      }
+
       if (method === "GET" && path === granolaTransportPaths.automationRuns) {
         sendJson(
           response,
@@ -563,6 +608,18 @@ export async function startGranolaServer(
           path.slice(`${granolaTransportPaths.automationArtefacts}/`.length, -"/rerun".length),
         );
         sendJson(response, await app.rerunAutomationArtefact(id), { headers: originHeaders });
+        return;
+      }
+
+      if (
+        method === "GET" &&
+        path.startsWith(`${granolaTransportPaths.automationArtefacts}/`) &&
+        !path.slice(`${granolaTransportPaths.automationArtefacts}/`.length).includes("/")
+      ) {
+        const id = decodeURIComponent(
+          path.slice(`${granolaTransportPaths.automationArtefacts}/`.length),
+        );
+        sendJson(response, await app.getAutomationArtefact(id), { headers: originHeaders });
         return;
       }
 

@@ -114,6 +114,45 @@ function createTestApp(): {
             },
           },
         ]),
+        automationArtefacts: [
+          {
+            actionId: "pipeline-notes",
+            actionName: "Pipeline notes",
+            attempts: [],
+            createdAt: "2024-03-01T12:00:00.000Z",
+            eventId: "sync-1",
+            history: [
+              {
+                action: "generated",
+                at: "2024-03-01T12:00:00.000Z",
+              },
+            ],
+            id: "notes:sync-1:pipeline-notes",
+            kind: "notes",
+            matchId: "sync-1:meeting-created-any",
+            meetingId: "doc-alpha-1111",
+            model: "gpt-5-codex",
+            parseMode: "json",
+            prompt: "Prompt",
+            provider: "codex",
+            rawOutput: "{}",
+            ruleId: "meeting-created-any",
+            ruleName: "Meeting created",
+            runId: "sync-1:meeting-created-any:pipeline-notes",
+            status: "generated",
+            structured: {
+              actionItems: [],
+              decisions: [],
+              followUps: [],
+              highlights: [],
+              markdown: "# Alpha Sync",
+              sections: [],
+              summary: "Generated summary",
+              title: "Alpha Sync Notes",
+            },
+            updatedAt: "2024-03-01T12:00:00.000Z",
+          },
+        ],
         cacheLoader: async () => cacheData,
         granolaClient: {
           listDocuments: async () => currentDocuments,
@@ -274,6 +313,60 @@ describe("GranolaServerClient", () => {
       expect.objectContaining({
         result: "Approved in test",
         status: "completed",
+      }),
+    );
+
+    const artefacts = await client.listAutomationArtefacts({ limit: 5 });
+    expect(artefacts.artefacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "notes:sync-1:pipeline-notes",
+          status: "generated",
+        }),
+      ]),
+    );
+    const updatedArtefact = await client.updateAutomationArtefact("notes:sync-1:pipeline-notes", {
+      markdown: "# Alpha Sync\n\nReviewed in test",
+      note: "Trimmed boilerplate",
+      summary: "Reviewed summary",
+      title: "Alpha Sync Notes (Reviewed)",
+    });
+    expect(updatedArtefact).toEqual(
+      expect.objectContaining({
+        history: expect.arrayContaining([
+          expect.objectContaining({
+            action: "edited",
+            note: "Trimmed boilerplate",
+          }),
+        ]),
+        structured: expect.objectContaining({
+          title: "Alpha Sync Notes (Reviewed)",
+        }),
+      }),
+    );
+    const approvedArtefact = await client.resolveAutomationArtefact(
+      "notes:sync-1:pipeline-notes",
+      "approve",
+      {
+        note: "Looks good",
+      },
+    );
+    expect(approvedArtefact).toEqual(
+      expect.objectContaining({
+        status: "approved",
+      }),
+    );
+    expect(await client.getAutomationArtefact("notes:sync-1:pipeline-notes")).toEqual(
+      expect.objectContaining({
+        history: expect.arrayContaining([
+          expect.objectContaining({
+            action: "approved",
+            note: "Looks good",
+          }),
+        ]),
+        structured: expect.objectContaining({
+          markdown: "# Alpha Sync\n\nReviewed in test",
+        }),
       }),
     );
 

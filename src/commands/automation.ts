@@ -17,7 +17,7 @@ function automationHelp(): string {
   return `Granola automation
 
 Usage:
-  granola automation <rules|matches|runs|artefacts|approve|reject|rerun> [options]
+  granola automation <rules|matches|runs|artefacts|approve|reject|approve-artefact|reject-artefact|rerun> [options]
 
 Subcommands:
   rules               List configured automation rules
@@ -26,6 +26,10 @@ Subcommands:
   artefacts           Show generated note and enrichment artefacts
   approve <id>        Approve a pending ask-user action run
   reject <id>         Reject a pending ask-user action run
+  approve-artefact <id>
+                      Approve a generated automation artefact
+  reject-artefact <id>
+                      Reject a generated automation artefact
   rerun <id>          Re-run the pipeline that produced an artefact
 
 Options:
@@ -298,6 +302,25 @@ export const automationCommand: CommandDefinition = {
         );
         return 0;
       }
+      case "approve-artefact":
+      case "reject-artefact": {
+        const id = commandArgs[1]?.trim();
+        if (!id) {
+          throw new Error(`missing automation artefact id for ${action}`);
+        }
+
+        const artefact = await app.resolveAutomationArtefact(
+          id,
+          action === "approve-artefact" ? "approve" : "reject",
+          {
+            note: typeof commandFlags.note === "string" ? commandFlags.note : undefined,
+          },
+        );
+        console.log(
+          `${action === "approve-artefact" ? "Approved" : "Rejected"} artefact ${artefact.structured.title} (${artefact.id})`,
+        );
+        return 0;
+      }
       case "rerun": {
         const id = commandArgs[1]?.trim();
         if (!id) {
@@ -315,7 +338,7 @@ export const automationCommand: CommandDefinition = {
         return 1;
       default:
         throw new Error(
-          "invalid automation command: expected rules, matches, runs, artefacts, approve, reject, or rerun",
+          "invalid automation command: expected rules, matches, runs, artefacts, approve, reject, approve-artefact, reject-artefact, or rerun",
         );
     }
   },

@@ -115,12 +115,15 @@ import type {
   GranolaAutomationArtefact,
   GranolaAutomationArtefactsResult,
   GranolaAutomationArtefactAttempt,
+  GranolaAutomationArtefactHistoryAction,
+  GranolaAutomationArtefactHistoryEntry,
   GranolaAutomationCommandAction,
   GranolaAutomationAgentAction,
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
   GranolaAutomationActionRun,
   GranolaAutomationArtefactListOptions,
+  GranolaAutomationArtefactUpdate,
   GranolaAutomationMatch,
   GranolaAutomationRule,
   GranolaAutomationMatchesResult,
@@ -377,6 +380,7 @@ function defaultState(
       loaded: false,
       matchCount: 0,
       matchesFile: defaultAutomationMatchesFilePath(),
+      pendingArtefactCount: 0,
       pendingRunCount: 0,
       ruleCount: 0,
       rulesFile: config.automation?.rulesFile ?? defaultAutomationRulesFilePath(),
@@ -473,6 +477,9 @@ export class GranolaApp implements GranolaAppApi {
       loaded: true,
       matchCount: this.#automationMatches.length,
       matchesFile: defaultAutomationMatchesFilePath(),
+      pendingArtefactCount: this.#automationArtefacts.filter(
+        (artefact) => artefact.status === "generated",
+      ).length,
       pendingRunCount: this.#automationActionRuns.filter((run) => run.status === "pending").length,
       ruleCount: this.#automationRules.length,
       rulesFile: config.automation?.rulesFile ?? defaultAutomationRulesFilePath(),
@@ -625,6 +632,7 @@ export class GranolaApp implements GranolaAppApi {
     return {
       ...artefact,
       attempts: artefact.attempts.map((attempt) => ({ ...attempt })),
+      history: artefact.history.map((entry) => ({ ...entry })),
       structured: {
         ...artefact.structured,
         actionItems: artefact.structured.actionItems.map((item) => ({ ...item })),
@@ -663,6 +671,9 @@ export class GranolaApp implements GranolaAppApi {
       loaded: true,
       matchCount: this.#automationMatches.length,
       matchesFile: defaultAutomationMatchesFilePath(),
+      pendingArtefactCount: this.#automationArtefacts.filter(
+        (artefact) => artefact.status === "generated",
+      ).length,
       pendingRunCount: this.#automationActionRuns.filter((run) => run.status === "pending").length,
       ruleCount: this.#automationRules.length,
       rulesFile: this.config.automation?.rulesFile ?? defaultAutomationRulesFilePath(),
@@ -737,6 +748,49 @@ export class GranolaApp implements GranolaAppApi {
     }
 
     this.refreshAutomationState();
+  }
+
+  private buildAutomationArtefactHistoryEntry(
+    action: GranolaAutomationArtefactHistoryAction,
+    note?: string,
+  ): GranolaAutomationArtefactHistoryEntry {
+    return {
+      action,
+      at: this.nowIso(),
+      note: note?.trim() || undefined,
+    };
+  }
+
+  private async readAutomationArtefactById(
+    id: string,
+  ): Promise<GranolaAutomationArtefact | undefined> {
+    return (
+      (this.deps.automationArtefactStore
+        ? await this.deps.automationArtefactStore.readArtefact(id)
+        : undefined) ?? this.#automationArtefacts.find((artefact) => artefact.id === id)
+    );
+  }
+
+  private assertMutableAutomationArtefact(artefact: GranolaAutomationArtefact): void {
+    if (artefact.status === "superseded") {
+      throw new Error(`automation artefact is superseded: ${artefact.id}`);
+    }
+  }
+
+  private async replaceAutomationArtefact(
+    nextArtefact: GranolaAutomationArtefact,
+  ): Promise<GranolaAutomationArtefact> {
+    const nextArtefacts = [
+      this.cloneAutomationArtefact(nextArtefact),
+      ...this.#automationArtefacts
+        .filter((artefact) => artefact.id !== nextArtefact.id)
+        .map((artefact) => this.cloneAutomationArtefact(artefact)),
+    ];
+    await this.writeAutomationArtefacts(nextArtefacts);
+    this.emitStateUpdate();
+    return this.cloneAutomationArtefact(
+      this.#automationArtefacts.find((artefact) => artefact.id === nextArtefact.id) ?? nextArtefact,
+    );
   }
 
   private createSyncRunId(): string {
@@ -1174,6 +1228,18 @@ export class GranolaApp implements GranolaAppApi {
     };
   }
 
+  async getAutomationArtefact(id: string): Promise<GranolaAutomationArtefact> {
+    const artefact = await this.readAutomationArtefactById(id);
+    if (!artefact) {
+      throw new Error(`automation artefact not found: ${id}`);
+    }
+
+    this.setUiState({
+      view: "idle",
+    });
+    return this.cloneAutomationArtefact(artefact);
+  }
+
   async listAutomationRules(): Promise<GranolaAutomationRulesResult> {
     const rules = await this.loadAutomationRules({ forceRefresh: true });
     this.setUiState({
@@ -1257,11 +1323,72 @@ export class GranolaApp implements GranolaAppApi {
     return this.cloneAutomationRun(resolved);
   }
 
+  async resolveAutomationArtefact(
+    id: string,
+    decision: "approve" | "reject",
+    options: { note?: string } = {},
+  ): Promise<GranolaAutomationArtefact> {
+    const current = await this.readAutomationArtefactById(id);
+    if (!current) {
+      throw new Error(`automation artefact not found: ${id}`);
+    }
+
+    this.assertMutableAutomationArtefact(current);
+
+    const nextArtefact: GranolaAutomationArtefact = {
+      ...this.cloneAutomationArtefact(current),
+      history: [
+        ...current.history.map((entry) => ({ ...entry })),
+        this.buildAutomationArtefactHistoryEntry(
+          decision === "approve" ? "approved" : "rejected",
+          options.note,
+        ),
+      ],
+      status: decision === "approve" ? "approved" : "rejected",
+      updatedAt: this.nowIso(),
+    };
+
+    return await this.replaceAutomationArtefact(nextArtefact);
+  }
+
+  async updateAutomationArtefact(
+    id: string,
+    patch: GranolaAutomationArtefactUpdate,
+  ): Promise<GranolaAutomationArtefact> {
+    const current = await this.readAutomationArtefactById(id);
+    if (!current) {
+      throw new Error(`automation artefact not found: ${id}`);
+    }
+
+    this.assertMutableAutomationArtefact(current);
+
+    const nextTitle = patch.title?.trim();
+    const nextSummary = patch.summary?.trim();
+    const nextMarkdown = patch.markdown?.trim();
+    if (nextTitle === "" || nextMarkdown === "") {
+      throw new Error("automation artefact title and markdown must not be empty");
+    }
+
+    const nextArtefact: GranolaAutomationArtefact = {
+      ...this.cloneAutomationArtefact(current),
+      history: [
+        ...current.history.map((entry) => ({ ...entry })),
+        this.buildAutomationArtefactHistoryEntry("edited", patch.note),
+      ],
+      structured: {
+        ...current.structured,
+        markdown: nextMarkdown ?? current.structured.markdown,
+        summary: nextSummary === undefined ? current.structured.summary : nextSummary || undefined,
+        title: nextTitle ?? current.structured.title,
+      },
+      updatedAt: this.nowIso(),
+    };
+
+    return await this.replaceAutomationArtefact(nextArtefact);
+  }
+
   async rerunAutomationArtefact(id: string): Promise<GranolaAutomationArtefact> {
-    const current =
-      (this.deps.automationArtefactStore
-        ? await this.deps.automationArtefactStore.readArtefact(id)
-        : undefined) ?? this.#automationArtefacts.find((artefact) => artefact.id === id);
+    const current = await this.readAutomationArtefactById(id);
     if (!current) {
       throw new Error(`automation artefact not found: ${id}`);
     }
@@ -1325,6 +1452,10 @@ export class GranolaApp implements GranolaAppApi {
       artefact.id === current.id
         ? {
             ...artefact,
+            history: [
+              ...artefact.history.map((entry) => ({ ...entry })),
+              this.buildAutomationArtefactHistoryEntry("rerun", `Superseded by ${nextArtefact.id}`),
+            ],
             status: "superseded" as const,
             supersededById: nextArtefact.id,
             updatedAt: nextArtefact.createdAt,
@@ -1736,12 +1867,20 @@ export class GranolaApp implements GranolaAppApi {
             meetingTitle: match.title,
             rawOutput: result.output ?? "",
           });
+          const createdAt = this.nowIso();
           const artefact: GranolaAutomationArtefact = {
             actionId: action.id,
             actionName: automationActionName(action),
             attempts: attemptMeta.map((item) => ({ ...item })),
-            createdAt: this.nowIso(),
+            createdAt,
             eventId: match.eventId,
+            history: [
+              {
+                action: "generated",
+                at: createdAt,
+                note: run.rerunOfId ? `Rerun of ${run.rerunOfId}` : undefined,
+              },
+            ],
             id: buildAutomationArtefactId(run.id, action.pipeline.kind),
             kind: action.pipeline.kind,
             matchId: match.id,
@@ -1764,7 +1903,7 @@ export class GranolaApp implements GranolaAppApi {
             runId: run.id,
             status: "generated",
             structured: parsed.structured,
-            updatedAt: this.nowIso(),
+            updatedAt: createdAt,
           };
           await this.writeAutomationArtefacts([artefact, ...this.#automationArtefacts]);
 

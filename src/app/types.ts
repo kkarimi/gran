@@ -17,6 +17,12 @@ export type GranolaExportJobKind = "notes" | "transcripts";
 export type GranolaExportJobStatus = "completed" | "failed" | "running";
 export type GranolaSyncChangeKind = "changed" | "created" | "removed" | "transcript-ready";
 export type GranolaAutomationArtefactKind = "enrichment" | "notes";
+export type GranolaAutomationArtefactHistoryAction =
+  | "approved"
+  | "edited"
+  | "generated"
+  | "rejected"
+  | "rerun";
 export type GranolaAutomationArtefactStatus = "approved" | "generated" | "rejected" | "superseded";
 export type GranolaSyncEventKind =
   | "meeting.changed"
@@ -295,12 +301,19 @@ export interface GranolaAutomationArtefactAttempt {
   provider?: GranolaAgentProviderKind;
 }
 
+export interface GranolaAutomationArtefactHistoryEntry {
+  action: GranolaAutomationArtefactHistoryAction;
+  at: string;
+  note?: string;
+}
+
 export interface GranolaAutomationArtefact {
   actionId: string;
   actionName: string;
   attempts: GranolaAutomationArtefactAttempt[];
   createdAt: string;
   eventId: string;
+  history: GranolaAutomationArtefactHistoryEntry[];
   id: string;
   kind: GranolaAutomationArtefactKind;
   matchId: string;
@@ -328,6 +341,7 @@ export interface GranolaAppAutomationState {
   loaded: boolean;
   matchCount: number;
   matchesFile?: string;
+  pendingArtefactCount: number;
   pendingRunCount: number;
   ruleCount: number;
   rulesFile?: string;
@@ -489,6 +503,13 @@ export interface GranolaAutomationArtefactListOptions {
   status?: GranolaAutomationArtefactStatus;
 }
 
+export interface GranolaAutomationArtefactUpdate {
+  markdown?: string;
+  note?: string;
+  summary?: string;
+  title?: string;
+}
+
 export interface GranolaAppStateEvent {
   state: GranolaAppState;
   timestamp: string;
@@ -501,6 +522,7 @@ export interface GranolaAppApi {
   getState(): GranolaAppState;
   subscribe(listener: (event: GranolaAppStateEvent) => void): () => void;
   inspectAuth(): Promise<GranolaAppAuthState>;
+  getAutomationArtefact(id: string): Promise<GranolaAutomationArtefact>;
   listAutomationArtefacts(
     options?: GranolaAutomationArtefactListOptions,
   ): Promise<GranolaAutomationArtefactsResult>;
@@ -514,6 +536,11 @@ export interface GranolaAppApi {
   inspectSync(): Promise<GranolaAppSyncState>;
   loginAuth(options?: { apiKey?: string; supabasePath?: string }): Promise<GranolaAppAuthState>;
   logoutAuth(): Promise<GranolaAppAuthState>;
+  resolveAutomationArtefact(
+    id: string,
+    decision: "approve" | "reject",
+    options?: { note?: string },
+  ): Promise<GranolaAutomationArtefact>;
   resolveAutomationRun(
     id: string,
     decision: "approve" | "reject",
@@ -523,6 +550,10 @@ export interface GranolaAppApi {
   refreshAuth(): Promise<GranolaAppAuthState>;
   switchAuthMode(mode: GranolaAppAuthMode): Promise<GranolaAppAuthState>;
   sync(options?: { forceRefresh?: boolean; foreground?: boolean }): Promise<GranolaAppSyncResult>;
+  updateAutomationArtefact(
+    id: string,
+    patch: GranolaAutomationArtefactUpdate,
+  ): Promise<GranolaAutomationArtefact>;
   listFolders(options?: GranolaFolderListOptions): Promise<GranolaFolderListResult>;
   getFolder(id: string): Promise<FolderRecord>;
   findFolder(query: string): Promise<FolderRecord>;

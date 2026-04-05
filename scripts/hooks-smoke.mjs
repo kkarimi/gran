@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const tempDir = mkdtempSync(join(tmpdir(), "granola-hook-smoke-"));
-let cleanupNeeded = false;
+const tempRoot = mkdtempSync(join(tmpdir(), "granola-hook-smoke-"));
+const tempDir = join(tempRoot, "repo");
 
 function run(command, args, cwd = root, options = {}) {
   return execFileSync(command, args, {
@@ -18,20 +18,11 @@ function run(command, args, cwd = root, options = {}) {
 }
 
 function cleanup() {
-  if (!cleanupNeeded) {
-    return;
-  }
-
-  try {
-    run("git", ["worktree", "remove", "--force", tempDir], root, { stdio: "pipe" });
-  } catch {}
-
-  rmSync(tempDir, { force: true, recursive: true });
+  rmSync(tempRoot, { force: true, recursive: true });
 }
 
 try {
-  run("git", ["worktree", "add", "--detach", tempDir, "HEAD"]);
-  cleanupNeeded = true;
+  run("git", ["clone", "--quiet", root, tempDir]);
 
   const workspaceNodeModules = resolve(tempDir, "node_modules");
   if (!existsSync(workspaceNodeModules)) {

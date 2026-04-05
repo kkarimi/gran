@@ -290,6 +290,7 @@ function createAppState(): GranolaAppState {
     automation: {
       artefactCount: 0,
       loaded: true,
+      pendingArtefactCount: 0,
       pendingRunCount: 0,
       matchCount: 0,
       matchesFile: "/tmp/automation-matches.jsonl",
@@ -363,6 +364,13 @@ function createAppState(): GranolaAppState {
 
 function createWorkspaceHarness(
   options: {
+    automationArtefacts?: Array<{
+      id: string;
+      meetingId?: string;
+      status: "approved" | "generated" | "rejected" | "superseded";
+      summary?: string;
+      title: string;
+    }>;
     automationRuns?: Array<{
       actionId: string;
       actionKind: "ask-user" | "command" | "export-notes" | "export-transcript";
@@ -458,6 +466,47 @@ function createWorkspaceHarness(
     title: "Alpha Sync",
     transcriptLoaded: true,
   }));
+  const resolveAutomationArtefact = vi.fn(async (id: string) => ({
+    actionId: "pipeline-notes",
+    actionName: "Pipeline notes",
+    attempts: [],
+    createdAt: "2024-03-01T12:00:00.000Z",
+    eventId: "sync-1",
+    history: [
+      {
+        action: "generated" as const,
+        at: "2024-03-01T12:00:00.000Z",
+      },
+      {
+        action: "approved" as const,
+        at: "2024-03-01T12:01:00.000Z",
+      },
+    ],
+    id,
+    kind: "notes" as const,
+    matchId: "sync-1:team-transcript",
+    meetingId: "doc-alpha-1111",
+    model: "gpt-5-codex",
+    parseMode: "json" as const,
+    prompt: "Prompt",
+    provider: "codex" as const,
+    rawOutput: "{}",
+    ruleId: "team-transcript",
+    ruleName: "Team transcript ready",
+    runId: "sync-1:team-transcript:pipeline-notes",
+    status: "approved" as const,
+    structured: {
+      actionItems: [],
+      decisions: [],
+      followUps: [],
+      highlights: [],
+      markdown: "# Alpha Sync",
+      sections: [],
+      summary: "Generated notes",
+      title: "Alpha Sync Notes",
+    },
+    updatedAt: "2024-03-01T12:01:00.000Z",
+  }));
 
   const app: GranolaTuiApp = {
     exportNotes: vi.fn(),
@@ -469,7 +518,81 @@ function createWorkspaceHarness(
     getState: () => state,
     inspectAuth: vi.fn(async () => state.auth),
     inspectSync: vi.fn(async () => state.sync),
-    listAutomationArtefacts: vi.fn(async () => ({ artefacts: [] })),
+    getAutomationArtefact: vi.fn(async (id: string) => ({
+      actionId: "pipeline-notes",
+      actionName: "Pipeline notes",
+      attempts: [],
+      createdAt: "2024-03-01T12:00:00.000Z",
+      eventId: "sync-1",
+      history: [
+        {
+          action: "generated" as const,
+          at: "2024-03-01T12:00:00.000Z",
+        },
+      ],
+      id,
+      kind: "notes" as const,
+      matchId: "sync-1:team-transcript",
+      meetingId: "doc-alpha-1111",
+      model: "gpt-5-codex",
+      parseMode: "json" as const,
+      prompt: "Prompt",
+      provider: "codex" as const,
+      rawOutput: "{}",
+      ruleId: "team-transcript",
+      ruleName: "Team transcript ready",
+      runId: "sync-1:team-transcript:pipeline-notes",
+      status: "generated" as const,
+      structured: {
+        actionItems: [],
+        decisions: [],
+        followUps: [],
+        highlights: [],
+        markdown: "# Alpha Sync",
+        sections: [],
+        summary: "Generated notes",
+        title: "Alpha Sync Notes",
+      },
+      updatedAt: "2024-03-01T12:00:00.000Z",
+    })),
+    listAutomationArtefacts: vi.fn(async () => ({
+      artefacts: (options.automationArtefacts ?? []).map((artefact) => ({
+        actionId: "pipeline-notes",
+        actionName: "Pipeline notes",
+        attempts: [],
+        createdAt: "2024-03-01T12:00:00.000Z",
+        eventId: "sync-1",
+        history: [
+          {
+            action: "generated" as const,
+            at: "2024-03-01T12:00:00.000Z",
+          },
+        ],
+        kind: "notes" as const,
+        matchId: "sync-1:team-transcript",
+        meetingId: artefact.meetingId ?? "doc-alpha-1111",
+        model: "gpt-5-codex",
+        parseMode: "json" as const,
+        prompt: "Prompt",
+        provider: "codex" as const,
+        rawOutput: "{}",
+        ruleId: "team-transcript",
+        ruleName: "Team transcript ready",
+        runId: `sync-1:team-transcript:${artefact.id}`,
+        structured: {
+          actionItems: [],
+          decisions: [],
+          followUps: [],
+          highlights: [],
+          markdown: "# Alpha Sync",
+          sections: [],
+          summary: artefact.summary ?? "Generated notes",
+          title: artefact.title,
+        },
+        updatedAt: "2024-03-01T12:00:00.000Z",
+        ...artefact,
+      })),
+    })),
     listAutomationMatches: vi.fn(async () => ({ matches: [] })),
     listAutomationRuns: vi.fn(async () => ({
       runs: (options.automationRuns ?? []).map((run) => ({
@@ -495,6 +618,7 @@ function createWorkspaceHarness(
     loginAuth: vi.fn(async () => state.auth),
     logoutAuth: vi.fn(async () => state.auth),
     refreshAuth: vi.fn(async () => state.auth),
+    resolveAutomationArtefact,
     resolveAutomationRun,
     rerunAutomationArtefact: vi.fn(),
     rerunExportJob: vi.fn(),
@@ -517,6 +641,7 @@ function createWorkspaceHarness(
       };
     },
     switchAuthMode: vi.fn(async () => state.auth),
+    updateAutomationArtefact: vi.fn(),
   };
 
   const workspace = new GranolaTuiWorkspace(host, app, {
@@ -559,6 +684,7 @@ function createWorkspaceHarness(
     listFolders,
     listMeetings,
     resolveAutomationRun,
+    resolveAutomationArtefact,
     state,
     waitFor,
     workspace,
@@ -714,5 +840,45 @@ describe("GranolaTuiWorkspace", () => {
     await harness.flush();
 
     expect(harness.resolveAutomationRun).toHaveBeenCalledWith("sync-1:1:review", "approve");
+  });
+
+  test("prefers generated artefacts in the automation review overlay", async () => {
+    const harness = createWorkspaceHarness({
+      automationArtefacts: [
+        {
+          id: "notes:sync-1:pipeline-notes",
+          status: "generated",
+          title: "Alpha Sync Notes",
+        },
+      ],
+      automationRuns: [
+        {
+          actionId: "review",
+          actionKind: "ask-user",
+          actionName: "Review transcript",
+          id: "sync-1:1:review",
+          prompt: "Review the transcript before sharing it",
+          status: "pending",
+          title: "Alpha Sync",
+        },
+      ],
+    });
+
+    await harness.workspace.initialise();
+    harness.workspace.handleInput("u");
+
+    const overlay = harness.host.overlayComponent;
+    expect(overlay).toBeInstanceOf(GranolaTuiAutomationOverlay);
+    if (!(overlay instanceof GranolaTuiAutomationOverlay)) {
+      throw new Error("expected automation overlay");
+    }
+
+    overlay.handleInput("\n");
+    await harness.flush();
+
+    expect(harness.resolveAutomationArtefact).toHaveBeenCalledWith(
+      "notes:sync-1:pipeline-notes",
+      "approve",
+    );
   });
 });

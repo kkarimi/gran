@@ -5,6 +5,7 @@ import { createStore } from "solid-js/store";
 
 import type {
   FolderSummaryRecord,
+  GranolaAutomationArtefact,
   GranolaAutomationActionRun,
   GranolaAppAuthMode,
   GranolaAppAuthState,
@@ -34,6 +35,8 @@ import {
 } from "../web/client-state.ts";
 import {
   AppStatePanel,
+  ArtefactReviewPanel,
+  AutomationArtefactsPanel,
   AutomationRunsPanel,
   AuthPanel,
   ExportJobsPanel,
@@ -53,6 +56,11 @@ interface GranolaWebBrowserConfig {
 
 interface GranolaWebAppState {
   apiKeyDraft: string;
+  automationArtefactDraftMarkdown: string;
+  automationArtefactDraftSummary: string;
+  automationArtefactDraftTitle: string;
+  automationArtefactError: string;
+  automationArtefacts: GranolaAutomationArtefact[];
   appState: GranolaAppState | null;
   automationRuns: GranolaAutomationActionRun[];
   detailError: string;
@@ -65,10 +73,12 @@ interface GranolaWebAppState {
   recentMeetings: WebWorkspacePreferences["recentMeetings"];
   savedFilters: WebWorkspacePreferences["savedFilters"];
   search: string;
+  selectedAutomationArtefactId: string | null;
   selectedFolderId: string | null;
   selectedMeetingBundle: GranolaMeetingBundle | null;
   selectedMeetingId: string | null;
   selectedMeeting: MeetingRecord | null;
+  reviewNote: string;
   serverLocked: boolean;
   serverPassword: string;
   sort: GranolaMeetingSort;
@@ -106,6 +116,11 @@ export function App() {
   );
   const [state, setState] = createStore<GranolaWebAppState>({
     apiKeyDraft: "",
+    automationArtefactDraftMarkdown: "",
+    automationArtefactDraftSummary: "",
+    automationArtefactDraftTitle: "",
+    automationArtefactError: "",
+    automationArtefacts: [],
     appState: null,
     automationRuns: [],
     detailError: "",
@@ -118,10 +133,12 @@ export function App() {
     recentMeetings: initialPreferences.recentMeetings,
     savedFilters: initialPreferences.savedFilters,
     search: "",
+    selectedAutomationArtefactId: null,
     selectedFolderId: startup.folderId || null,
     selectedMeetingBundle: null,
     selectedMeetingId: startup.meetingId || null,
     selectedMeeting: null,
+    reviewNote: "",
     serverLocked: browserConfig().passwordRequired,
     serverPassword: "",
     sort: "updated-desc",
@@ -237,6 +254,59 @@ export function App() {
     }
   };
 
+  const syncSelectedArtefact = (
+    artefacts: GranolaAutomationArtefact[],
+    options: {
+      preferredId?: string | null;
+      preferredMeetingId?: string | null;
+    } = {},
+  ) => {
+    const preferred =
+      (options.preferredId
+        ? artefacts.find((candidate) => candidate.id === options.preferredId)
+        : undefined) ??
+      (options.preferredMeetingId
+        ? artefacts.find(
+            (candidate) =>
+              candidate.meetingId === options.preferredMeetingId &&
+              candidate.status === "generated",
+          )
+        : undefined) ??
+      artefacts.find((candidate) => candidate.status === "generated") ??
+      artefacts[0];
+
+    setState("selectedAutomationArtefactId", preferred?.id ?? null);
+    setState("automationArtefactDraftTitle", preferred?.structured.title ?? "");
+    setState("automationArtefactDraftSummary", preferred?.structured.summary ?? "");
+    setState("automationArtefactDraftMarkdown", preferred?.structured.markdown ?? "");
+    setState("reviewNote", "");
+  };
+
+  const loadAutomationArtefacts = async (
+    options: {
+      preferredId?: string | null;
+      preferredMeetingId?: string | null;
+    } = {},
+  ) => {
+    if (!client) {
+      return;
+    }
+
+    try {
+      setState("automationArtefactError", "");
+      const result = await client.listAutomationArtefacts({ limit: 30 });
+      setState("automationArtefacts", result.artefacts);
+      syncSelectedArtefact(result.artefacts, {
+        preferredId: options.preferredId ?? state.selectedAutomationArtefactId,
+        preferredMeetingId: options.preferredMeetingId ?? state.selectedMeetingId,
+      });
+    } catch (error) {
+      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
+      setState("automationArtefacts", []);
+      syncSelectedArtefact([]);
+    }
+  };
+
   const loadMeeting = async (meetingId: string) => {
     if (!client) {
       return;
@@ -251,6 +321,10 @@ export function App() {
       updatePreferences((preferences) =>
         rememberRecentMeeting(preferences, bundle.meeting.meeting),
       );
+      await loadAutomationArtefacts({
+        preferredId: state.selectedAutomationArtefactId,
+        preferredMeetingId: bundle.document.id,
+      });
     } catch (error) {
       setState("selectedMeetingBundle", null);
       setState("selectedMeeting", null);
@@ -287,6 +361,10 @@ export function App() {
         setState("selectedMeeting", null);
         setState("selectedMeetingBundle", null);
         setState("detailError", "");
+        await loadAutomationArtefacts({
+          preferredId: state.selectedAutomationArtefactId,
+          preferredMeetingId: null,
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -311,7 +389,12 @@ export function App() {
       });
     }
 
-    await Promise.all([loadFolders(forceRefresh), loadAutomationRuns(), mergeAuthState()]);
+    await Promise.all([
+      loadFolders(forceRefresh),
+      loadAutomationRuns(),
+      loadAutomationArtefacts(),
+      mergeAuthState(),
+    ]);
     await loadMeetings({ refresh: forceRefresh });
 
     setState("serverLocked", false);
@@ -595,6 +678,11 @@ export function App() {
     }
   };
 
+  const selectedAutomationArtefact = () =>
+    state.automationArtefacts.find(
+      (artefact) => artefact.id === state.selectedAutomationArtefactId,
+    ) || null;
+
   const resolveAutomationRun = async (id: string, decision: "approve" | "reject") => {
     if (!client) {
       return;
@@ -607,6 +695,100 @@ export function App() {
     } catch (error) {
       setState("detailError", error instanceof Error ? error.message : String(error));
       setStatus("Automation decision failed", "error");
+    }
+  };
+
+  const selectAutomationArtefact = async (id: string) => {
+    if (!client) {
+      return;
+    }
+
+    try {
+      const artefact =
+        state.automationArtefacts.find((candidate) => candidate.id === id) ??
+        (await client.getAutomationArtefact(id));
+      setState("selectedAutomationArtefactId", artefact.id);
+      setState("automationArtefactDraftTitle", artefact.structured.title);
+      setState("automationArtefactDraftSummary", artefact.structured.summary ?? "");
+      setState("automationArtefactDraftMarkdown", artefact.structured.markdown);
+      setState("reviewNote", "");
+      if (artefact.meetingId !== state.selectedMeetingId) {
+        await loadMeeting(artefact.meetingId);
+      }
+    } catch (error) {
+      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
+      setStatus("Unable to open artefact", "error");
+    }
+  };
+
+  const saveAutomationArtefact = async () => {
+    if (!client || !state.selectedAutomationArtefactId) {
+      return;
+    }
+
+    setStatus("Saving artefact edits…", "busy");
+    try {
+      const artefact = await client.updateAutomationArtefact(state.selectedAutomationArtefactId, {
+        markdown: state.automationArtefactDraftMarkdown,
+        note: state.reviewNote || undefined,
+        summary: state.automationArtefactDraftSummary,
+        title: state.automationArtefactDraftTitle,
+      });
+      await loadAutomationArtefacts({
+        preferredId: artefact.id,
+        preferredMeetingId: artefact.meetingId,
+      });
+      await loadAutomationRuns();
+      setStatus("Artefact updated", "ok");
+    } catch (error) {
+      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
+      setStatus("Artefact save failed", "error");
+    }
+  };
+
+  const resolveAutomationArtefact = async (decision: "approve" | "reject") => {
+    if (!client || !state.selectedAutomationArtefactId) {
+      return;
+    }
+
+    setStatus(decision === "approve" ? "Approving artefact…" : "Rejecting artefact…", "busy");
+    try {
+      const artefact = await client.resolveAutomationArtefact(
+        state.selectedAutomationArtefactId,
+        decision,
+        {
+          note: state.reviewNote || undefined,
+        },
+      );
+      await loadAutomationArtefacts({
+        preferredId: artefact.id,
+        preferredMeetingId: artefact.meetingId,
+      });
+      await loadAutomationRuns();
+      setStatus(decision === "approve" ? "Artefact approved" : "Artefact rejected", "ok");
+    } catch (error) {
+      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
+      setStatus("Artefact decision failed", "error");
+    }
+  };
+
+  const rerunAutomationArtefact = async () => {
+    if (!client || !state.selectedAutomationArtefactId) {
+      return;
+    }
+
+    setStatus("Rerunning artefact pipeline…", "busy");
+    try {
+      const artefact = await client.rerunAutomationArtefact(state.selectedAutomationArtefactId);
+      await loadAutomationArtefacts({
+        preferredId: artefact.id,
+        preferredMeetingId: artefact.meetingId,
+      });
+      await loadAutomationRuns();
+      setStatus("Artefact rerun complete", "ok");
+    } catch (error) {
+      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
+      setStatus("Artefact rerun failed", "error");
     }
   };
 
@@ -646,12 +828,19 @@ export function App() {
     await detachClient();
     setState({
       appState: null,
+      automationArtefactDraftMarkdown: "",
+      automationArtefactDraftSummary: "",
+      automationArtefactDraftTitle: "",
+      automationArtefactError: "",
+      automationArtefacts: [],
       automationRuns: [],
       detailError: "",
       folderError: "",
       folders: [],
       listError: "",
       meetings: [],
+      reviewNote: "",
+      selectedAutomationArtefactId: null,
       selectedFolderId: null,
       selectedMeeting: null,
       selectedMeetingBundle: null,
@@ -680,6 +869,7 @@ export function App() {
     }
 
     void loadAutomationRuns();
+    void loadAutomationArtefacts();
   });
 
   onMount(() => {
@@ -891,6 +1081,46 @@ export function App() {
             void resolveAutomationRun(runId, "reject");
           }}
           runs={state.automationRuns}
+        />
+        <AutomationArtefactsPanel
+          artefacts={state.automationArtefacts}
+          onSelect={(artefactId) => {
+            void selectAutomationArtefact(artefactId);
+          }}
+          selectedArtefactId={state.selectedAutomationArtefactId}
+        />
+        <ArtefactReviewPanel
+          artefact={selectedAutomationArtefact()}
+          bundle={state.selectedMeetingBundle}
+          draftMarkdown={state.automationArtefactDraftMarkdown}
+          draftSummary={state.automationArtefactDraftSummary}
+          draftTitle={state.automationArtefactDraftTitle}
+          error={state.automationArtefactError}
+          onApprove={() => {
+            void resolveAutomationArtefact("approve");
+          }}
+          onDraftMarkdownChange={(value) => {
+            setState("automationArtefactDraftMarkdown", value);
+          }}
+          onDraftSummaryChange={(value) => {
+            setState("automationArtefactDraftSummary", value);
+          }}
+          onDraftTitleChange={(value) => {
+            setState("automationArtefactDraftTitle", value);
+          }}
+          onReject={() => {
+            void resolveAutomationArtefact("reject");
+          }}
+          onRerun={() => {
+            void rerunAutomationArtefact();
+          }}
+          onReviewNoteChange={(value) => {
+            setState("reviewNote", value);
+          }}
+          onSave={() => {
+            void saveAutomationArtefact();
+          }}
+          reviewNote={state.reviewNote}
         />
         <Workspace
           bundle={state.selectedMeetingBundle}

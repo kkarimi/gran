@@ -3,6 +3,7 @@
 import { For, Show, type JSX } from "solid-js";
 
 import type {
+  GranolaAutomationArtefact,
   FolderSummaryRecord,
   GranolaAutomationActionRun,
   GranolaAppAuthState,
@@ -108,6 +109,30 @@ interface AutomationRunsPanelProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   runs: GranolaAutomationActionRun[];
+}
+
+interface AutomationArtefactsPanelProps {
+  artefacts: GranolaAutomationArtefact[];
+  onSelect: (id: string) => void;
+  selectedArtefactId?: string | null;
+}
+
+interface ArtefactReviewPanelProps {
+  artefact: GranolaAutomationArtefact | null;
+  bundle: GranolaMeetingBundle | null;
+  draftMarkdown: string;
+  draftSummary: string;
+  draftTitle: string;
+  error?: string;
+  onApprove: () => void;
+  onDraftMarkdownChange: (value: string) => void;
+  onDraftSummaryChange: (value: string) => void;
+  onDraftTitleChange: (value: string) => void;
+  onReject: () => void;
+  onRerun: () => void;
+  onReviewNoteChange: (value: string) => void;
+  onSave: () => void;
+  reviewNote: string;
 }
 
 interface WorkspaceProps {
@@ -541,7 +566,7 @@ export function AppStatePanel(props: {
               <div>
                 <span class="status-label">Automation</span>
                 <strong>
-                  {`${appState().automation.runCount} runs / ${appState().automation.pendingRunCount} pending`}
+                  {`${appState().automation.runCount} runs / ${appState().automation.pendingRunCount} pending runs / ${appState().automation.pendingArtefactCount} pending artefacts`}
                 </strong>
               </div>
             </div>
@@ -851,6 +876,182 @@ export function AutomationRunsPanel(props: AutomationRunsPanelProps): JSX.Elemen
           </For>
         </Show>
       </div>
+    </section>
+  );
+}
+
+export function AutomationArtefactsPanel(props: AutomationArtefactsPanelProps): JSX.Element {
+  return (
+    <section class="jobs-panel">
+      <div class="jobs-panel__head">
+        <h3>Review Queue</h3>
+        <p>Generated note and enrichment candidates waiting for review or follow-up.</p>
+      </div>
+      <div class="jobs-list">
+        <Show
+          when={props.artefacts.length > 0}
+          fallback={<div class="job-empty">No automation artefacts yet.</div>}
+        >
+          <For each={props.artefacts.slice(0, 10)}>
+            {(artefact) => (
+              <button
+                class="job-card job-card--button"
+                data-selected={artefact.id === props.selectedArtefactId ? "true" : undefined}
+                onClick={() => {
+                  props.onSelect(artefact.id);
+                }}
+                type="button"
+              >
+                <div class="job-card__head">
+                  <div>
+                    <div class="job-card__title">{artefact.structured.title}</div>
+                    <div class="job-card__meta">{`${artefact.kind} • ${artefact.ruleName}`}</div>
+                  </div>
+                  <div class="job-card__status" data-status={artefact.status}>
+                    {artefact.status}
+                  </div>
+                </div>
+                <div class="job-card__meta">{artefact.meetingId}</div>
+                <Show when={artefact.structured.summary}>
+                  <div class="job-card__meta">{artefact.structured.summary}</div>
+                </Show>
+                <div class="job-card__meta">{`Updated: ${artefact.updatedAt.slice(0, 19)}`}</div>
+              </button>
+            )}
+          </For>
+        </Show>
+      </div>
+    </section>
+  );
+}
+
+export function ArtefactReviewPanel(props: ArtefactReviewPanelProps): JSX.Element {
+  return (
+    <section class="review-panel">
+      <div class="jobs-panel__head">
+        <h3>Artefact Review</h3>
+        <p>
+          Review generated candidate notes, compare them to the current meeting, then approve,
+          reject, edit, or rerun.
+        </p>
+      </div>
+      <Show
+        when={props.artefact}
+        fallback={
+          <div class="job-empty">
+            {props.error || "Select an automation artefact to review it."}
+          </div>
+        }
+      >
+        {(artefact) => (
+          <div class="review-body">
+            <div class="detail-meta">
+              <div class="detail-chip">{`Status: ${artefact().status}`}</div>
+              <div class="detail-chip">{`Kind: ${artefact().kind}`}</div>
+              <div class="detail-chip">{`Meeting: ${artefact().meetingId}`}</div>
+              <div class="detail-chip">{`Provider: ${artefact().provider}/${artefact().model}`}</div>
+            </div>
+            <Show when={!props.error} fallback={<div class="empty">{props.error}</div>}>
+              <div class="review-grid">
+                <section class="detail-section">
+                  <h2>Current Meeting Notes</h2>
+                  <pre class="detail-pre">
+                    {props.bundle?.meeting.noteMarkdown || "(No existing meeting notes)"}
+                  </pre>
+                </section>
+                <section class="detail-section">
+                  <h2>Candidate</h2>
+                  <label class="field-row">
+                    <span class="field-label">Title</span>
+                    <input
+                      class="field-input field-input--plain"
+                      onInput={(event) => {
+                        props.onDraftTitleChange(event.currentTarget.value);
+                      }}
+                      value={props.draftTitle}
+                    />
+                  </label>
+                  <label class="field-row">
+                    <span class="field-label">Summary</span>
+                    <textarea
+                      class="review-textarea review-textarea--summary"
+                      onInput={(event) => {
+                        props.onDraftSummaryChange(event.currentTarget.value);
+                      }}
+                    >
+                      {props.draftSummary}
+                    </textarea>
+                  </label>
+                  <label class="field-row">
+                    <span class="field-label">Markdown</span>
+                    <textarea
+                      class="review-textarea"
+                      onInput={(event) => {
+                        props.onDraftMarkdownChange(event.currentTarget.value);
+                      }}
+                    >
+                      {props.draftMarkdown}
+                    </textarea>
+                  </label>
+                  <label class="field-row">
+                    <span class="field-label">Review Note</span>
+                    <textarea
+                      class="review-textarea review-textarea--summary"
+                      onInput={(event) => {
+                        props.onReviewNoteChange(event.currentTarget.value);
+                      }}
+                    >
+                      {props.reviewNote}
+                    </textarea>
+                  </label>
+                  <div class="job-card__actions">
+                    <button class="button button--secondary" onClick={props.onSave} type="button">
+                      Save edits
+                    </button>
+                    <button
+                      class="button button--secondary"
+                      disabled={artefact().status === "superseded"}
+                      onClick={props.onApprove}
+                      type="button"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      class="button button--secondary"
+                      disabled={artefact().status === "superseded"}
+                      onClick={props.onReject}
+                      type="button"
+                    >
+                      Reject
+                    </button>
+                    <button class="button button--secondary" onClick={props.onRerun} type="button">
+                      Rerun
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </Show>
+            <section class="detail-section review-history">
+              <h2>History</h2>
+              <div class="jobs-list">
+                <For each={artefact().history.slice().reverse()}>
+                  {(entry) => (
+                    <div class="job-card">
+                      <div class="job-card__head">
+                        <div class="job-card__title">{entry.action}</div>
+                        <div class="job-card__meta">{entry.at.slice(0, 19)}</div>
+                      </div>
+                      <Show when={entry.note}>
+                        <div class="job-card__meta">{entry.note}</div>
+                      </Show>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </section>
+          </div>
+        )}
+      </Show>
     </section>
   );
 }

@@ -802,6 +802,83 @@ describe("command execution", () => {
     expect(log).toHaveBeenCalledWith("Approved Review transcript for Alpha Sync (sync-1:1:review)");
   });
 
+  test("automation approve-artefact resolves a generated artefact", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      resolveAutomationArtefact: vi.fn(async () => ({
+        actionId: "pipeline-notes",
+        actionName: "Pipeline notes",
+        attempts: [],
+        createdAt: "2024-03-01T12:00:00.000Z",
+        eventId: "sync-1",
+        history: [
+          {
+            action: "generated" as const,
+            at: "2024-03-01T12:00:00.000Z",
+          },
+          {
+            action: "approved" as const,
+            at: "2024-03-01T12:01:00.000Z",
+            note: "Looks good",
+          },
+        ],
+        id: "notes:sync-1:team-transcript:pipeline-notes",
+        kind: "notes" as const,
+        matchId: "sync-1:team-transcript",
+        meetingId: "doc-alpha-1111",
+        model: "gpt-5-codex",
+        parseMode: "json" as const,
+        prompt: "Prompt",
+        provider: "codex" as const,
+        rawOutput: "{}",
+        ruleId: "team-transcript",
+        ruleName: "Team transcript ready",
+        runId: "sync-1:team-transcript:pipeline-notes",
+        status: "approved" as const,
+        structured: {
+          actionItems: [],
+          decisions: [],
+          followUps: [],
+          highlights: [],
+          markdown: "# Alpha",
+          sections: [],
+          summary: "Generated notes",
+          title: "Alpha Sync Notes",
+        },
+        updatedAt: "2024-03-01T12:01:00.000Z",
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await automationCommand.run(
+      makeContext({
+        commandArgs: ["approve-artefact", "notes:sync-1:team-transcript:pipeline-notes"],
+        commandFlags: {
+          note: "Looks good",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.resolveAutomationArtefact).toHaveBeenCalledWith(
+      "notes:sync-1:team-transcript:pipeline-notes",
+      "approve",
+      {
+        note: "Looks good",
+      },
+    );
+    expect(log).toHaveBeenCalledWith(
+      "Approved artefact Alpha Sync Notes (notes:sync-1:team-transcript:pipeline-notes)",
+    );
+  });
+
   test("automation rerun replays an artefact pipeline", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const app = {

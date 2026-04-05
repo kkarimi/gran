@@ -1082,6 +1082,11 @@ describe("GranolaApp", () => {
             provider: "codex",
           }),
         ],
+        history: [
+          expect.objectContaining({
+            action: "generated",
+          }),
+        ],
         kind: "notes",
         provider: "codex",
         status: "generated",
@@ -1091,6 +1096,48 @@ describe("GranolaApp", () => {
         }),
       }),
     );
+
+    const updated = await app.updateAutomationArtefact(firstArtefacts.artefacts[0]!.id, {
+      markdown: "# Alpha Sync\n\nEdited notes",
+      note: "Tightened the generated copy",
+      summary: "Edited note summary",
+      title: "Alpha Sync Notes (Edited)",
+    });
+    expect(updated).toEqual(
+      expect.objectContaining({
+        history: expect.arrayContaining([
+          expect.objectContaining({
+            action: "edited",
+            note: "Tightened the generated copy",
+          }),
+        ]),
+        structured: expect.objectContaining({
+          markdown: "# Alpha Sync\n\nEdited notes",
+          summary: "Edited note summary",
+          title: "Alpha Sync Notes (Edited)",
+        }),
+      }),
+    );
+
+    const approved = await app.resolveAutomationArtefact(
+      firstArtefacts.artefacts[0]!.id,
+      "approve",
+      {
+        note: "Ready to share",
+      },
+    );
+    expect(approved).toEqual(
+      expect.objectContaining({
+        history: expect.arrayContaining([
+          expect.objectContaining({
+            action: "approved",
+            note: "Ready to share",
+          }),
+        ]),
+        status: "approved",
+      }),
+    );
+    expect(app.getState().automation.pendingArtefactCount).toBe(0);
 
     const firstRuns = await app.listAutomationRuns({ limit: 10 });
     expect(firstRuns.runs[0]).toEqual(
@@ -1114,17 +1161,31 @@ describe("GranolaApp", () => {
     expect(afterRerun.artefacts).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          history: expect.arrayContaining([
+            expect.objectContaining({
+              action: "approved",
+            }),
+            expect.objectContaining({
+              action: "rerun",
+            }),
+          ]),
           id: firstArtefacts.artefacts[0]!.id,
           status: "superseded",
           supersededById: rerun.id,
         }),
         expect.objectContaining({
+          history: expect.arrayContaining([
+            expect.objectContaining({
+              action: "generated",
+            }),
+          ]),
           id: rerun.id,
           rerunOfId: firstArtefacts.artefacts[0]!.id,
         }),
       ]),
     );
     expect(app.getState().automation.artefactCount).toBe(2);
+    expect(app.getState().automation.pendingArtefactCount).toBe(1);
     expect(runAgent).toHaveBeenCalledTimes(4);
   });
 
