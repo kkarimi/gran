@@ -41,6 +41,7 @@ Override that path with either:
         {
           "id": "rewrite-with-agent",
           "kind": "agent",
+          "approvalMode": "manual",
           "pipeline": {
             "kind": "notes"
           },
@@ -49,10 +50,36 @@ Override that path with either:
           "promptFile": "./agents/customer-call/AGENT.md"
         },
         {
+          "id": "publish-approved-markdown",
+          "kind": "write-file",
+          "trigger": "approval",
+          "sourceActionId": "rewrite-with-agent",
+          "format": "markdown",
+          "outputDir": "./automation/approved"
+        },
+        {
+          "id": "notify-slack",
+          "kind": "slack-message",
+          "trigger": "approval",
+          "sourceActionId": "rewrite-with-agent",
+          "webhookUrlEnv": "SLACK_WEBHOOK_URL",
+          "text": "Approved {{artefact.title}}"
+        },
+        {
+          "id": "publish-hook",
+          "kind": "webhook",
+          "trigger": "approval",
+          "sourceActionId": "rewrite-with-agent",
+          "urlEnv": "POST_REVIEW_WEBHOOK_URL",
+          "payload": "json"
+        },
+        {
           "id": "summarise",
           "kind": "command",
+          "trigger": "approval",
+          "sourceActionId": "rewrite-with-agent",
           "command": "/bin/sh",
-          "args": ["-lc", "cat >/tmp/granola-event.json"]
+          "args": ["-lc", "cat >/tmp/granola-approved.json"]
         },
         {
           "id": "review",
@@ -72,6 +99,9 @@ Each rule can contain zero or more actions. Current action kinds are:
 - `agent`
 - `command`
 - `ask-user`
+- `write-file`
+- `webhook`
+- `slack-message`
 
 `agent` actions run BYOA prompts against OpenRouter, OpenAI-compatible APIs, or the local `codex`
 CLI. They append structured meeting context automatically, so a prompt file can stay focused on
@@ -80,6 +110,7 @@ instructions such as “turn this transcript into follow-up notes”.
 Supported agent fields:
 
 - `pipeline.kind`: `notes` or `enrichment`
+- `approvalMode`: `manual` or `auto`
 - `harnessId`
 - `fallbackHarnessIds`
 - `provider`: `openrouter`, `openai`, or `codex`
@@ -108,8 +139,28 @@ artefact, and the artefact can be re-run later without waiting for a fresh sync 
 tries the primary harness first, then each fallback harness in order, and records those attempts on
 the generated artefact for later review.
 
+`approvalMode` controls what happens after a pipeline artefact is generated:
+
+- `manual` keeps the artefact in the review queue until a person approves or rejects it
+- `auto` approves it immediately and triggers any approval-phase actions without waiting for manual review
+
 `command` actions receive a JSON payload on stdin by default, including the matched event, rule,
 and meeting bundle when the meeting still exists.
+
+`write-file`, `webhook`, `slack-message`, and `command` can also run with
+`"trigger": "approval"` plus `sourceActionId`. In that mode they execute once per approved
+artefact from the source pipeline action and receive the approved artefact in their payload.
+
+Approval-triggered actions are how you send reviewed notes into the rest of your stack:
+
+- `write-file` writes approved markdown, text, or JSON payloads to a local directory
+- `command` receives the same review payload on stdin for arbitrary local tooling
+- `webhook` posts either JSON or rendered text/markdown bodies to any HTTP endpoint
+- `slack-message` posts a simple text payload to an incoming Slack webhook
+
+Template fields such as `{{artefact.title}}`, `{{artefact.summary}}`, `{{meeting.title}}`, and
+`{{rule.name}}` are available in `text`, `contentTemplate`, `bodyTemplate`, and
+`filenameTemplate`.
 
 `ask-user` actions do not perform side effects immediately. They create a pending automation run
 that can be approved or rejected later from the CLI, web workspace, or TUI.
@@ -148,6 +199,12 @@ whatever process runs your automation:
 For local Codex runs, the toolkit shells out to `codex exec`, so it uses whatever local Codex login
 state you already have. You can override the command path with `GRANOLA_CODEX_COMMAND` or
 `codex-command = "..."` in `.granola.toml`.
+
+For approval-phase delivery actions, provide any external endpoints in the same runtime
+environment, for example:
+
+- `SLACK_WEBHOOK_URL`
+- `POST_REVIEW_WEBHOOK_URL`
 
 Non-secret defaults can live in `.granola.toml`:
 
@@ -249,6 +306,11 @@ the sync loop.
 Pipeline artefacts also keep their own audit trail. Generated candidates can be edited, approved,
 rejected, and rerun later, and every step is appended to the artefact history so the review queue
 can show what changed and why.
+
+When an artefact is approved, the toolkit looks for rule actions whose `trigger` is `approval` and
+whose `sourceActionId` matches the pipeline action that created the artefact. Those delivery
+actions are then executed exactly once for that artefact, whether the approval came from the review
+queue or from `approvalMode: "auto"`.
 
 Processing health sits next to that audit trail. The toolkit detects:
 

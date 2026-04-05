@@ -1189,6 +1189,339 @@ describe("GranolaApp", () => {
     expect(runAgent).toHaveBeenCalledTimes(4);
   });
 
+  test("runs downstream approval actions after approving an artefact", async () => {
+    const outputDir = await mkdtemp(join(tmpdir(), "granola-approval-actions-"));
+    const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-cache-")), "cache.json");
+    await writeFile(cacheFile, "{}\n", "utf8");
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      return new Response(`ok:${url}`, {
+        status: 200,
+      });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    const previousSlackUrl = process.env.TEST_SLACK_URL;
+    process.env.TEST_SLACK_URL = "https://hooks.slack.test/approved";
+
+    const app = new GranolaApp(
+      {
+        agents: {
+          codexCommand: "codex",
+          defaultProvider: "codex",
+          dryRun: false,
+          harnessesFile: "/tmp/agent-harnesses.json",
+          maxRetries: 1,
+          openaiBaseUrl: "https://api.openai.com/v1",
+          openrouterBaseUrl: "https://openrouter.ai/api/v1",
+          timeoutMs: 30_000,
+        },
+        automation: {
+          artefactsFile: "/tmp/automation-artefacts.json",
+          rulesFile: "/tmp/automation-rules.json",
+        },
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile,
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        agentRunner: {
+          run: async (
+            request: GranolaAutomationAgentRequest,
+          ): Promise<GranolaAutomationAgentResult> => ({
+            dryRun: false,
+            model: "gpt-5-codex",
+            output: JSON.stringify({
+              markdown: "# Approved Notes\n\nShip it.",
+              summary: "Ship it",
+              title: "Approved Notes",
+            }),
+            prompt: request.prompt,
+            provider: "codex",
+          }),
+        },
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        automationArtefactStore: new MemoryAutomationArtefactStore(),
+        automationMatchStore: new MemoryAutomationMatchStore(),
+        automationRuleStore: new MemoryAutomationRuleStore([
+          {
+            actions: [
+              {
+                id: "pipeline-notes",
+                kind: "agent",
+                pipeline: {
+                  kind: "notes",
+                },
+                prompt: "Write approved notes",
+              },
+              {
+                args: [
+                  "-e",
+                  "let data='';process.stdin.on('data',chunk=>data+=chunk);process.stdin.on('end',()=>{const input=JSON.parse(data);process.stdout.write(input.artefact.title);});",
+                ],
+                command: "node",
+                id: "publish-command",
+                kind: "command",
+                sourceActionId: "pipeline-notes",
+                trigger: "approval",
+              },
+              {
+                format: "markdown",
+                id: "write-approved-markdown",
+                kind: "write-file",
+                outputDir,
+                sourceActionId: "pipeline-notes",
+                trigger: "approval",
+              },
+              {
+                id: "notify-webhook",
+                kind: "webhook",
+                sourceActionId: "pipeline-notes",
+                trigger: "approval",
+                url: "https://hooks.example.test/artefacts",
+              },
+              {
+                id: "notify-slack",
+                kind: "slack-message",
+                sourceActionId: "pipeline-notes",
+                text: "Approved {{artefact.title}}",
+                trigger: "approval",
+                webhookUrlEnv: "TEST_SLACK_URL",
+              },
+            ],
+            id: "team-transcript",
+            name: "Team transcript ready",
+            when: {
+              eventKinds: ["transcript.ready"],
+              folderNames: ["Team"],
+              tags: ["team"],
+              transcriptLoaded: true,
+            },
+          },
+        ]),
+        automationRunStore: new MemoryAutomationRunStore(),
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+      { surface: "server" },
+    );
+
+    try {
+      await app.sync();
+
+      const artefact = (await app.listAutomationArtefacts({ kind: "notes", limit: 10 }))
+        .artefacts[0];
+      expect(artefact).toBeDefined();
+
+      const approved = await app.resolveAutomationArtefact(artefact!.id, "approve", {
+        note: "Ready to publish",
+      });
+
+      expect(approved.status).toBe("approved");
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
+        "https://hooks.example.test/artefacts",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        "https://hooks.slack.test/approved",
+        expect.objectContaining({
+          body: JSON.stringify({ text: "Approved Approved Notes" }),
+          method: "POST",
+        }),
+      );
+
+      const writtenFile = join(outputDir, "Alpha Sync-notes.md");
+      expect(await readFile(writtenFile, "utf8")).toContain("# Approved Notes");
+
+      const runs = await app.listAutomationRuns({ limit: 10 });
+      expect(runs.runs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            actionId: "publish-command",
+            artefactIds: [artefact!.id],
+            result: "Approved Notes",
+            status: "completed",
+          }),
+          expect.objectContaining({
+            actionId: "write-approved-markdown",
+            artefactIds: [artefact!.id],
+            result: `Wrote markdown file to ${writtenFile}`,
+            status: "completed",
+          }),
+          expect.objectContaining({
+            actionId: "notify-webhook",
+            artefactIds: [artefact!.id],
+            result: "ok:https://hooks.example.test/artefacts",
+            status: "completed",
+          }),
+          expect.objectContaining({
+            actionId: "notify-slack",
+            artefactIds: [artefact!.id],
+            result: "ok:https://hooks.slack.test/approved",
+            status: "completed",
+          }),
+        ]),
+      );
+    } finally {
+      if (previousSlackUrl == null) {
+        delete process.env.TEST_SLACK_URL;
+      } else {
+        process.env.TEST_SLACK_URL = previousSlackUrl;
+      }
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("auto-approval dispatches downstream actions during sync", async () => {
+    const outputDir = await mkdtemp(join(tmpdir(), "granola-auto-approval-actions-"));
+    const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-cache-")), "cache.json");
+    await writeFile(cacheFile, "{}\n", "utf8");
+
+    const app = new GranolaApp(
+      {
+        agents: {
+          codexCommand: "codex",
+          defaultProvider: "codex",
+          dryRun: false,
+          harnessesFile: "/tmp/agent-harnesses.json",
+          maxRetries: 1,
+          openaiBaseUrl: "https://api.openai.com/v1",
+          openrouterBaseUrl: "https://openrouter.ai/api/v1",
+          timeoutMs: 30_000,
+        },
+        automation: {
+          artefactsFile: "/tmp/automation-artefacts.json",
+          rulesFile: "/tmp/automation-rules.json",
+        },
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile,
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        agentRunner: {
+          run: async (
+            request: GranolaAutomationAgentRequest,
+          ): Promise<GranolaAutomationAgentResult> => ({
+            dryRun: false,
+            model: "gpt-5-codex",
+            output: JSON.stringify({
+              markdown: "# Auto Notes\n\nApproved automatically.",
+              summary: "Auto-approved",
+              title: "Auto Notes",
+            }),
+            prompt: request.prompt,
+            provider: "codex",
+          }),
+        },
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        automationArtefactStore: new MemoryAutomationArtefactStore(),
+        automationMatchStore: new MemoryAutomationMatchStore(),
+        automationRuleStore: new MemoryAutomationRuleStore([
+          {
+            actions: [
+              {
+                approvalMode: "auto",
+                id: "pipeline-notes",
+                kind: "agent",
+                pipeline: {
+                  kind: "notes",
+                },
+                prompt: "Write auto-approved notes",
+              },
+              {
+                format: "json",
+                id: "write-approved-json",
+                kind: "write-file",
+                outputDir,
+                sourceActionId: "pipeline-notes",
+                trigger: "approval",
+              },
+            ],
+            id: "team-transcript",
+            name: "Team transcript ready",
+            when: {
+              eventKinds: ["transcript.ready"],
+              folderNames: ["Team"],
+              tags: ["team"],
+              transcriptLoaded: true,
+            },
+          },
+        ]),
+        automationRunStore: new MemoryAutomationRunStore(),
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+      { surface: "server" },
+    );
+
+    await app.sync();
+
+    const artefact = (await app.listAutomationArtefacts({ kind: "notes", limit: 10 })).artefacts[0];
+    expect(artefact).toEqual(
+      expect.objectContaining({
+        status: "approved",
+      }),
+    );
+
+    const writtenFile = join(outputDir, "Alpha Sync-notes.json");
+    const writtenPayload = JSON.parse(await readFile(writtenFile, "utf8")) as {
+      approval?: { note?: string };
+      artefact?: { title?: string };
+    };
+    expect(writtenPayload.approval?.note).toBe("Auto-approved by automation rule");
+    expect(writtenPayload.artefact?.title).toBe("Auto Notes");
+
+    const runs = await app.listAutomationRuns({ limit: 10 });
+    expect(runs.runs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionId: "write-approved-json",
+          artefactIds: [artefact!.id],
+          status: "completed",
+        }),
+      ]),
+    );
+  });
+
   test("detects failed processing issues and recovers them", async () => {
     const runAgent = vi.fn(
       async (): Promise<GranolaAutomationAgentResult> => ({

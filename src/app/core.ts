@@ -21,10 +21,19 @@ import {
 } from "../agents.ts";
 import {
   automationActionName,
+  buildAutomationApprovalActionRunId,
   buildAutomationActionRunId,
   enabledAutomationActions,
   executeAutomationAction,
+  type AutomationActionContext,
 } from "../automation-actions.ts";
+import {
+  buildAutomationDeliveryPayload,
+  renderSlackMessageText,
+  renderWebhookBody,
+  renderWriteFileContent,
+  resolveWriteFilePath,
+} from "../automation-delivery.ts";
 import {
   createDefaultAutomationMatchStore,
   defaultAutomationMatchesFilePath,
@@ -113,7 +122,7 @@ import type {
   NoteOutputFormat,
   TranscriptOutputFormat,
 } from "../types.ts";
-import { granolaCacheCandidates } from "../utils.ts";
+import { granolaCacheCandidates, writeTextFile } from "../utils.ts";
 
 import type {
   GranolaAppApi,
@@ -124,6 +133,7 @@ import type {
   GranolaAutomationArtefactHistoryEntry,
   GranolaAutomationCommandAction,
   GranolaAutomationAgentAction,
+  GranolaAutomationApprovalMode,
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
   GranolaAutomationActionRun,
@@ -134,6 +144,9 @@ import type {
   GranolaAutomationMatchesResult,
   GranolaAutomationRulesResult,
   GranolaAutomationRunsResult,
+  GranolaAutomationSlackMessageAction,
+  GranolaAutomationWebhookAction,
+  GranolaAutomationWriteFileAction,
   GranolaAppAuthMode,
   GranolaAppAuthState,
   GranolaAppExportJobState,
@@ -605,6 +618,15 @@ export class GranolaApp implements GranolaAppApi {
           case "export-notes":
           case "export-transcript":
             return { ...action };
+          case "slack-message":
+            return { ...action };
+          case "webhook":
+            return {
+              ...action,
+              headers: action.headers ? { ...action.headers } : undefined,
+            };
+          case "write-file":
+            return { ...action };
         }
       }),
       when: {
@@ -828,7 +850,26 @@ export class GranolaApp implements GranolaAppApi {
         nextMatch: GranolaAutomationMatch,
         nextRule: GranolaAutomationRule,
         nextAction: GranolaAutomationCommandAction,
-      ) => await this.runAutomationCommand(nextMatch, nextRule, nextAction),
+        context: AutomationActionContext,
+      ) => await this.runAutomationCommand(nextMatch, nextRule, nextAction, context),
+      runSlackMessage: async (
+        nextMatch: GranolaAutomationMatch,
+        nextRule: GranolaAutomationRule,
+        nextAction: GranolaAutomationSlackMessageAction,
+        context: AutomationActionContext,
+      ) => await this.runAutomationSlackMessage(nextMatch, nextRule, nextAction, context),
+      runWebhook: async (
+        nextMatch: GranolaAutomationMatch,
+        nextRule: GranolaAutomationRule,
+        nextAction: GranolaAutomationWebhookAction,
+        context: AutomationActionContext,
+      ) => await this.runAutomationWebhook(nextMatch, nextRule, nextAction, context),
+      writeFile: async (
+        nextMatch: GranolaAutomationMatch,
+        nextRule: GranolaAutomationRule,
+        nextAction: GranolaAutomationWriteFileAction,
+        context: AutomationActionContext,
+      ) => await this.runAutomationWriteFile(nextMatch, nextRule, nextAction, context),
     };
   }
 
@@ -1442,6 +1483,84 @@ export class GranolaApp implements GranolaAppApi {
     return this.cloneAutomationRun(resolved);
   }
 
+  private async readAutomationMatchById(id: string): Promise<GranolaAutomationMatch | undefined> {
+    return (
+      (this.deps.automationMatchStore
+        ? (await this.deps.automationMatchStore.readMatches(0)).find(
+            (candidate) => candidate.id === id,
+          )
+        : undefined) ?? this.#automationMatches.find((candidate) => candidate.id === id)
+    );
+  }
+
+  private pipelineApprovalMode(
+    action: GranolaAutomationAgentAction,
+  ): GranolaAutomationApprovalMode {
+    return action.approvalMode ?? "manual";
+  }
+
+  private async runPostApprovalActions(
+    artefact: GranolaAutomationArtefact,
+    options: { decision: "approve" | "reject"; note?: string },
+  ): Promise<GranolaAutomationActionRun[]> {
+    if (options.decision !== "approve") {
+      return [];
+    }
+
+    const rule = (await this.loadAutomationRules({ forceRefresh: true })).find(
+      (candidate) => candidate.id === artefact.ruleId,
+    );
+    if (!rule) {
+      return [];
+    }
+
+    const match = await this.readAutomationMatchById(artefact.matchId);
+    if (!match) {
+      return [];
+    }
+
+    const actions = enabledAutomationActions(rule, {
+      sourceActionId: artefact.actionId,
+      trigger: "approval",
+    });
+    if (actions.length === 0) {
+      return [];
+    }
+
+    const existingRunIds = new Set(this.#automationActionRuns.map((run) => run.id));
+    const runs: GranolaAutomationActionRun[] = [];
+
+    for (const action of actions) {
+      const runId = buildAutomationApprovalActionRunId(artefact, action.id);
+      if (existingRunIds.has(runId)) {
+        continue;
+      }
+
+      existingRunIds.add(runId);
+      runs.push(
+        await executeAutomationAction(
+          this.cloneAutomationMatch(match),
+          rule,
+          action,
+          this.automationActionHandlers(),
+          {
+            context: {
+              artefact: this.cloneAutomationArtefact(artefact),
+              decision: options.decision,
+              note: options.note,
+              trigger: "approval",
+            },
+            runId,
+          },
+        ),
+      );
+    }
+
+    await this.appendAutomationRuns(runs);
+    this.emitStateUpdate();
+    return runs.map((run) => this.cloneAutomationRun(run));
+  }
+
   async resolveAutomationArtefact(
     id: string,
     decision: "approve" | "reject",
@@ -1453,6 +1572,7 @@ export class GranolaApp implements GranolaAppApi {
     }
 
     this.assertMutableAutomationArtefact(current);
+    const shouldRunPostApproval = decision === "approve" && current.status !== "approved";
 
     const nextArtefact: GranolaAutomationArtefact = {
       ...this.cloneAutomationArtefact(current),
@@ -1467,7 +1587,15 @@ export class GranolaApp implements GranolaAppApi {
       updatedAt: this.nowIso(),
     };
 
-    return await this.replaceAutomationArtefact(nextArtefact);
+    const replaced = await this.replaceAutomationArtefact(nextArtefact);
+    if (shouldRunPostApproval) {
+      await this.runPostApprovalActions(replaced, {
+        decision,
+        note: options.note,
+      });
+    }
+
+    return replaced;
   }
 
   async updateAutomationArtefact(
@@ -1646,17 +1774,7 @@ export class GranolaApp implements GranolaAppApi {
       this.cloneAutomationMatch(match),
       rule,
       action,
-      {
-        exportNotes: async (nextMatch, nextAction) =>
-          await this.runAutomationNotesAction(nextMatch, nextAction),
-        exportTranscripts: async (nextMatch, nextAction) =>
-          await this.runAutomationTranscriptAction(nextMatch, nextAction),
-        nowIso: () => this.nowIso(),
-        runAgent: async (nextMatch, nextRule, nextAction, run) =>
-          await this.runAutomationAgent(nextMatch, nextRule, nextAction, run),
-        runCommand: async (nextMatch, nextRule, nextAction) =>
-          await this.runAutomationCommand(nextMatch, nextRule, nextAction),
-      },
+      this.automationActionHandlers(),
       {
         rerunOfId: current.runId,
         runId: `${current.runId}:rerun:${this.nowIso().replaceAll(/[-:.]/g, "").replace("T", "").replace("Z", "")}`,
@@ -1856,42 +1974,68 @@ export class GranolaApp implements GranolaAppApi {
     };
   }
 
+  private async buildAutomationExecutionBundle(
+    match: GranolaAutomationMatch,
+  ): Promise<GranolaMeetingBundle | undefined> {
+    if (match.eventKind === "meeting.removed") {
+      return undefined;
+    }
+
+    return await this.maybeReadMeetingBundleById(match.meetingId, {
+      requireCache: false,
+    });
+  }
+
+  private buildAutomationDeliveryPayloadForAction(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: {
+      id: string;
+      kind: GranolaAutomationActionRun["actionKind"];
+      name?: string;
+    },
+    context: AutomationActionContext,
+    bundle: GranolaMeetingBundle | undefined,
+  ) {
+    return buildAutomationDeliveryPayload({
+      action,
+      artefact: context.artefact ? this.cloneAutomationArtefact(context.artefact) : undefined,
+      bundle,
+      decision: context.decision,
+      generatedAt: this.nowIso(),
+      match: this.cloneAutomationMatch(match),
+      note: context.note,
+      rule,
+      trigger: context.trigger,
+    });
+  }
+
   private async runAutomationCommand(
     match: GranolaAutomationMatch,
     rule: GranolaAutomationRule,
     action: GranolaAutomationCommandAction,
+    context: AutomationActionContext,
   ): Promise<{
     command: string;
     cwd?: string;
     output?: string;
   }> {
-    const bundle =
-      match.eventKind === "meeting.removed"
-        ? undefined
-        : await this.maybeReadMeetingBundleById(match.meetingId, {
-            requireCache: false,
-          });
+    const bundle = await this.buildAutomationExecutionBundle(match);
     const cwd = action.cwd ? resolvePath(action.cwd) : process.cwd();
     const payload = JSON.stringify(
       {
-        action: {
-          id: action.id,
-          kind: "command",
-          name: automationActionName(action),
-        },
+        ...this.buildAutomationDeliveryPayloadForAction(
+          match,
+          rule,
+          {
+            id: action.id,
+            kind: "command",
+            name: automationActionName(action),
+          },
+          context,
+          bundle,
+        ),
         authMode: this.#state.auth.mode,
-        generatedAt: this.nowIso(),
-        match: this.cloneAutomationMatch(match),
-        meeting: bundle
-          ? {
-              document: bundle.document,
-              meeting: bundle.meeting,
-            }
-          : undefined,
-        rule: {
-          id: rule.id,
-          name: rule.name,
-        },
       },
       null,
       2,
@@ -1904,6 +2048,9 @@ export class GranolaApp implements GranolaAppApi {
           ...process.env,
           ...action.env,
           GRANOLA_ACTION_KIND: "command",
+          GRANOLA_ACTION_TRIGGER: context.trigger,
+          GRANOLA_APPROVAL_DECISION: context.decision,
+          GRANOLA_ARTEFACT_ID: context.artefact?.id,
           GRANOLA_EVENT_ID: match.eventId,
           GRANOLA_EVENT_KIND: match.eventKind,
           GRANOLA_MATCH_ID: match.id,
@@ -1959,6 +2106,143 @@ export class GranolaApp implements GranolaAppApi {
       }
       child.stdin.end();
     });
+  }
+
+  private async runAutomationWebhook(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: GranolaAutomationWebhookAction,
+    context: AutomationActionContext,
+  ): Promise<{
+    output?: string;
+    status: number;
+    url: string;
+  }> {
+    const bundle = await this.buildAutomationExecutionBundle(match);
+    const payload = this.buildAutomationDeliveryPayloadForAction(
+      match,
+      rule,
+      {
+        id: action.id,
+        kind: "webhook",
+        name: automationActionName(action),
+      },
+      context,
+      bundle,
+    );
+    const url = action.url?.trim() || (action.urlEnv ? process.env[action.urlEnv]?.trim() : "");
+    if (!url) {
+      throw new Error(`automation webhook action ${action.id} is missing a URL`);
+    }
+
+    const rendered = renderWebhookBody(action, payload);
+    const response = await fetch(url, {
+      body: rendered.body,
+      headers: {
+        "content-type": rendered.contentType,
+        ...action.headers,
+      },
+      method: action.method ?? "POST",
+    });
+    const output = (await response.text()).trim() || undefined;
+    if (!response.ok) {
+      throw new Error(output || `automation webhook failed with status ${response.status}`);
+    }
+
+    return {
+      output,
+      status: response.status,
+      url,
+    };
+  }
+
+  private async runAutomationSlackMessage(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: GranolaAutomationSlackMessageAction,
+    context: AutomationActionContext,
+  ): Promise<{
+    output?: string;
+    status: number;
+    text: string;
+    url: string;
+  }> {
+    const bundle = await this.buildAutomationExecutionBundle(match);
+    const payload = this.buildAutomationDeliveryPayloadForAction(
+      match,
+      rule,
+      {
+        id: action.id,
+        kind: "slack-message",
+        name: automationActionName(action),
+      },
+      context,
+      bundle,
+    );
+    const url =
+      action.webhookUrl?.trim() ||
+      (action.webhookUrlEnv
+        ? process.env[action.webhookUrlEnv]?.trim()
+        : process.env.SLACK_WEBHOOK_URL?.trim());
+    if (!url) {
+      throw new Error(`automation Slack action ${action.id} is missing a webhook URL`);
+    }
+
+    const text = renderSlackMessageText(action, payload);
+    const response = await fetch(url, {
+      body: JSON.stringify({ text }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+    const output = (await response.text()).trim() || undefined;
+    if (!response.ok) {
+      throw new Error(output || `automation Slack action failed with status ${response.status}`);
+    }
+
+    return {
+      output,
+      status: response.status,
+      text,
+      url,
+    };
+  }
+
+  private async runAutomationWriteFile(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: GranolaAutomationWriteFileAction,
+    context: AutomationActionContext,
+  ): Promise<{
+    bytes: number;
+    filePath: string;
+    format: string;
+  }> {
+    const bundle = await this.buildAutomationExecutionBundle(match);
+    const payload = this.buildAutomationDeliveryPayloadForAction(
+      match,
+      rule,
+      {
+        id: action.id,
+        kind: "write-file",
+        name: automationActionName(action),
+      },
+      context,
+      bundle,
+    );
+    const filePath = resolveWriteFilePath(action, payload);
+    if (existsSync(filePath) && action.overwrite === false) {
+      throw new Error(`automation write-file target already exists: ${filePath}`);
+    }
+
+    const content = renderWriteFileContent(action, payload);
+    await writeTextFile(filePath, content);
+    return {
+      bytes: Buffer.byteLength(content, "utf8"),
+      filePath,
+      format: action.format ?? "markdown",
+    };
   }
 
   private async buildAutomationAgentAttempt(
@@ -2131,9 +2415,15 @@ export class GranolaApp implements GranolaAppApi {
             updatedAt: createdAt,
           };
           await this.writeAutomationArtefacts([artefact, ...this.#automationArtefacts]);
+          const finalArtefact =
+            this.pipelineApprovalMode(action) === "auto"
+              ? await this.resolveAutomationArtefact(artefact.id, "approve", {
+                  note: "Auto-approved by automation rule",
+                })
+              : artefact;
 
           return {
-            artefactIds: [artefact.id],
+            artefactIds: [finalArtefact.id],
             attempts: attemptMeta,
             command: result.command,
             dryRun: result.dryRun,
@@ -2200,17 +2490,7 @@ export class GranolaApp implements GranolaAppApi {
 
         existingRunIds.add(runId);
         runs.push(
-          await executeAutomationAction(match, rule, action, {
-            exportNotes: async (nextMatch, nextAction) =>
-              await this.runAutomationNotesAction(nextMatch, nextAction),
-            exportTranscripts: async (nextMatch, nextAction) =>
-              await this.runAutomationTranscriptAction(nextMatch, nextAction),
-            nowIso: () => this.nowIso(),
-            runAgent: async (nextMatch, nextRule, nextAction, run) =>
-              await this.runAutomationAgent(nextMatch, nextRule, nextAction, run),
-            runCommand: async (nextMatch, nextRule, nextAction) =>
-              await this.runAutomationCommand(nextMatch, nextRule, nextAction),
-          }),
+          await executeAutomationAction(match, rule, action, this.automationActionHandlers()),
         );
       }
     }

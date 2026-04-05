@@ -7,8 +7,11 @@ import type {
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
   GranolaAutomationPipelineConfig,
+  GranolaAutomationSlackMessageAction,
   GranolaAutomationMatch,
   GranolaAutomationRule,
+  GranolaAutomationWebhookAction,
+  GranolaAutomationWriteFileAction,
   GranolaAppSyncEvent,
 } from "./app/index.ts";
 import { defaultGranolaToolkitPersistenceLayout } from "./persistence/layout.ts";
@@ -35,6 +38,7 @@ function cloneAction(action: GranolaAutomationAction): GranolaAutomationAction {
     case "agent":
       return {
         ...action,
+        approvalMode: action.approvalMode,
         fallbackHarnessIds: action.fallbackHarnessIds ? [...action.fallbackHarnessIds] : undefined,
         pipeline: action.pipeline ? { ...action.pipeline } : undefined,
       };
@@ -48,6 +52,15 @@ function cloneAction(action: GranolaAutomationAction): GranolaAutomationAction {
       };
     case "export-notes":
     case "export-transcript":
+      return { ...action };
+    case "slack-message":
+      return { ...action };
+    case "webhook":
+      return {
+        ...action,
+        headers: action.headers ? { ...action.headers } : undefined,
+      };
+    case "write-file":
       return { ...action };
   }
 }
@@ -91,6 +104,14 @@ function parsePipeline(value: unknown): GranolaAutomationPipelineConfig | undefi
       ? value.trim()
       : "";
   return kind === "enrichment" || kind === "notes" ? { kind } : undefined;
+}
+
+function parseTrigger(value: unknown): "approval" | "match" | undefined {
+  if (value === "approval" || value === "match") {
+    return value;
+  }
+
+  return undefined;
 }
 
 function parseAction(value: unknown, index: number): GranolaAutomationAction | undefined {
@@ -149,6 +170,10 @@ function parseAction(value: unknown, index: number): GranolaAutomationAction | u
       }
 
       const action: GranolaAutomationAgentAction = {
+        approvalMode:
+          record.approvalMode === "auto" || record.approvalMode === "manual"
+            ? record.approvalMode
+            : undefined,
         cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : undefined,
         dryRun: typeof record.dryRun === "boolean" ? record.dryRun : undefined,
         enabled,
@@ -219,6 +244,10 @@ function parseAction(value: unknown, index: number): GranolaAutomationAction | u
         id,
         kind,
         name,
+        sourceActionId:
+          typeof record.sourceActionId === "string" && record.sourceActionId.trim()
+            ? record.sourceActionId.trim()
+            : undefined,
         stdin: record.stdin === "json" || record.stdin === "none" ? record.stdin : undefined,
         timeoutMs:
           typeof record.timeoutMs === "number" && Number.isFinite(record.timeoutMs)
@@ -226,6 +255,7 @@ function parseAction(value: unknown, index: number): GranolaAutomationAction | u
             : typeof record.timeoutMs === "string" && /^\d+$/.test(record.timeoutMs)
               ? Number(record.timeoutMs)
               : undefined,
+        trigger: parseTrigger(record.trigger),
       };
       return action;
     }
@@ -280,6 +310,106 @@ function parseAction(value: unknown, index: number): GranolaAutomationAction | u
             ? record.outputDir.trim()
             : undefined,
         scopedOutput: typeof record.scopedOutput === "boolean" ? record.scopedOutput : undefined,
+      };
+      return action;
+    }
+    case "slack-message": {
+      if (!id) {
+        return undefined;
+      }
+
+      const action: GranolaAutomationSlackMessageAction = {
+        enabled,
+        id,
+        kind,
+        name,
+        sourceActionId:
+          typeof record.sourceActionId === "string" && record.sourceActionId.trim()
+            ? record.sourceActionId.trim()
+            : undefined,
+        text:
+          typeof record.text === "string" && record.text.trim() ? record.text.trim() : undefined,
+        trigger: parseTrigger(record.trigger),
+        webhookUrl:
+          typeof record.webhookUrl === "string" && record.webhookUrl.trim()
+            ? record.webhookUrl.trim()
+            : undefined,
+        webhookUrlEnv:
+          typeof record.webhookUrlEnv === "string" && record.webhookUrlEnv.trim()
+            ? record.webhookUrlEnv.trim()
+            : undefined,
+      };
+      return action;
+    }
+    case "webhook": {
+      if (!id) {
+        return undefined;
+      }
+
+      const action: GranolaAutomationWebhookAction = {
+        bodyTemplate:
+          typeof record.bodyTemplate === "string" && record.bodyTemplate.trim()
+            ? record.bodyTemplate.trim()
+            : undefined,
+        enabled,
+        headers: stringRecord(record.headers),
+        id,
+        kind,
+        method:
+          typeof record.method === "string" && record.method.trim()
+            ? record.method.trim().toUpperCase()
+            : undefined,
+        name,
+        payload:
+          record.payload === "json" || record.payload === "markdown" || record.payload === "text"
+            ? record.payload
+            : undefined,
+        sourceActionId:
+          typeof record.sourceActionId === "string" && record.sourceActionId.trim()
+            ? record.sourceActionId.trim()
+            : undefined,
+        trigger: parseTrigger(record.trigger),
+        url: typeof record.url === "string" && record.url.trim() ? record.url.trim() : undefined,
+        urlEnv:
+          typeof record.urlEnv === "string" && record.urlEnv.trim()
+            ? record.urlEnv.trim()
+            : undefined,
+      };
+      return action;
+    }
+    case "write-file": {
+      const outputDir =
+        typeof record.outputDir === "string" && record.outputDir.trim()
+          ? record.outputDir.trim()
+          : undefined;
+      if (!id || !outputDir) {
+        return undefined;
+      }
+
+      const action: GranolaAutomationWriteFileAction = {
+        contentTemplate:
+          typeof record.contentTemplate === "string" && record.contentTemplate.trim()
+            ? record.contentTemplate.trim()
+            : undefined,
+        enabled,
+        filenameTemplate:
+          typeof record.filenameTemplate === "string" && record.filenameTemplate.trim()
+            ? record.filenameTemplate.trim()
+            : undefined,
+        format:
+          record.format === "json" || record.format === "markdown" || record.format === "text"
+            ? record.format
+            : undefined,
+        id,
+        kind,
+        name,
+        outputDir,
+        overwrite: typeof record.overwrite === "boolean" ? record.overwrite : undefined,
+        sourceActionId:
+          typeof record.sourceActionId === "string" && record.sourceActionId.trim()
+            ? record.sourceActionId.trim()
+            : undefined,
+        trigger: parseTrigger(record.trigger),
       };
       return action;
     }

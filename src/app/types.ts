@@ -24,6 +24,8 @@ export type GranolaAutomationArtefactHistoryAction =
   | "rejected"
   | "rerun";
 export type GranolaAutomationArtefactStatus = "approved" | "generated" | "rejected" | "superseded";
+export type GranolaAutomationActionTrigger = "approval" | "match";
+export type GranolaAutomationApprovalMode = "auto" | "manual";
 export type GranolaProcessingIssueKind =
   | "artefact-stale"
   | "pipeline-failed"
@@ -41,8 +43,13 @@ export type GranolaAutomationActionKind =
   | "ask-user"
   | "command"
   | "export-notes"
-  | "export-transcript";
+  | "export-transcript"
+  | "slack-message"
+  | "webhook"
+  | "write-file";
 export type GranolaAutomationActionRunStatus = "completed" | "failed" | "pending" | "skipped";
+export type GranolaAutomationWebhookPayloadFormat = "json" | "markdown" | "text";
+export type GranolaAutomationWriteFileFormat = "json" | "markdown" | "text";
 export type GranolaExportScope =
   | {
       mode: "all";
@@ -166,6 +173,7 @@ export interface GranolaAutomationAskUserAction {
 }
 
 export interface GranolaAutomationAgentAction {
+  approvalMode?: GranolaAutomationApprovalMode;
   cwd?: string;
   dryRun?: boolean;
   enabled?: boolean;
@@ -198,8 +206,10 @@ export interface GranolaAutomationCommandAction {
   id: string;
   kind: "command";
   name?: string;
+  sourceActionId?: string;
   stdin?: "json" | "none";
   timeoutMs?: number;
+  trigger?: GranolaAutomationActionTrigger;
 }
 
 export interface GranolaAutomationExportNotesAction {
@@ -222,12 +232,56 @@ export interface GranolaAutomationExportTranscriptAction {
   scopedOutput?: boolean;
 }
 
+export interface GranolaAutomationWebhookAction {
+  bodyTemplate?: string;
+  enabled?: boolean;
+  headers?: Record<string, string>;
+  id: string;
+  kind: "webhook";
+  method?: string;
+  name?: string;
+  payload?: GranolaAutomationWebhookPayloadFormat;
+  sourceActionId?: string;
+  trigger?: GranolaAutomationActionTrigger;
+  url?: string;
+  urlEnv?: string;
+}
+
+export interface GranolaAutomationSlackMessageAction {
+  enabled?: boolean;
+  id: string;
+  kind: "slack-message";
+  name?: string;
+  sourceActionId?: string;
+  text?: string;
+  trigger?: GranolaAutomationActionTrigger;
+  webhookUrl?: string;
+  webhookUrlEnv?: string;
+}
+
+export interface GranolaAutomationWriteFileAction {
+  contentTemplate?: string;
+  enabled?: boolean;
+  filenameTemplate?: string;
+  format?: GranolaAutomationWriteFileFormat;
+  id: string;
+  kind: "write-file";
+  name?: string;
+  outputDir: string;
+  overwrite?: boolean;
+  sourceActionId?: string;
+  trigger?: GranolaAutomationActionTrigger;
+}
+
 export type GranolaAutomationAction =
   | GranolaAutomationAgentAction
   | GranolaAutomationAskUserAction
   | GranolaAutomationCommandAction
   | GranolaAutomationExportNotesAction
-  | GranolaAutomationExportTranscriptAction;
+  | GranolaAutomationExportTranscriptAction
+  | GranolaAutomationWebhookAction
+  | GranolaAutomationSlackMessageAction
+  | GranolaAutomationWriteFileAction;
 
 export interface GranolaAutomationRule {
   actions?: GranolaAutomationAction[];
