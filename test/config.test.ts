@@ -20,6 +20,12 @@ describe("loadConfig", () => {
         'timeout = "30s"',
         'cache-file = "/tmp/cache.json"',
         'transcript-output = "./transcripts-out"',
+        'agent-provider = "openrouter"',
+        'agent-model = "openai/gpt-5-mini"',
+        "agent-dry-run = true",
+        "agent-max-retries = 4",
+        'agent-timeout = "45s"',
+        'codex-command = "codex-beta"',
       ].join("\n"),
       "utf8",
     );
@@ -37,6 +43,16 @@ describe("loadConfig", () => {
     expect(config.notes.timeoutMs).toBe(30_000);
     expect(config.transcripts.cacheFile).toBe("/tmp/cache.json");
     expect(config.transcripts.output).toBe("./transcripts-out");
+    expect(config.agents).toEqual(
+      expect.objectContaining({
+        codexCommand: "codex-beta",
+        defaultModel: "openai/gpt-5-mini",
+        defaultProvider: "openrouter",
+        dryRun: true,
+        maxRetries: 4,
+        timeoutMs: 45_000,
+      }),
+    );
   });
 
   test("throws a clean error when an explicit config file is missing", async () => {

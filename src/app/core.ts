@@ -1,7 +1,13 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 
+import {
+  createDefaultAutomationAgentRunner,
+  type GranolaAutomationAgentRequest,
+  type GranolaAutomationAgentRunner,
+} from "../agents.ts";
 import {
   automationActionName,
   buildAutomationActionRunId,
@@ -95,6 +101,7 @@ import { granolaCacheCandidates } from "../utils.ts";
 import type {
   GranolaAppApi,
   GranolaAutomationCommandAction,
+  GranolaAutomationAgentAction,
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
   GranolaAutomationActionRun,
@@ -134,6 +141,7 @@ type GranolaRemoteClient = Pick<GranolaApiClient, "listDocuments"> &
   Partial<Pick<GranolaApiClient, "listFolders">>;
 
 interface GranolaAppDependencies {
+  agentRunner?: GranolaAutomationAgentRunner;
   auth: GranolaAppAuthState;
   authController?: DefaultGranolaAuthController;
   automationMatchStore?: AutomationMatchStore;
@@ -210,6 +218,86 @@ function cloneMeetingSummary(meeting: MeetingSummaryRecord): MeetingSummaryRecor
   };
 }
 
+function resolveActionFilePath(filePath: string, cwd?: string): string {
+  return cwd ? resolvePath(cwd, filePath) : resolvePath(filePath);
+}
+
+function combinePromptSections(...values: Array<string | undefined>): string | undefined {
+  const sections = values
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  return sections.length > 0 ? sections.join("\n\n") : undefined;
+}
+
+function meetingTranscriptText(bundle: GranolaMeetingBundle): string | undefined {
+  const segments =
+    bundle.document.transcriptSegments ??
+    (bundle.cacheData ? bundle.cacheData.transcripts[bundle.document.id] : undefined);
+  if (!segments?.length) {
+    return undefined;
+  }
+
+  return segments
+    .slice()
+    .sort((left, right) => left.startTimestamp.localeCompare(right.startTimestamp))
+    .map((segment) => segment.text.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildAutomationAgentPrompt(
+  match: GranolaAutomationMatch,
+  rule: GranolaAutomationRule,
+  instructions: string,
+  bundle?: GranolaMeetingBundle,
+): string {
+  const transcriptText = bundle ? meetingTranscriptText(bundle)?.trim() : undefined;
+  const context = {
+    event: {
+      id: match.eventId,
+      kind: match.eventKind,
+      matchedAt: match.matchedAt,
+      meetingId: match.meetingId,
+      transcriptLoaded: match.transcriptLoaded,
+    },
+    folders: match.folders.map((folder) => ({
+      id: folder.id,
+      name: folder.name,
+    })),
+    meeting: bundle
+      ? {
+          id: bundle.document.id,
+          notesPlain: bundle.document.notesPlain,
+          tags: [...bundle.document.tags],
+          title: bundle.document.title,
+          updatedAt: bundle.document.updatedAt,
+        }
+      : {
+          id: match.meetingId,
+          tags: [...match.tags],
+          title: match.title,
+        },
+    rule: {
+      id: rule.id,
+      name: rule.name,
+    },
+  };
+
+  return [
+    instructions.trim(),
+    "Meeting context (JSON):",
+    "```json",
+    JSON.stringify(context, null, 2),
+    "```",
+    bundle?.document.notesPlain?.trim()
+      ? `Existing notes:\n${bundle.document.notesPlain.trim()}`
+      : "",
+    transcriptText ? `Transcript:\n${transcriptText}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function cloneState(state: GranolaAppState): GranolaAppState {
   return {
     auth: { ...state.auth },
@@ -218,6 +306,7 @@ function cloneState(state: GranolaAppState): GranolaAppState {
     config: {
       ...state.config,
       automation: state.config.automation ? { ...state.config.automation } : undefined,
+      agents: state.config.agents ? { ...state.config.agents } : undefined,
       notes: { ...state.config.notes },
       transcripts: { ...state.config.transcripts },
     },
@@ -260,6 +349,7 @@ function defaultState(
     },
     config: {
       ...config,
+      agents: config.agents ? { ...config.agents } : undefined,
       notes: { ...config.notes },
       transcripts: { ...config.transcripts },
     },
@@ -437,6 +527,8 @@ export class GranolaApp implements GranolaAppApi {
       ...rule,
       actions: rule.actions?.map((action) => {
         switch (action.kind) {
+          case "agent":
+            return { ...action };
           case "ask-user":
             return { ...action };
           case "command":
@@ -1317,6 +1409,52 @@ export class GranolaApp implements GranolaAppApi {
     });
   }
 
+  private async runAutomationAgent(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: GranolaAutomationAgentAction,
+  ): Promise<{
+    command?: string;
+    dryRun: boolean;
+    model: string;
+    output?: string;
+    prompt: string;
+    provider: string;
+    systemPrompt?: string;
+  }> {
+    const bundle =
+      match.eventKind === "meeting.removed"
+        ? undefined
+        : await this.maybeReadMeetingBundleById(match.meetingId, {
+            requireCache: false,
+          });
+    const promptFile = action.promptFile
+      ? await readFile(resolveActionFilePath(action.promptFile, action.cwd), "utf8")
+      : undefined;
+    const systemPromptFile = action.systemPromptFile
+      ? await readFile(resolveActionFilePath(action.systemPromptFile, action.cwd), "utf8")
+      : undefined;
+    const instructions = combinePromptSections(promptFile, action.prompt);
+    if (!instructions) {
+      throw new Error(`automation agent action ${action.id} is missing prompt instructions`);
+    }
+
+    const request: GranolaAutomationAgentRequest = {
+      cwd: action.cwd,
+      dryRun: action.dryRun,
+      model: action.model,
+      prompt: buildAutomationAgentPrompt(match, rule, instructions, bundle),
+      provider: action.provider,
+      retries: action.retries,
+      systemPrompt: combinePromptSections(systemPromptFile, action.systemPrompt),
+      timeoutMs: action.timeoutMs,
+    };
+
+    return await (this.deps.agentRunner ?? createDefaultAutomationAgentRunner(this.config)).run(
+      request,
+    );
+  }
+
   private async runAutomationActions(
     rules: GranolaAutomationRule[],
     matches: GranolaAutomationMatch[],
@@ -1345,6 +1483,8 @@ export class GranolaApp implements GranolaAppApi {
             exportTranscripts: async (nextMatch, nextAction) =>
               await this.runAutomationTranscriptAction(nextMatch, nextAction),
             nowIso: () => this.nowIso(),
+            runAgent: async (nextMatch, nextRule, nextAction) =>
+              await this.runAutomationAgent(nextMatch, nextRule, nextAction),
             runCommand: async (nextMatch, nextRule, nextAction) =>
               await this.runAutomationCommand(nextMatch, nextRule, nextAction),
           }),
@@ -2066,6 +2206,7 @@ export async function createGranolaApp(
     config,
     {
       auth,
+      agentRunner: createDefaultAutomationAgentRunner(config),
       authController,
       automationMatches,
       automationMatchStore,

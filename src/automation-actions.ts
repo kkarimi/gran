@@ -1,5 +1,6 @@
 import type {
   GranolaAutomationAction,
+  GranolaAutomationAgentAction,
   GranolaAutomationActionRun,
   GranolaAutomationCommandAction,
   GranolaAutomationExportNotesAction,
@@ -11,6 +12,8 @@ import type {
 
 function cloneAction(action: GranolaAutomationAction): GranolaAutomationAction {
   switch (action.kind) {
+    case "agent":
+      return { ...action };
     case "ask-user":
       return { ...action };
     case "command":
@@ -48,6 +51,16 @@ export interface AutomationActionCommandResult {
   output?: string;
 }
 
+export interface AutomationActionAgentResult {
+  command?: string;
+  dryRun: boolean;
+  model: string;
+  output?: string;
+  prompt: string;
+  provider: string;
+  systemPrompt?: string;
+}
+
 export interface AutomationActionExportResult {
   format: string;
   outputDir: string;
@@ -65,6 +78,11 @@ export interface AutomationActionExecutionHandlers {
     action: GranolaAutomationExportTranscriptAction,
   ): Promise<AutomationActionExportResult | undefined>;
   nowIso(): string;
+  runAgent(
+    match: GranolaAutomationMatch,
+    rule: GranolaAutomationRule,
+    action: GranolaAutomationAgentAction,
+  ): Promise<AutomationActionAgentResult>;
   runCommand(
     match: GranolaAutomationMatch,
     rule: GranolaAutomationRule,
@@ -147,6 +165,23 @@ export async function executeAutomationAction(
   const run = baseRun(match, rule, action, startedAt);
 
   switch (action.kind) {
+    case "agent":
+      try {
+        const result = await handlers.runAgent(match, rule, action);
+        return completedRun(run, handlers.nowIso(), {
+          meta: {
+            command: result.command,
+            dryRun: result.dryRun,
+            model: result.model,
+            provider: result.provider,
+            systemPrompt: result.systemPrompt,
+          },
+          prompt: result.prompt,
+          result: result.output ?? (result.dryRun ? "Dry run: provider request not executed" : ""),
+        });
+      } catch (error) {
+        return failedRun(run, handlers.nowIso(), error);
+      }
     case "ask-user":
       return {
         ...run,

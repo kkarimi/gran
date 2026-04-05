@@ -8,7 +8,7 @@ import type {
   NoteOutputFormat,
   TranscriptOutputFormat,
 } from "./models.ts";
-import type { AppConfig, CacheData, GranolaDocument } from "../types.ts";
+import type { AppConfig, CacheData, GranolaDocument, GranolaAgentProviderKind } from "../types.ts";
 
 export type GranolaAppAuthMode = GranolaSessionMetadata["mode"];
 export type GranolaAppSurface = "cli" | "server" | "tui" | "web";
@@ -22,6 +22,7 @@ export type GranolaSyncEventKind =
   | "meeting.removed"
   | "transcript.ready";
 export type GranolaAutomationActionKind =
+  | "agent"
   | "ask-user"
   | "command"
   | "export-notes"
@@ -149,6 +150,23 @@ export interface GranolaAutomationAskUserAction {
   prompt: string;
 }
 
+export interface GranolaAutomationAgentAction {
+  cwd?: string;
+  dryRun?: boolean;
+  enabled?: boolean;
+  id: string;
+  kind: "agent";
+  model?: string;
+  name?: string;
+  prompt?: string;
+  promptFile?: string;
+  provider?: GranolaAgentProviderKind;
+  retries?: number;
+  systemPrompt?: string;
+  systemPromptFile?: string;
+  timeoutMs?: number;
+}
+
 export interface GranolaAutomationCommandAction {
   args?: string[];
   command: string;
@@ -183,6 +201,7 @@ export interface GranolaAutomationExportTranscriptAction {
 }
 
 export type GranolaAutomationAction =
+  | GranolaAutomationAgentAction
   | GranolaAutomationAskUserAction
   | GranolaAutomationCommandAction
   | GranolaAutomationExportNotesAction

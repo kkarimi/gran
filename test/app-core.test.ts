@@ -544,6 +544,15 @@ describe("GranolaApp", () => {
     const meetingIndexStore = new MemoryMeetingIndexStore();
     const matchStore = new MemoryAutomationMatchStore();
     const runStore = new MemoryAutomationRunStore();
+    const runAgent = vi.fn(async (request: { prompt: string }) => ({
+      dryRun: false,
+      model: "gpt-5-codex",
+      output: request.prompt.includes("Alpha Sync")
+        ? "Agent summary for Alpha Sync"
+        : "Agent summary",
+      prompt: request.prompt,
+      provider: "codex" as const,
+    }));
 
     await meetingIndexStore.writeIndex([
       {
@@ -590,9 +599,18 @@ describe("GranolaApp", () => {
           supabasePath: "/tmp/supabase.json",
         },
         automationMatchStore: matchStore,
+        agentRunner: {
+          run: runAgent,
+        },
         automationRuleStore: new MemoryAutomationRuleStore([
           {
             actions: [
+              {
+                id: "meeting-agent",
+                kind: "agent",
+                prompt: "Rewrite this meeting into concise notes.",
+                provider: "codex",
+              },
               {
                 id: "notes-export",
                 kind: "export-notes",
@@ -652,6 +670,12 @@ describe("GranolaApp", () => {
     expect(runs.runs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          actionId: "meeting-agent",
+          actionKind: "agent",
+          result: "Agent summary for Alpha Sync",
+          status: "completed",
+        }),
+        expect.objectContaining({
           actionId: "notes-export",
           actionKind: "export-notes",
           status: "completed",
@@ -674,7 +698,12 @@ describe("GranolaApp", () => {
       expect.objectContaining({
         matchCount: 1,
         pendingRunCount: 1,
-        runCount: 3,
+        runCount: 4,
+      }),
+    );
+    expect(runAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining("Transcript:"),
       }),
     );
 

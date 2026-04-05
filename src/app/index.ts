@@ -19,6 +19,7 @@ export type {
 export type {
   GranolaAppApi,
   GranolaAutomationAction,
+  GranolaAutomationAgentAction,
   GranolaAutomationAskUserAction,
   GranolaAutomationActionKind,
   GranolaAutomationActionRun,

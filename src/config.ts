@@ -24,6 +24,18 @@ function pickBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
 }
 
+function pickNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && /^-?\d+$/.test(value.trim())) {
+    return Number(value.trim());
+  }
+
+  return undefined;
+}
+
 function parseTomlScalar(rawValue: string): unknown {
   const value = rawValue.trim();
 
@@ -131,6 +143,11 @@ export async function loadConfig(options: {
   const configValues = config.values;
   const defaultSupabase = firstExistingPath(granolaSupabaseCandidates());
   const defaultCache = firstExistingPath(granolaCacheCandidates());
+  const agentTimeoutValue =
+    pickString(env.GRANOLA_AGENT_TIMEOUT) ??
+    pickString(configValues["agent-timeout"]) ??
+    pickString(configValues.agentTimeout) ??
+    "5m";
 
   const timeoutValue =
     pickString(options.subcommandFlags.timeout) ??
@@ -146,6 +163,49 @@ export async function loadConfig(options: {
         pickString(configValues["automation-rules-file"]) ??
         pickString(configValues.automationRulesFile) ??
         defaultGranolaToolkitPersistenceLayout().automationRulesFile,
+    },
+    agents: {
+      codexCommand:
+        pickString(env.GRANOLA_CODEX_COMMAND) ??
+        pickString(configValues["codex-command"]) ??
+        pickString(configValues.codexCommand) ??
+        "codex",
+      defaultModel:
+        pickString(env.GRANOLA_AGENT_MODEL) ??
+        pickString(configValues["agent-model"]) ??
+        pickString(configValues.agentModel),
+      defaultProvider: (() => {
+        const value =
+          pickString(env.GRANOLA_AGENT_PROVIDER) ??
+          pickString(configValues["agent-provider"]) ??
+          pickString(configValues.agentProvider);
+        return value === "codex" || value === "openai" || value === "openrouter"
+          ? value
+          : undefined;
+      })(),
+      dryRun:
+        envFlag(env.GRANOLA_AGENT_DRY_RUN) ??
+        pickBoolean(configValues["agent-dry-run"]) ??
+        pickBoolean(configValues.agentDryRun) ??
+        false,
+      maxRetries:
+        pickNumber(env.GRANOLA_AGENT_MAX_RETRIES) ??
+        pickNumber(configValues["agent-max-retries"]) ??
+        pickNumber(configValues.agentMaxRetries) ??
+        2,
+      openaiBaseUrl:
+        pickString(env.GRANOLA_OPENAI_BASE_URL) ??
+        pickString(env.OPENAI_BASE_URL) ??
+        pickString(configValues["openai-base-url"]) ??
+        pickString(configValues.openaiBaseUrl) ??
+        "https://api.openai.com/v1",
+      openrouterBaseUrl:
+        pickString(env.GRANOLA_OPENROUTER_BASE_URL) ??
+        pickString(env.OPENROUTER_BASE_URL) ??
+        pickString(configValues["openrouter-base-url"]) ??
+        pickString(configValues.openrouterBaseUrl) ??
+        "https://openrouter.ai/api/v1",
+      timeoutMs: parseDuration(agentTimeoutValue),
     },
     apiKey:
       pickString(options.globalFlags["api-key"]) ??

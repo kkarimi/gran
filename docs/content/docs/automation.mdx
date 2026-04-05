@@ -39,6 +39,13 @@ Override that path with either:
           "scopedOutput": true
         },
         {
+          "id": "rewrite-with-agent",
+          "kind": "agent",
+          "provider": "openrouter",
+          "model": "openai/gpt-5-mini",
+          "promptFile": "./agents/customer-call/AGENT.md"
+        },
+        {
           "id": "summarise",
           "kind": "command",
           "command": "/bin/sh",
@@ -59,8 +66,29 @@ Each rule can contain zero or more actions. Current action kinds are:
 
 - `export-notes`
 - `export-transcript`
+- `agent`
 - `command`
 - `ask-user`
+
+`agent` actions run BYOA prompts against OpenRouter, OpenAI-compatible APIs, or the local `codex`
+CLI. They append structured meeting context automatically, so a prompt file can stay focused on
+instructions such as “turn this transcript into follow-up notes”.
+
+Supported agent fields:
+
+- `provider`: `openrouter`, `openai`, or `codex`
+- `model`
+- `prompt`
+- `promptFile`
+- `systemPrompt`
+- `systemPromptFile`
+- `cwd`
+- `dryRun`
+- `retries`
+- `timeoutMs`
+
+Use `promptFile` or `systemPromptFile` for local playbooks such as `AGENT.md`. Relative paths are
+resolved from the current working directory, or from `cwd` if you set one on the action.
 
 `command` actions receive a JSON payload on stdin by default, including the matched event, rule,
 and meeting bundle when the meeting still exists.
@@ -89,6 +117,29 @@ Available match fields:
 - `transcriptLoaded`
 
 Fields are combined with `AND`, while multiple values inside one field are treated as `OR`.
+
+## Provider Credentials
+
+For HTTP providers, set credentials in the environment used by `granola sync`, `granola serve`, or
+whatever process runs your automation:
+
+- `OPENROUTER_API_KEY` or `GRANOLA_OPENROUTER_API_KEY`
+- `OPENAI_API_KEY` or `GRANOLA_OPENAI_API_KEY`
+
+For local Codex runs, the toolkit shells out to `codex exec`, so it uses whatever local Codex login
+state you already have. You can override the command path with `GRANOLA_CODEX_COMMAND` or
+`codex-command = "..."` in `.granola.toml`.
+
+Non-secret defaults can live in `.granola.toml`:
+
+```toml
+agent-provider = "openrouter"
+agent-model = "openai/gpt-5-mini"
+agent-timeout = "5m"
+agent-max-retries = 2
+agent-dry-run = false
+codex-command = "codex"
+```
 
 ## Commands
 

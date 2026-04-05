@@ -111,10 +111,24 @@ export interface TranscriptOptions {
   output: string;
 }
 
+export type GranolaAgentProviderKind = "codex" | "openai" | "openrouter";
+
+export interface GranolaAgentsOptions {
+  codexCommand: string;
+  defaultModel?: string;
+  defaultProvider?: GranolaAgentProviderKind;
+  dryRun: boolean;
+  maxRetries: number;
+  openaiBaseUrl: string;
+  openrouterBaseUrl: string;
+  timeoutMs: number;
+}
+
 export interface AppConfig {
   automation?: {
     rulesFile: string;
   };
+  agents?: GranolaAgentsOptions;
   apiKey?: string;
   configFileUsed?: string;
   debug: boolean;

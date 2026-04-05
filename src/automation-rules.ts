@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import type {
   GranolaAutomationAction,
+  GranolaAutomationAgentAction,
   GranolaAutomationCommandAction,
   GranolaAutomationExportNotesAction,
   GranolaAutomationExportTranscriptAction,
@@ -30,6 +31,8 @@ function cloneRule(rule: GranolaAutomationRule): GranolaAutomationRule {
 
 function cloneAction(action: GranolaAutomationAction): GranolaAutomationAction {
   switch (action.kind) {
+    case "agent":
+      return { ...action };
     case "ask-user":
       return { ...action };
     case "command":
@@ -94,6 +97,66 @@ function parseAction(value: unknown, index: number): GranolaAutomationAction | u
   const enabled = typeof record.enabled === "boolean" ? record.enabled : undefined;
 
   switch (kind) {
+    case "agent": {
+      if (!id) {
+        return undefined;
+      }
+
+      const provider =
+        record.provider === "codex" ||
+        record.provider === "openai" ||
+        record.provider === "openrouter"
+          ? record.provider
+          : undefined;
+      const prompt =
+        typeof record.prompt === "string" && record.prompt.trim()
+          ? record.prompt.trim()
+          : undefined;
+      const promptFile =
+        typeof record.promptFile === "string" && record.promptFile.trim()
+          ? record.promptFile.trim()
+          : undefined;
+      const systemPrompt =
+        typeof record.systemPrompt === "string" && record.systemPrompt.trim()
+          ? record.systemPrompt.trim()
+          : undefined;
+      const systemPromptFile =
+        typeof record.systemPromptFile === "string" && record.systemPromptFile.trim()
+          ? record.systemPromptFile.trim()
+          : undefined;
+      if (!prompt && !promptFile) {
+        return undefined;
+      }
+
+      const action: GranolaAutomationAgentAction = {
+        cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : undefined,
+        dryRun: typeof record.dryRun === "boolean" ? record.dryRun : undefined,
+        enabled,
+        id,
+        kind,
+        model:
+          typeof record.model === "string" && record.model.trim() ? record.model.trim() : undefined,
+        name,
+        prompt,
+        promptFile,
+        provider,
+        retries:
+          typeof record.retries === "number" && Number.isFinite(record.retries)
+            ? record.retries
+            : typeof record.retries === "string" && /^\d+$/.test(record.retries)
+              ? Number(record.retries)
+              : undefined,
+        systemPrompt,
+        systemPromptFile,
+        timeoutMs:
+          typeof record.timeoutMs === "number" && Number.isFinite(record.timeoutMs)
+            ? record.timeoutMs
+            : typeof record.timeoutMs === "string" && /^\d+$/.test(record.timeoutMs)
+              ? Number(record.timeoutMs)
+              : undefined,
+      };
+      return action;
+    }
     case "ask-user": {
       const prompt =
         typeof record.prompt === "string" && record.prompt.trim()
