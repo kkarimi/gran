@@ -1,0 +1,53 @@
+---
+title: Agent Skills
+description: Reuse granola-toolkit from external agents, including the built-in OpenClaw skill directory shipped in this repo.
+---
+
+## OpenClaw Skill
+
+This repo ships an OpenClaw-ready skill directory at:
+
+```text
+skills/openclaw-granola-toolkit
+```
+
+The entry file is:
+
+```text
+skills/openclaw-granola-toolkit/SKILL.md
+```
+
+Point OpenClaw at that directory, or copy/symlink it into your own OpenClaw skills path. The skill
+assumes the toolkit is installed as either `granola` or `granola-toolkit`.
+
+## What The Skill Covers
+
+The skill is tuned for practical meeting workflows:
+
+- checking auth and refreshing local sync state
+- finding meetings by search, folder, or date window
+- fetching one meeting’s notes or transcript
+- reviewing automation artefacts and approval queues
+- triggering recovery for failed or stale meeting processing
+- running targeted exports for one folder or meeting set
+
+It also tells the agent to prefer `--format json` when another step needs to parse the output.
+
+## Typical Agent Prompts
+
+- “Get today’s meeting notes from Granola.”
+- “Find the last customer onboarding call and show me the transcript.”
+- “Review the pending generated notes and approve the good ones.”
+- “Export all Team folder notes into `./exports/team-notes`.”
+- “Check if any Granola automation runs failed and recover them.”
+
+## Repo Examples
+
+The skill directory also includes extra examples in:
+
+```text
+skills/openclaw-granola-toolkit/references/cli-examples.md
+```
+
+That file is useful when you want to adapt the same commands for another agent system or a local
+script.
