@@ -35,6 +35,10 @@ granola web
 prompt files under `./.granola/` so the first-run setup is not just “read docs and assemble JSON by
 hand”.
 
+If you start with `granola web`, the browser now walks you through the same first-run path:
+enter a Granola API key, import your meetings, choose an agent provider, and land in a workspace
+with a starter reviewable notes pipeline already configured.
+
 If you prefer to reuse the desktop app session instead, `granola auth login` still imports it from
 `supabase.json`.
 

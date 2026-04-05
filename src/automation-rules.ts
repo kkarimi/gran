@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 import type {
   GranolaAutomationAction,
@@ -490,6 +491,7 @@ function parseRule(value: unknown): GranolaAutomationRule | undefined {
 
 export interface AutomationRuleStore {
   readRules(): Promise<GranolaAutomationRule[]>;
+  writeRules(rules: GranolaAutomationRule[]): Promise<void>;
 }
 
 export class MemoryAutomationRuleStore implements AutomationRuleStore {
@@ -497,6 +499,10 @@ export class MemoryAutomationRuleStore implements AutomationRuleStore {
 
   async readRules(): Promise<GranolaAutomationRule[]> {
     return this.rules.map(cloneRule);
+  }
+
+  async writeRules(rules: GranolaAutomationRule[]): Promise<void> {
+    this.rules.splice(0, this.rules.length, ...rules.map(cloneRule));
   }
 }
 
@@ -522,6 +528,11 @@ export class FileAutomationRuleStore implements AutomationRuleStore {
     } catch {
       return [];
     }
+  }
+
+  async writeRules(rules: GranolaAutomationRule[]): Promise<void> {
+    await mkdir(dirname(this.filePath), { recursive: true });
+    await writeFile(this.filePath, `${JSON.stringify({ rules }, null, 2)}\n`, "utf8");
   }
 }
 

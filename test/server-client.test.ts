@@ -327,6 +327,34 @@ describe("GranolaServerClient", () => {
         rules: [expect.objectContaining({ id: "meeting-created-any" })],
       }),
     );
+    expect(
+      await client.saveAutomationRules([
+        {
+          actions: [
+            {
+              approvalMode: "manual",
+              harnessId: "team-harness",
+              id: "starter-pipeline",
+              kind: "agent",
+              name: "Generate starter notes",
+              pipeline: {
+                kind: "notes",
+              },
+            },
+          ],
+          id: "starter-rule",
+          name: "Starter Rule",
+          when: {
+            eventKinds: ["transcript.ready"],
+            transcriptLoaded: true,
+          },
+        },
+      ]),
+    ).toEqual(
+      expect.objectContaining({
+        rules: [expect.objectContaining({ id: "starter-rule" })],
+      }),
+    );
     expect(await client.listAutomationMatches({ limit: 5 })).toEqual(
       expect.objectContaining({
         matches: [expect.objectContaining({ ruleId: "meeting-created-any" })],

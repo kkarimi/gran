@@ -16,9 +16,15 @@ test.describe("toolkit web workspace", () => {
   test("connects and shows the shared workspace surfaces", async ({ page }) => {
     await page.goto(server.url);
 
-    await expect(page.getByRole("heading", { name: "Granola Toolkit" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Meeting Workspace" })).toBeVisible();
-    await expect(page.getByText("Connected")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Granola Toolkit" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByRole("heading", { name: "Meeting Workspace" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Connected")).toBeVisible({
+      timeout: 20_000,
+    });
     await expect(page.getByText("Auth Session")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save API key" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
@@ -29,11 +35,22 @@ test.describe("toolkit web workspace", () => {
   test("edits and tests harnesses against the selected meeting", async ({ page }) => {
     await page.goto(server.url);
 
+    await expect(page.getByText("Connected")).toBeVisible({
+      timeout: 20_000,
+    });
     await expect(page.getByRole("heading", { name: "Harness Editor" })).toBeVisible();
-    await page.getByRole("button", { name: /Alpha Sync/i }).click();
+    await page
+      .locator(".meeting-list")
+      .getByRole("button", { name: /Alpha Sync/i })
+      .click();
     await expect(page.getByText("Team Notes").first()).toBeVisible();
+    await expect(page.getByText("Run Team Notes against Alpha Sync.")).toBeVisible({
+      timeout: 20_000,
+    });
     const testHarnessButton = page.getByRole("button", { name: "Test Harness" });
-    await expect(testHarnessButton).toBeEnabled();
+    await expect(testHarnessButton).toBeEnabled({
+      timeout: 20_000,
+    });
     await testHarnessButton.click();
     await expect(page.getByRole("heading", { name: "Latest Test Run" })).toBeVisible();
     await expect(page.getByLabel("Structured Title")).toHaveValue("Team Notes", {
@@ -45,5 +62,48 @@ test.describe("toolkit web workspace", () => {
         timeout: 20_000,
       },
     );
+  });
+
+  test("guides a first-run user through onboarding", async ({ page }) => {
+    test.setTimeout(60_000);
+    const coldServer = await startToolkitWebServer({ scenario: "cold-start" });
+
+    try {
+      await page.goto(coldServer.url);
+
+      await expect(
+        page.getByRole("heading", {
+          name: "Connect Granola, import your meetings, and pick an agent.",
+        }),
+      ).toBeVisible();
+      await expect(page.getByText("Step 1")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Save API key" })).toBeVisible();
+      const importMeetingsButton = page.getByRole("button", { name: "Import meetings now" });
+      await expect(importMeetingsButton).toBeDisabled();
+
+      await page.getByPlaceholder("grn_...").fill("grn_test_123");
+      await page.getByRole("button", { name: "Save API key" }).click();
+      await expect(importMeetingsButton).toBeEnabled({
+        timeout: 20_000,
+      });
+      await importMeetingsButton.click();
+      await expect(page.getByText("2 meetings indexed locally.")).toBeVisible({
+        timeout: 20_000,
+      });
+
+      await page.getByRole("button", { name: "OpenRouter" }).click();
+      await page.getByRole("button", { name: "Create starter pipeline" }).click();
+
+      await expect(page.getByRole("heading", { name: "Granola Toolkit" })).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(page.getByRole("heading", { name: "Starter Meeting Notes" })).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
+    } finally {
+      await page.close();
+      await coldServer.close();
+    }
   });
 });

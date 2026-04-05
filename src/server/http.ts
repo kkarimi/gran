@@ -175,6 +175,14 @@ function harnessesFromBody(value: unknown): GranolaAgentHarness[] {
   return value as GranolaAgentHarness[];
 }
 
+function rulesFromBody(value: unknown): import("../app/index.ts").GranolaAutomationRule[] {
+  if (!Array.isArray(value)) {
+    throw new Error("rules must be an array");
+  }
+
+  return value as import("../app/index.ts").GranolaAutomationRule[];
+}
+
 function evaluationCasesFromBody(value: unknown): GranolaAutomationEvaluationCase[] {
   if (!Array.isArray(value)) {
     throw new Error("evaluation cases must be an array");
@@ -600,6 +608,14 @@ export async function startGranolaServer(
 
       if (method === "GET" && path === granolaTransportPaths.automationRules) {
         sendJson(response, await app.listAutomationRules(), { headers: originHeaders });
+        return;
+      }
+
+      if (method === "POST" && path === granolaTransportPaths.automationRules) {
+        const body = await readJsonBody(request);
+        sendJson(response, await app.saveAutomationRules(rulesFromBody(body.rules)), {
+          headers: originHeaders,
+        });
         return;
       }
 

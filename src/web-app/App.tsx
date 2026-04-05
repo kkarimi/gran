@@ -1,6 +1,6 @@
 /** @jsxImportSource solid-js */
 
-import { createEffect, onCleanup, onMount } from "solid-js";
+import { createEffect, onCleanup, onMount, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 
 import type {
@@ -8,6 +8,7 @@ import type {
   GranolaAgentHarness,
   GranolaAgentHarnessMatchExplanation,
   GranolaAutomationArtefact,
+  GranolaAutomationRule,
   GranolaAutomationArtefactKind,
   GranolaAutomationEvaluationRun,
   GranolaAutomationActionRun,
@@ -22,6 +23,8 @@ import type {
   MeetingSummarySource,
 } from "../app/index.ts";
 import { createGranolaServerClient, type GranolaServerClient } from "../server/client.ts";
+import { granolaTransportPaths } from "../transport.ts";
+import type { GranolaAgentProviderKind } from "../types.ts";
 import {
   applyWorkspaceFilter,
   buildBrowserUrlPath,
@@ -60,6 +63,7 @@ import {
   createHarnessTemplate,
   duplicateHarnessTemplate,
 } from "./harness-editor.tsx";
+import { buildStarterPipeline, deriveOnboardingState, OnboardingPanel } from "./onboarding.tsx";
 
 interface GranolaWebBrowserConfig {
   passwordRequired: boolean;
@@ -72,6 +76,7 @@ interface GranolaWebAppState {
   automationArtefactDraftTitle: string;
   automationArtefactError: string;
   automationArtefacts: GranolaAutomationArtefact[];
+  automationRules: GranolaAutomationRule[];
   appState: GranolaAppState | null;
   automationRuns: GranolaAutomationActionRun[];
   detailError: string;
@@ -89,6 +94,7 @@ interface GranolaWebAppState {
   meetings: MeetingSummaryRecord[];
   processingIssueError: string;
   processingIssues: import("../app/index.ts").GranolaProcessingIssue[];
+  preferredProvider: GranolaAgentProviderKind;
   quickOpen: string;
   recentMeetings: WebWorkspacePreferences["recentMeetings"];
   savedFilters: WebWorkspacePreferences["savedFilters"];
@@ -142,6 +148,7 @@ export function App() {
     automationArtefactDraftTitle: "",
     automationArtefactError: "",
     automationArtefacts: [],
+    automationRules: [],
     appState: null,
     automationRuns: [],
     detailError: "",
@@ -159,6 +166,7 @@ export function App() {
     meetings: [],
     processingIssueError: "",
     processingIssues: [],
+    preferredProvider: "openrouter",
     quickOpen: "",
     recentMeetings: initialPreferences.recentMeetings,
     savedFilters: initialPreferences.savedFilters,
@@ -181,6 +189,7 @@ export function App() {
   });
 
   let client: GranolaServerClient | null = null;
+  let automationPanelsHydrated = false;
   let unsubscribe: (() => void) | undefined;
 
   const setStatus = (label: string, tone: WebStatusTone = "idle") => {
@@ -282,6 +291,20 @@ export function App() {
       setState("automationRuns", result.runs);
     } catch (error) {
       setState("detailError", error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const loadAutomationRules = async () => {
+    if (!client) {
+      return;
+    }
+
+    try {
+      const result = await client.listAutomationRules();
+      setState("automationRules", result.rules);
+    } catch (error) {
+      setState("detailError", error instanceof Error ? error.message : String(error));
+      setState("automationRules", []);
     }
   };
 
@@ -396,6 +419,10 @@ export function App() {
       );
       setState("harnesses", result.harnesses);
       setState("selectedHarnessId", nextSelectedHarnessId);
+      const nextPreferredProvider = result.harnesses.find((harness) => harness.provider)?.provider;
+      if (nextPreferredProvider) {
+        setState("preferredProvider", nextPreferredProvider);
+      }
       setState("harnessDirty", false);
       setState("harnessTestResult", null);
       await loadHarnessExplanations(state.selectedMeetingId);
@@ -465,6 +492,10 @@ export function App() {
       const nextSelectedHarnessId = selectHarnessId(result.harnesses, state.selectedHarnessId);
       setState("harnesses", result.harnesses);
       setState("selectedHarnessId", nextSelectedHarnessId);
+      const nextPreferredProvider = result.harnesses.find((harness) => harness.provider)?.provider;
+      if (nextPreferredProvider) {
+        setState("preferredProvider", nextPreferredProvider);
+      }
       setState("harnessDirty", false);
       setState("harnessError", "");
       await loadHarnessExplanations(state.selectedMeetingId);
@@ -479,6 +510,33 @@ export function App() {
     setStatus("Reloading harnesses…", "busy");
     await loadHarnesses(state.selectedHarnessId);
     setStatus("Harnesses reloaded", "ok");
+  };
+
+  const createStarterPipeline = async () => {
+    if (!client) {
+      return;
+    }
+
+    setStatus("Creating starter pipeline…", "busy");
+    try {
+      const [currentHarnesses, currentRules] = await Promise.all([
+        client.listAgentHarnesses(),
+        client.listAutomationRules(),
+      ]);
+      const starter = buildStarterPipeline({
+        harnesses: currentHarnesses.harnesses,
+        provider: state.preferredProvider,
+        rules: currentRules.rules,
+      });
+
+      await client.saveAgentHarnesses(starter.harnesses);
+      await client.saveAutomationRules(starter.rules);
+      await refreshAll();
+      setStatus("Starter pipeline ready", "ok");
+    } catch (error) {
+      setState("detailError", error instanceof Error ? error.message : String(error));
+      setStatus("Starter pipeline setup failed", "error");
+    }
   };
 
   const testHarness = async () => {
@@ -627,6 +685,7 @@ export function App() {
     await Promise.all([
       loadFolders(forceRefresh),
       loadHarnesses(),
+      loadAutomationRules(),
       loadAutomationRuns(),
       loadAutomationArtefacts(),
       loadProcessingIssues(),
@@ -683,10 +742,6 @@ export function App() {
   };
 
   const saveApiKey = async () => {
-    if (!client) {
-      return;
-    }
-
     if (!state.apiKeyDraft.trim()) {
       setStatus("Enter a Granola API key", "error");
       return;
@@ -694,12 +749,21 @@ export function App() {
 
     setStatus("Saving API key…", "busy");
     try {
-      const auth = await client.loginAuth({
-        apiKey: state.apiKeyDraft.trim(),
+      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authLogin, {
+        body: JSON.stringify({
+          apiKey: state.apiKeyDraft.trim(),
+        }),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
       });
       setState("apiKeyDraft", "");
-      await mergeAuthState(auth);
-      await refreshAll();
+      setState("detailError", "");
+      if (state.appState) {
+        setState("appState", "auth", auth);
+      }
+      setStatus("API key saved", "ok");
     } catch (error) {
       await mergeAuthState();
       setState("detailError", error instanceof Error ? error.message : String(error));
@@ -708,15 +772,20 @@ export function App() {
   };
 
   const importDesktopSession = async () => {
-    if (!client) {
-      return;
-    }
-
     setStatus("Importing desktop session…", "busy");
     try {
-      const auth = await client.loginAuth();
-      await mergeAuthState(auth);
-      await refreshAll();
+      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authLogin, {
+        body: JSON.stringify({}),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+      setState("detailError", "");
+      if (state.appState) {
+        setState("appState", "auth", auth);
+      }
+      setStatus("Desktop session imported", "ok");
     } catch (error) {
       await mergeAuthState();
       setState("detailError", error instanceof Error ? error.message : String(error));
@@ -725,13 +794,11 @@ export function App() {
   };
 
   const refreshAuth = async () => {
-    if (!client) {
-      return;
-    }
-
     setStatus("Refreshing session…", "busy");
     try {
-      const auth = await client.refreshAuth();
+      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authRefresh, {
+        method: "POST",
+      });
       await mergeAuthState(auth);
       await refreshAll();
     } catch (error) {
@@ -742,13 +809,15 @@ export function App() {
   };
 
   const switchAuthMode = async (mode: GranolaAppAuthMode) => {
-    if (!client) {
-      return;
-    }
-
     setStatus("Switching auth source…", "busy");
     try {
-      const auth = await client.switchAuthMode(mode);
+      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authMode, {
+        body: JSON.stringify({ mode }),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
       await mergeAuthState(auth);
       await refreshAll();
     } catch (error) {
@@ -759,13 +828,11 @@ export function App() {
   };
 
   const logout = async () => {
-    if (!client) {
-      return;
-    }
-
     setStatus("Signing out…", "busy");
     try {
-      const auth = await client.logoutAuth();
+      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authLogout, {
+        method: "POST",
+      });
       await mergeAuthState(auth);
       await refreshAll();
     } catch (error) {
@@ -1091,6 +1158,7 @@ export function App() {
       automationArtefactDraftTitle: "",
       automationArtefactError: "",
       automationArtefacts: [],
+      automationRules: [],
       automationRuns: [],
       detailError: "",
       folderError: "",
@@ -1132,9 +1200,15 @@ export function App() {
 
   createEffect(() => {
     if (!state.appState?.automation.loaded || !client) {
+      automationPanelsHydrated = false;
       return;
     }
 
+    if (automationPanelsHydrated) {
+      return;
+    }
+
+    automationPanelsHydrated = true;
     void loadAutomationRuns();
     void loadAutomationArtefacts();
     void loadProcessingIssues();
@@ -1171,276 +1245,349 @@ export function App() {
     void detachClient();
   });
 
+  const onboardingState = () =>
+    deriveOnboardingState({
+      appState: state.appState,
+      automationRuleCount: state.automationRules.length,
+      harnesses: state.harnesses,
+      meetingsLoadedCount: state.meetings.length,
+    });
+
+  const showOnboarding = () => !state.serverLocked && !onboardingState().complete;
+
   return (
-    <div class="shell">
-      <aside class="pane sidebar">
-        <ToolbarFilters
-          onQuickOpen={() => {
-            void quickOpenMeeting();
-          }}
-          onQuickOpenInput={(value) => {
-            setState("quickOpen", value);
-          }}
-          onSearchInput={(value) => {
-            setState("search", value.trim());
-            void loadMeetings();
-          }}
-          onSortChange={(value) => {
-            setState("sort", value);
-            void loadMeetings();
-          }}
-          onUpdatedFromChange={(value) => {
-            setState("updatedFrom", value);
-            void loadMeetings();
-          }}
-          onUpdatedToChange={(value) => {
-            setState("updatedTo", value);
-            void loadMeetings();
-          }}
-          quickOpen={state.quickOpen}
-          search={state.search}
-          sort={state.sort}
-          updatedFrom={state.updatedFrom}
-          updatedTo={state.updatedTo}
-        />
-        <SavedFiltersPanel
-          folders={state.folders}
-          onApply={(preset) => {
-            void applySavedFilterPreset(preset.id);
-          }}
-          onRemove={removeSavedFilterPreset}
-          onSaveCurrent={saveCurrentFilter}
-          savedFilters={state.savedFilters}
-          search={state.search}
-          selectedFolderId={state.selectedFolderId}
-          sort={state.sort}
-          updatedFrom={state.updatedFrom}
-          updatedTo={state.updatedTo}
-        />
-        <RecentMeetingsPanel
-          onOpen={(meeting) => {
-            void openRecentMeeting(meeting.id, meeting.folderId);
-          }}
-          recentMeetings={state.recentMeetings}
-        />
-        <FolderList
-          error={state.folderError}
-          folders={state.folders}
-          onSelect={(folderId) => {
-            setState("selectedFolderId", folderId);
-            setState("selectedMeetingId", null);
-            setState("selectedMeeting", null);
-            setState("selectedMeetingBundle", null);
-            void loadMeetings();
-          }}
-          selectedFolderId={state.selectedFolderId}
-        />
-        <MeetingList
-          error={state.listError}
-          emptyHint={meetingEmptyHint()}
-          folders={state.folders}
-          meetings={state.meetings}
-          onSelect={(meetingId) => {
-            void loadMeeting(meetingId);
-          }}
-          search={state.search}
-          selectedFolderId={state.selectedFolderId}
-          selectedMeetingId={state.selectedMeetingId}
-          updatedFrom={state.updatedFrom}
-          updatedTo={state.updatedTo}
-        />
-      </aside>
-      <main class="pane detail">
-        <AppStatePanel
-          appState={state.appState}
-          statusLabel={state.statusLabel}
-          statusTone={state.statusTone}
-        />
-        <section class="toolbar">
-          <div class="toolbar-actions">
-            <button
-              class="button button--primary"
-              onClick={() => {
-                void connectAndRefresh(true);
+    <Show
+      when={!state.serverLocked && !showOnboarding()}
+      fallback={
+        <div class="shell shell--onboarding">
+          <main class="pane detail detail--onboarding">
+            <AppStatePanel
+              appState={state.appState}
+              statusLabel={state.statusLabel}
+              statusTone={state.statusTone}
+            />
+            <SecurityPanel
+              onLock={() => {
+                void lockServer();
               }}
-              type="button"
-            >
-              Sync now
-            </button>
-            <button
-              class="button button--secondary"
-              onClick={() => {
-                void clearFilters();
+              onPasswordChange={(value) => {
+                setState("serverPassword", value);
               }}
-              type="button"
-            >
-              Clear Filters
-            </button>
-            <button
-              class="button button--secondary"
-              onClick={() => {
-                void exportNotes();
+              onUnlock={() => {
+                void unlockServer();
               }}
-              type="button"
-            >
-              Export Notes
-            </button>
-            <button
-              class="button button--secondary"
-              onClick={() => {
-                void exportTranscripts();
-              }}
-              type="button"
-            >
-              Export Transcripts
-            </button>
-          </div>
-          <p>
-            Solid-powered web workspace on top of the same local server, sync loop, and shared app
-            contracts.
-          </p>
-        </section>
-        <SecurityPanel
-          onLock={() => {
-            void lockServer();
-          }}
-          onPasswordChange={(value) => {
-            setState("serverPassword", value);
-          }}
-          onUnlock={() => {
-            void unlockServer();
-          }}
-          password={state.serverPassword}
-          visible={state.serverLocked}
-        />
-        <AuthPanel
-          apiKeyDraft={state.apiKeyDraft}
-          auth={state.appState?.auth}
-          onApiKeyDraftChange={(value) => {
-            setState("apiKeyDraft", value);
-          }}
-          onImportDesktopSession={() => {
-            void importDesktopSession();
-          }}
-          onLogout={() => {
-            void logout();
-          }}
-          onRefresh={() => {
-            void refreshAuth();
-          }}
-          onSaveApiKey={() => {
-            void saveApiKey();
-          }}
-          onSwitchMode={(mode) => {
-            void switchAuthMode(mode);
-          }}
-        />
-        <HarnessEditorPanel
-          dirty={state.harnessDirty}
-          error={state.harnessError}
-          explanations={state.harnessExplanations}
-          explanationEventKind={state.harnessExplainEventKind}
-          harnesses={state.harnesses}
-          onChange={updateHarness}
-          onDuplicate={duplicateHarness}
-          onNew={createHarness}
-          onReload={() => {
-            void reloadHarnesses();
-          }}
-          onRemove={removeHarness}
-          onSave={() => {
-            void saveHarnesses();
-          }}
-          onSelect={(id) => {
-            setState("selectedHarnessId", id);
-            setState("harnessTestResult", null);
-          }}
-          onTest={() => {
-            void testHarness();
-          }}
-          onTestKindChange={(kind) => {
-            setState("harnessTestKind", kind);
-          }}
-          selectedHarness={selectedHarness()}
-          selectedHarnessId={state.selectedHarnessId}
-          selectedMeeting={state.selectedMeeting}
-          testKind={state.harnessTestKind}
-          testResult={state.harnessTestResult}
-        />
-        <ExportJobsPanel
-          jobs={state.appState?.exports.jobs || []}
-          onRerun={(jobId) => {
-            void rerunJob(jobId);
-          }}
-        />
-        <AutomationRunsPanel
-          onApprove={(runId) => {
-            void resolveAutomationRun(runId, "approve");
-          }}
-          onReject={(runId) => {
-            void resolveAutomationRun(runId, "reject");
-          }}
-          runs={state.automationRuns}
-        />
-        <ProcessingIssuesPanel
-          issues={state.processingIssues}
-          onOpenMeeting={(meetingId) => {
-            void loadMeeting(meetingId);
-          }}
-          onRecover={(issueId) => {
-            void recoverProcessingIssue(issueId);
-          }}
-        />
-        <AutomationArtefactsPanel
-          artefacts={state.automationArtefacts}
-          onSelect={(artefactId) => {
-            void selectAutomationArtefact(artefactId);
-          }}
-          selectedArtefactId={state.selectedAutomationArtefactId}
-        />
-        <ArtefactReviewPanel
-          artefact={selectedAutomationArtefact()}
-          bundle={state.selectedMeetingBundle}
-          draftMarkdown={state.automationArtefactDraftMarkdown}
-          draftSummary={state.automationArtefactDraftSummary}
-          draftTitle={state.automationArtefactDraftTitle}
-          error={state.automationArtefactError}
-          onApprove={() => {
-            void resolveAutomationArtefact("approve");
-          }}
-          onDraftMarkdownChange={(value) => {
-            setState("automationArtefactDraftMarkdown", value);
-          }}
-          onDraftSummaryChange={(value) => {
-            setState("automationArtefactDraftSummary", value);
-          }}
-          onDraftTitleChange={(value) => {
-            setState("automationArtefactDraftTitle", value);
-          }}
-          onReject={() => {
-            void resolveAutomationArtefact("reject");
-          }}
-          onRerun={() => {
-            void rerunAutomationArtefact();
-          }}
-          onReviewNoteChange={(value) => {
-            setState("reviewNote", value);
-          }}
-          onSave={() => {
-            void saveAutomationArtefact();
-          }}
-          reviewNote={state.reviewNote}
-        />
-        <Workspace
-          bundle={state.selectedMeetingBundle}
-          detailError={state.detailError}
-          onSelectTab={(tab) => {
-            setState("workspaceTab", tab);
-          }}
-          selectedMeeting={state.selectedMeeting}
-          tab={state.workspaceTab}
-        />
-      </main>
-    </div>
+              password={state.serverPassword}
+              visible={state.serverLocked}
+            />
+            {!state.serverLocked ? (
+              <OnboardingPanel
+                apiKeyDraft={state.apiKeyDraft}
+                auth={state.appState?.auth}
+                folders={state.folders}
+                meetingsLoadedCount={state.meetings.length}
+                onApiKeyDraftChange={(value) => {
+                  setState("apiKeyDraft", value);
+                }}
+                onCreateStarterPipeline={() => {
+                  void createStarterPipeline();
+                }}
+                onImportDesktopSession={() => {
+                  void importDesktopSession();
+                }}
+                onRunSync={() => {
+                  void connectAndRefresh(true);
+                }}
+                onSaveApiKey={() => {
+                  void saveApiKey();
+                }}
+                onSelectProvider={(provider) => {
+                  setState("preferredProvider", provider);
+                }}
+                preferredProvider={state.preferredProvider}
+                state={onboardingState()}
+              />
+            ) : null}
+            {!state.serverLocked && state.detailError ? (
+              <section class="jobs-panel">
+                <div class="auth-card">
+                  <div class="auth-card__meta auth-card__error">{state.detailError}</div>
+                </div>
+              </section>
+            ) : null}
+          </main>
+        </div>
+      }
+    >
+      <div class="shell">
+        <aside class="pane sidebar">
+          <ToolbarFilters
+            onQuickOpen={() => {
+              void quickOpenMeeting();
+            }}
+            onQuickOpenInput={(value) => {
+              setState("quickOpen", value);
+            }}
+            onSearchInput={(value) => {
+              setState("search", value.trim());
+              void loadMeetings();
+            }}
+            onSortChange={(value) => {
+              setState("sort", value);
+              void loadMeetings();
+            }}
+            onUpdatedFromChange={(value) => {
+              setState("updatedFrom", value);
+              void loadMeetings();
+            }}
+            onUpdatedToChange={(value) => {
+              setState("updatedTo", value);
+              void loadMeetings();
+            }}
+            quickOpen={state.quickOpen}
+            search={state.search}
+            sort={state.sort}
+            updatedFrom={state.updatedFrom}
+            updatedTo={state.updatedTo}
+          />
+          <SavedFiltersPanel
+            folders={state.folders}
+            onApply={(preset) => {
+              void applySavedFilterPreset(preset.id);
+            }}
+            onRemove={removeSavedFilterPreset}
+            onSaveCurrent={saveCurrentFilter}
+            savedFilters={state.savedFilters}
+            search={state.search}
+            selectedFolderId={state.selectedFolderId}
+            sort={state.sort}
+            updatedFrom={state.updatedFrom}
+            updatedTo={state.updatedTo}
+          />
+          <RecentMeetingsPanel
+            onOpen={(meeting) => {
+              void openRecentMeeting(meeting.id, meeting.folderId);
+            }}
+            recentMeetings={state.recentMeetings}
+          />
+          <FolderList
+            error={state.folderError}
+            folders={state.folders}
+            onSelect={(folderId) => {
+              setState("selectedFolderId", folderId);
+              setState("selectedMeetingId", null);
+              setState("selectedMeeting", null);
+              setState("selectedMeetingBundle", null);
+              void loadMeetings();
+            }}
+            selectedFolderId={state.selectedFolderId}
+          />
+          <MeetingList
+            error={state.listError}
+            emptyHint={meetingEmptyHint()}
+            folders={state.folders}
+            meetings={state.meetings}
+            onSelect={(meetingId) => {
+              void loadMeeting(meetingId);
+            }}
+            search={state.search}
+            selectedFolderId={state.selectedFolderId}
+            selectedMeetingId={state.selectedMeetingId}
+            updatedFrom={state.updatedFrom}
+            updatedTo={state.updatedTo}
+          />
+        </aside>
+        <main class="pane detail">
+          <AppStatePanel
+            appState={state.appState}
+            statusLabel={state.statusLabel}
+            statusTone={state.statusTone}
+          />
+          <section class="toolbar">
+            <div class="toolbar-actions">
+              <button
+                class="button button--primary"
+                onClick={() => {
+                  void connectAndRefresh(true);
+                }}
+                type="button"
+              >
+                Sync now
+              </button>
+              <button
+                class="button button--secondary"
+                onClick={() => {
+                  void clearFilters();
+                }}
+                type="button"
+              >
+                Clear Filters
+              </button>
+              <button
+                class="button button--secondary"
+                onClick={() => {
+                  void exportNotes();
+                }}
+                type="button"
+              >
+                Export Notes
+              </button>
+              <button
+                class="button button--secondary"
+                onClick={() => {
+                  void exportTranscripts();
+                }}
+                type="button"
+              >
+                Export Transcripts
+              </button>
+            </div>
+            <p>
+              Solid-powered web workspace on top of the same local server, sync loop, and shared app
+              contracts.
+            </p>
+          </section>
+          <SecurityPanel
+            onLock={() => {
+              void lockServer();
+            }}
+            onPasswordChange={(value) => {
+              setState("serverPassword", value);
+            }}
+            onUnlock={() => {
+              void unlockServer();
+            }}
+            password={state.serverPassword}
+            visible={state.serverLocked}
+          />
+          <AuthPanel
+            apiKeyDraft={state.apiKeyDraft}
+            auth={state.appState?.auth}
+            onApiKeyDraftChange={(value) => {
+              setState("apiKeyDraft", value);
+            }}
+            onImportDesktopSession={() => {
+              void importDesktopSession();
+            }}
+            onLogout={() => {
+              void logout();
+            }}
+            onRefresh={() => {
+              void refreshAuth();
+            }}
+            onSaveApiKey={() => {
+              void saveApiKey();
+            }}
+            onSwitchMode={(mode) => {
+              void switchAuthMode(mode);
+            }}
+          />
+          <HarnessEditorPanel
+            dirty={state.harnessDirty}
+            error={state.harnessError}
+            explanations={state.harnessExplanations}
+            explanationEventKind={state.harnessExplainEventKind}
+            harnesses={state.harnesses}
+            onChange={updateHarness}
+            onDuplicate={duplicateHarness}
+            onNew={createHarness}
+            onReload={() => {
+              void reloadHarnesses();
+            }}
+            onRemove={removeHarness}
+            onSave={() => {
+              void saveHarnesses();
+            }}
+            onSelect={(id) => {
+              setState("selectedHarnessId", id);
+              setState("harnessTestResult", null);
+            }}
+            onTest={() => {
+              void testHarness();
+            }}
+            onTestKindChange={(kind) => {
+              setState("harnessTestKind", kind);
+            }}
+            selectedHarness={selectedHarness()}
+            selectedHarnessId={state.selectedHarnessId}
+            selectedMeeting={state.selectedMeeting}
+            testKind={state.harnessTestKind}
+            testResult={state.harnessTestResult}
+          />
+          <ExportJobsPanel
+            jobs={state.appState?.exports.jobs || []}
+            onRerun={(jobId) => {
+              void rerunJob(jobId);
+            }}
+          />
+          <AutomationRunsPanel
+            onApprove={(runId) => {
+              void resolveAutomationRun(runId, "approve");
+            }}
+            onReject={(runId) => {
+              void resolveAutomationRun(runId, "reject");
+            }}
+            runs={state.automationRuns}
+          />
+          <ProcessingIssuesPanel
+            issues={state.processingIssues}
+            onOpenMeeting={(meetingId) => {
+              void loadMeeting(meetingId);
+            }}
+            onRecover={(issueId) => {
+              void recoverProcessingIssue(issueId);
+            }}
+          />
+          <AutomationArtefactsPanel
+            artefacts={state.automationArtefacts}
+            onSelect={(artefactId) => {
+              void selectAutomationArtefact(artefactId);
+            }}
+            selectedArtefactId={state.selectedAutomationArtefactId}
+          />
+          <ArtefactReviewPanel
+            artefact={selectedAutomationArtefact()}
+            bundle={state.selectedMeetingBundle}
+            draftMarkdown={state.automationArtefactDraftMarkdown}
+            draftSummary={state.automationArtefactDraftSummary}
+            draftTitle={state.automationArtefactDraftTitle}
+            error={state.automationArtefactError}
+            onApprove={() => {
+              void resolveAutomationArtefact("approve");
+            }}
+            onDraftMarkdownChange={(value) => {
+              setState("automationArtefactDraftMarkdown", value);
+            }}
+            onDraftSummaryChange={(value) => {
+              setState("automationArtefactDraftSummary", value);
+            }}
+            onDraftTitleChange={(value) => {
+              setState("automationArtefactDraftTitle", value);
+            }}
+            onReject={() => {
+              void resolveAutomationArtefact("reject");
+            }}
+            onRerun={() => {
+              void rerunAutomationArtefact();
+            }}
+            onReviewNoteChange={(value) => {
+              setState("reviewNote", value);
+            }}
+            onSave={() => {
+              void saveAutomationArtefact();
+            }}
+            reviewNote={state.reviewNote}
+          />
+          <Workspace
+            bundle={state.selectedMeetingBundle}
+            detailError={state.detailError}
+            onSelectTab={(tab) => {
+              setState("workspaceTab", tab);
+            }}
+            selectedMeeting={state.selectedMeeting}
+            tab={state.workspaceTab}
+          />
+        </main>
+      </div>
+    </Show>
   );
 }

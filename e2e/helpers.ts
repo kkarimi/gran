@@ -11,6 +11,8 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { MemoryAgentHarnessStore } from "../src/agent-harnesses.ts";
 import { GranolaApp } from "../src/app/core.ts";
+import type { GranolaAppAuthState } from "../src/app/index.ts";
+import { MemoryAutomationRuleStore } from "../src/automation-rules.ts";
 import { startGranolaServer } from "../src/server/http.ts";
 import { MemorySyncEventStore } from "../src/sync-events.ts";
 import type { CacheData, GranolaDocument, GranolaFolder } from "../src/types.ts";
@@ -18,6 +20,10 @@ import type { CacheData, GranolaDocument, GranolaFolder } from "../src/types.ts"
 interface StartedServer {
   close(): Promise<void>;
   url: string;
+}
+
+interface StartToolkitWebServerOptions {
+  scenario?: "cold-start" | "workspace";
 }
 
 const documents: GranolaDocument[] = [
@@ -181,10 +187,107 @@ async function waitForHttpReady(url: string, options: { timeoutMs?: number } = {
   throw new Error(`timed out waiting for ${url}`);
 }
 
-export async function startToolkitWebServer(): Promise<StartedServer> {
+function createInMemoryAuthController(initialState: GranolaAppAuthState) {
+  let authState = structuredClone(initialState);
+
+  return {
+    async inspect() {
+      return structuredClone(authState);
+    },
+    async login(options: { apiKey?: string } = {}) {
+      authState = {
+        ...authState,
+        apiKeyAvailable: Boolean(options.apiKey?.trim()) || authState.apiKeyAvailable,
+        lastError: undefined,
+        mode: options.apiKey?.trim() ? "api-key" : "stored-session",
+        storedSessionAvailable: options.apiKey?.trim() ? authState.storedSessionAvailable : true,
+      };
+      return structuredClone(authState);
+    },
+    async logout() {
+      authState = {
+        ...authState,
+        apiKeyAvailable: false,
+        lastError: undefined,
+        mode: authState.supabaseAvailable ? "supabase-file" : "api-key",
+        storedSessionAvailable: false,
+      };
+      return structuredClone(authState);
+    },
+    async refresh() {
+      if (!authState.storedSessionAvailable) {
+        authState = {
+          ...authState,
+          lastError: "no stored Granola session found",
+        };
+        throw new Error(authState.lastError);
+      }
+
+      authState = {
+        ...authState,
+        lastError: undefined,
+      };
+      return structuredClone(authState);
+    },
+    async switchMode(mode: GranolaAppAuthState["mode"]) {
+      if (mode === "api-key" && !authState.apiKeyAvailable) {
+        authState = {
+          ...authState,
+          lastError: "no Granola API key found",
+        };
+        throw new Error(authState.lastError);
+      }
+      if (mode === "stored-session" && !authState.storedSessionAvailable) {
+        authState = {
+          ...authState,
+          lastError: "no stored Granola session found",
+        };
+        throw new Error(authState.lastError);
+      }
+      if (mode === "supabase-file" && !authState.supabaseAvailable) {
+        authState = {
+          ...authState,
+          lastError: "supabase.json not found",
+        };
+        throw new Error(authState.lastError);
+      }
+
+      authState = {
+        ...authState,
+        lastError: undefined,
+        mode,
+      };
+      return structuredClone(authState);
+    },
+  };
+}
+
+export async function startToolkitWebServer(
+  options: StartToolkitWebServerOptions = {},
+): Promise<StartedServer> {
+  const scenario = options.scenario ?? "workspace";
   const outputRoot = await mkdtemp(join(tmpdir(), "granola-playwright-"));
   const cacheFile = join(outputRoot, "cache.json");
   await writeFile(cacheFile, `${JSON.stringify(cacheData)}\n`, "utf8");
+
+  const initialAuthState: GranolaAppAuthState =
+    scenario === "cold-start"
+      ? {
+          apiKeyAvailable: false,
+          mode: "api-key",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: false,
+        }
+      : {
+          apiKeyAvailable: true,
+          mode: "api-key",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: false,
+        };
+  const authController = createInMemoryAuthController(initialAuthState);
+
   const app = new GranolaApp(
     {
       debug: false,
@@ -199,25 +302,24 @@ export async function startToolkitWebServer(): Promise<StartedServer> {
       },
     },
     {
-      auth: {
-        apiKeyAvailable: true,
-        mode: "api-key",
-        refreshAvailable: false,
-        storedSessionAvailable: false,
-        supabaseAvailable: false,
-      },
-      agentHarnessStore: new MemoryAgentHarnessStore([
-        {
-          id: "team-notes",
-          match: {
-            folderNames: ["Team"],
-            transcriptLoaded: true,
-          },
-          name: "Team Notes",
-          prompt: "Write concise internal team notes.",
-          provider: "codex",
-        },
-      ]),
+      auth: initialAuthState,
+      authController,
+      agentHarnessStore: new MemoryAgentHarnessStore(
+        scenario === "cold-start"
+          ? []
+          : [
+              {
+                id: "team-notes",
+                match: {
+                  folderNames: ["Team"],
+                  transcriptLoaded: true,
+                },
+                name: "Team Notes",
+                prompt: "Write concise internal team notes.",
+                provider: "codex",
+              },
+            ],
+      ),
       agentRunner: {
         run: async (request) => ({
           dryRun: false,
@@ -236,10 +338,57 @@ export async function startToolkitWebServer(): Promise<StartedServer> {
           provider: request.provider ?? "codex",
         }),
       },
+      automationRuleStore: new MemoryAutomationRuleStore(
+        scenario === "cold-start"
+          ? []
+          : [
+              {
+                actions: [
+                  {
+                    approvalMode: "manual",
+                    harnessId: "team-notes",
+                    id: "team-notes-pipeline",
+                    kind: "agent",
+                    name: "Generate team notes",
+                    pipeline: {
+                      kind: "notes",
+                    },
+                  },
+                ],
+                id: "team-notes-on-transcript",
+                name: "Review team notes when a transcript is ready",
+                when: {
+                  eventKinds: ["transcript.ready"],
+                  folderNames: ["Team"],
+                  transcriptLoaded: true,
+                },
+              },
+            ],
+      ),
       cacheLoader: async () => cacheData,
-      granolaClient: {
-        listDocuments: async () => documents,
-        listFolders: async () => folders,
+      createGranolaClient: async (mode) => {
+        const auth = await authController.inspect();
+        const activeMode = mode ?? auth.mode;
+        if (activeMode === "api-key" && !auth.apiKeyAvailable) {
+          throw new Error("Granola API key required");
+        }
+        if (activeMode === "stored-session" && !auth.storedSessionAvailable) {
+          throw new Error("Granola desktop session required");
+        }
+        if (activeMode === "supabase-file" && !auth.supabaseAvailable) {
+          throw new Error("supabase.json not available");
+        }
+
+        return {
+          auth: {
+            ...auth,
+            mode: activeMode,
+          },
+          client: {
+            listDocuments: async () => documents,
+            listFolders: async () => folders,
+          },
+        };
       },
       now: () => new Date("2024-03-01T12:00:00Z"),
       syncEventStore: new MemorySyncEventStore(),
@@ -247,7 +396,9 @@ export async function startToolkitWebServer(): Promise<StartedServer> {
     { surface: "web" },
   );
 
-  await app.sync();
+  if (scenario !== "cold-start") {
+    await app.sync();
+  }
   const server = await startGranolaServer(app, {
     enableWebClient: true,
   });

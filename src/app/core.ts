@@ -1621,6 +1621,25 @@ export class GranolaApp implements GranolaAppApi {
     };
   }
 
+  async saveAutomationRules(rules: GranolaAutomationRule[]): Promise<GranolaAutomationRulesResult> {
+    if (!this.deps.automationRuleStore) {
+      throw new Error("automation rule store is not configured");
+    }
+
+    await this.deps.automationRuleStore.writeRules(
+      rules.map((rule) => this.cloneAutomationRule(rule)),
+    );
+    this.#automationRules = rules.map((rule) => this.cloneAutomationRule(rule));
+    this.refreshAutomationState();
+    this.setUiState({
+      view: "idle",
+    });
+    this.emitStateUpdate();
+    return {
+      rules: this.#automationRules.map((rule) => this.cloneAutomationRule(rule)),
+    };
+  }
+
   async listAutomationMatches(
     options: { limit?: number } = {},
   ): Promise<GranolaAutomationMatchesResult> {

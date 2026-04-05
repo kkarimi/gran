@@ -301,6 +301,18 @@ export class GranolaServerClient implements GranolaAppApi {
     return await this.requestJson(granolaTransportPaths.automationRules);
   }
 
+  async saveAutomationRules(
+    rules: import("../app/index.ts").GranolaAutomationRule[],
+  ): Promise<import("../app/index.ts").GranolaAutomationRulesResult> {
+    return await this.requestJson(granolaTransportPaths.automationRules, {
+      body: JSON.stringify({ rules }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+  }
+
   async listAutomationMatches(
     options: { limit?: number } = {},
   ): Promise<import("../app/index.ts").GranolaAutomationMatchesResult> {

@@ -206,4 +206,39 @@ describe("automation rules", () => {
       }),
     ]);
   });
+
+  test("writes rules back to a JSON file", async () => {
+    const filePath = join(await mkdtemp(join(tmpdir(), "granola-automation-rules-")), "rules.json");
+    const store = new FileAutomationRuleStore(filePath);
+
+    await store.writeRules([
+      {
+        actions: [
+          {
+            approvalMode: "manual",
+            harnessId: "starter-meeting-notes",
+            id: "starter-pipeline",
+            kind: "agent",
+            name: "Generate starter notes",
+            pipeline: {
+              kind: "notes",
+            },
+          },
+        ],
+        id: "starter-rule",
+        name: "Starter Rule",
+        when: {
+          eventKinds: ["transcript.ready"],
+          transcriptLoaded: true,
+        },
+      },
+    ]);
+
+    expect(await store.readRules()).toEqual([
+      expect.objectContaining({
+        id: "starter-rule",
+        name: "Starter Rule",
+      }),
+    ]);
+  });
 });

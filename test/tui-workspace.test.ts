@@ -707,6 +707,7 @@ function createWorkspaceHarness(
     rerunAutomationArtefact: vi.fn(),
     rerunExportJob: vi.fn(),
     saveAgentHarnesses: vi.fn(async () => ({ harnesses: [] })),
+    saveAutomationRules: vi.fn(async (rules) => ({ rules })),
     sync: vi.fn(async () => ({
       changes: [],
       state: state.sync,

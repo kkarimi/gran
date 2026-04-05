@@ -2,6 +2,7 @@ import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve as resolvePath } from "node:path";
 
 import type { GranolaAgentHarness } from "./agent-harnesses.ts";
+import { defaultGranolaAgentModel } from "./agent-defaults.ts";
 import type { GranolaAutomationRule } from "./app/index.ts";
 import type { GranolaAgentProviderKind } from "./types.ts";
 
@@ -17,12 +18,6 @@ export interface GranolaProjectInitResult {
   createdFiles: string[];
   directory: string;
 }
-
-const DEFAULT_MODELS: Record<GranolaAgentProviderKind, string> = {
-  codex: "gpt-5-codex",
-  openai: "gpt-5-mini",
-  openrouter: "openai/gpt-5-mini",
-};
 
 const TEAM_PROMPT = `# Team Notes Harness
 
@@ -57,7 +52,7 @@ function quoteTomlString(value: string): string {
 }
 
 function defaultModel(provider: GranolaAgentProviderKind, explicitModel?: string): string {
-  return explicitModel?.trim() || DEFAULT_MODELS[provider];
+  return defaultGranolaAgentModel(provider, explicitModel);
 }
 
 function configTemplate(options: {

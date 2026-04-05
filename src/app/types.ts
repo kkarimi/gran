@@ -715,6 +715,7 @@ export interface GranolaAppApi {
     status?: GranolaAutomationActionRunStatus;
   }): Promise<GranolaAutomationRunsResult>;
   listAutomationRules(): Promise<GranolaAutomationRulesResult>;
+  saveAutomationRules(rules: GranolaAutomationRule[]): Promise<GranolaAutomationRulesResult>;
   listSyncEvents(options?: { limit?: number }): Promise<GranolaAppSyncEventsResult>;
   inspectSync(): Promise<GranolaAppSyncState>;
   loginAuth(options?: { apiKey?: string; supabasePath?: string }): Promise<GranolaAppAuthState>;
