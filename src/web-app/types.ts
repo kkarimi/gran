@@ -1,0 +1,83 @@
+import type {
+  FolderSummaryRecord,
+  GranolaAgentHarness,
+  GranolaAgentHarnessMatchExplanation,
+  GranolaAutomationActionRun,
+  GranolaAutomationArtefact,
+  GranolaAutomationArtefactKind,
+  GranolaAutomationEvaluationRun,
+  GranolaAutomationRule,
+  GranolaAppState,
+  GranolaMeetingBundle,
+  GranolaMeetingSort,
+  GranolaSyncEventKind,
+  MeetingRecord,
+  MeetingSummaryRecord,
+  MeetingSummarySource,
+} from "../app/index.ts";
+import type { GranolaAgentProviderKind } from "../types.ts";
+import type { GranolaServerInfo } from "../transport.ts";
+
+import type { WebMainPage, WebSettingsSection, WebStatusTone } from "./components.tsx";
+import type { WebWorkspacePreferences, WorkspaceTab } from "../web/client-state.ts";
+
+export type MeetingReturnPage = Exclude<WebMainPage, "meeting">;
+
+export interface GranolaWebBrowserConfig {
+  passwordRequired: boolean;
+}
+
+export interface GranolaWebAppState {
+  activePage: WebMainPage;
+  apiKeyDraft: string;
+  advancedSearchQuery: string;
+  automationArtefactDraftMarkdown: string;
+  automationArtefactDraftSummary: string;
+  automationArtefactDraftTitle: string;
+  automationArtefactError: string;
+  automationArtefacts: GranolaAutomationArtefact[];
+  automationRules: GranolaAutomationRule[];
+  automationRuns: GranolaAutomationActionRun[];
+  appState: GranolaAppState | null;
+  detailError: string;
+  folderError: string;
+  folders: FolderSummaryRecord[];
+  harnessDirty: boolean;
+  harnessError: string;
+  harnessExplainEventKind: GranolaSyncEventKind | null;
+  harnessExplanations: GranolaAgentHarnessMatchExplanation[];
+  harnesses: GranolaAgentHarness[];
+  harnessTestKind: GranolaAutomationArtefactKind;
+  harnessTestResult: GranolaAutomationEvaluationRun | null;
+  homeMeetings: MeetingSummaryRecord[];
+  homeMeetingsError: string;
+  listError: string;
+  meetingReturnPage: MeetingReturnPage;
+  meetings: MeetingSummaryRecord[];
+  meetingSource: MeetingSummarySource;
+  preferredProvider: GranolaAgentProviderKind;
+  processingIssueError: string;
+  processingIssues: import("../app/index.ts").GranolaProcessingIssue[];
+  recentMeetings: WebWorkspacePreferences["recentMeetings"];
+  reviewNote: string;
+  savedFilters: WebWorkspacePreferences["savedFilters"];
+  search: string;
+  searchSubmitted: boolean;
+  selectedAutomationArtefactId: string | null;
+  selectedFolderId: string | null;
+  selectedHarnessId: string | null;
+  selectedMeeting: MeetingRecord | null;
+  selectedMeetingBundle: GranolaMeetingBundle | null;
+  selectedMeetingId: string | null;
+  selectedReviewInboxKey: string | null;
+  serverInfo: GranolaServerInfo | null;
+  serverLocked: boolean;
+  serverPassword: string;
+  settingsTab: WebSettingsSection;
+  sort: GranolaMeetingSort;
+  statusLabel: string;
+  statusTone: WebStatusTone;
+  updatedFrom: string;
+  updatedTo: string;
+  workspaceTab: WorkspaceTab;
+}

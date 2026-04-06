@@ -1,32 +1,17 @@
 /** @jsxImportSource solid-js */
 
-import { createEffect, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import { createEffect, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 
 import type {
-  FolderSummaryRecord,
   GranolaAgentHarness,
-  GranolaAgentHarnessMatchExplanation,
   GranolaAutomationArtefact,
-  GranolaAutomationRule,
-  GranolaAutomationArtefactKind,
-  GranolaAutomationEvaluationRun,
-  GranolaAutomationActionRun,
   GranolaAppAuthMode,
   GranolaAppAuthState,
-  GranolaAppState,
-  GranolaMeetingBundle,
-  GranolaMeetingSort,
-  GranolaSyncEventKind,
-  MeetingRecord,
-  MeetingSummaryRecord,
-  MeetingSummarySource,
 } from "../app/index.ts";
 import { buildGranolaReviewInbox, summariseGranolaReviewInbox } from "../review-inbox.ts";
 import { createGranolaServerClient, type GranolaServerClient } from "../server/client.ts";
-import type { GranolaServerInfo } from "../transport.ts";
 import { granolaTransportPaths } from "../transport.ts";
-import type { GranolaAgentProviderKind } from "../types.ts";
 import {
   buildBrowserUrlPath,
   granolaWebWorkspaceStorageKey,
@@ -39,99 +24,25 @@ import {
   selectMeetingId,
   startupSelectionFromSearch,
   type WebWorkspacePreferences,
-  type WorkspaceTab,
 } from "../web/client-state.ts";
 import {
-  AppStatePanel,
-  ArtefactReviewPanel,
-  AutomationRunsPanel,
-  AuthPanel,
-  BrowsePromptPanel,
-  DiagnosticsPanel,
-  ExportJobsPanel,
-  FolderList,
-  HomeDashboardPanel,
-  IssueReviewPanel,
-  MeetingList,
-  PageHeader,
   PrimaryNav,
-  ProcessingIssuesPanel,
-  ReviewInboxPanel,
-  RunReviewPanel,
-  SearchWorkspacePanel,
   SecurityPanel,
   type WebMainPage,
-  type WebSettingsSection,
   type WebStatusTone,
-  Workspace,
+  AppStatePanel,
 } from "./components.tsx";
-import {
-  HarnessEditorPanel,
-  createHarnessTemplate,
-  duplicateHarnessTemplate,
-} from "./harness-editor.tsx";
+import { createHarnessTemplate, duplicateHarnessTemplate } from "./harness-editor.tsx";
 import { buildStarterPipeline, deriveOnboardingState, OnboardingPanel } from "./onboarding.tsx";
-
-type MeetingReturnPage = Exclude<WebMainPage, "meeting">;
-
-interface GranolaWebBrowserConfig {
-  passwordRequired: boolean;
-}
-
-interface GranolaWebAppState {
-  activePage: WebMainPage;
-  apiKeyDraft: string;
-  advancedSearchQuery: string;
-  automationArtefactDraftMarkdown: string;
-  automationArtefactDraftSummary: string;
-  automationArtefactDraftTitle: string;
-  automationArtefactError: string;
-  automationArtefacts: GranolaAutomationArtefact[];
-  automationRules: GranolaAutomationRule[];
-  appState: GranolaAppState | null;
-  automationRuns: GranolaAutomationActionRun[];
-  detailError: string;
-  folderError: string;
-  folders: FolderSummaryRecord[];
-  homeMeetings: MeetingSummaryRecord[];
-  homeMeetingsError: string;
-  harnessDirty: boolean;
-  harnessError: string;
-  harnessExplainEventKind: GranolaSyncEventKind | null;
-  harnessExplanations: GranolaAgentHarnessMatchExplanation[];
-  harnessTestKind: GranolaAutomationArtefactKind;
-  harnessTestResult: GranolaAutomationEvaluationRun | null;
-  harnesses: GranolaAgentHarness[];
-  listError: string;
-  meetingSource: MeetingSummarySource;
-  meetings: MeetingSummaryRecord[];
-  processingIssueError: string;
-  processingIssues: import("../app/index.ts").GranolaProcessingIssue[];
-  preferredProvider: GranolaAgentProviderKind;
-  recentMeetings: WebWorkspacePreferences["recentMeetings"];
-  savedFilters: WebWorkspacePreferences["savedFilters"];
-  search: string;
-  serverInfo: GranolaServerInfo | null;
-  selectedAutomationArtefactId: string | null;
-  selectedFolderId: string | null;
-  selectedHarnessId: string | null;
-  selectedMeetingBundle: GranolaMeetingBundle | null;
-  selectedMeetingId: string | null;
-  selectedMeeting: MeetingRecord | null;
-  selectedReviewInboxKey: string | null;
-  searchSubmitted: boolean;
-  reviewNote: string;
-  meetingReturnPage: MeetingReturnPage;
-  serverLocked: boolean;
-  serverPassword: string;
-  settingsTab: WebSettingsSection;
-  sort: GranolaMeetingSort;
-  statusLabel: string;
-  statusTone: WebStatusTone;
-  updatedFrom: string;
-  updatedTo: string;
-  workspaceTab: WorkspaceTab;
-}
+import {
+  FoldersPageController,
+  HomePageController,
+  MeetingPageController,
+  ReviewPageController,
+  SearchPageController,
+  SettingsPageController,
+} from "./page-controllers.tsx";
+import type { GranolaWebAppState, GranolaWebBrowserConfig, MeetingReturnPage } from "./types.ts";
 
 function browserConfig(): GranolaWebBrowserConfig {
   return {
@@ -524,7 +435,12 @@ export function App() {
   const selectedFolder = () =>
     state.folders.find((folder) => folder.id === state.selectedFolderId) ?? null;
 
-  const openPage = async (page: MeetingReturnPage) => {
+  const openPage = async (
+    page: MeetingReturnPage,
+    options?: {
+      folderId?: string | null;
+    },
+  ) => {
     if (page === "home") {
       setState("activePage", "home");
       return;
@@ -536,7 +452,7 @@ export function App() {
       setState("updatedFrom", "");
       setState("updatedTo", "");
       setState("searchSubmitted", false);
-      setState("selectedFolderId", null);
+      setState("selectedFolderId", options?.folderId ?? null);
       setState("selectedMeetingId", null);
       setState("selectedMeeting", null);
       setState("selectedMeetingBundle", null);
@@ -544,6 +460,9 @@ export function App() {
       setState("listError", "");
       if (state.folders.length === 0) {
         await loadFolders(true);
+      }
+      if (options?.folderId) {
+        await loadMeetings();
       }
       return;
     }
@@ -1485,12 +1404,6 @@ export function App() {
       : "Transcript not loaded yet";
     return `${meeting.updatedAt.slice(0, 10)} • ${folderLabel} • ${transcriptLabel}`;
   };
-  const settingsTabs: Array<{ id: WebSettingsSection; label: string }> = [
-    { id: "auth", label: "Auth" },
-    { id: "pipelines", label: "Automation" },
-    { id: "exports", label: "Exports" },
-    { id: "diagnostics", label: "Diagnostics" },
-  ];
 
   return (
     <Show
@@ -1581,53 +1494,12 @@ export function App() {
         <main class="pane app-main">
           <Switch>
             <Match when={state.activePage === "home"}>
-              <PageHeader
-                actions={
-                  <>
-                    <button
-                      class="button button--secondary"
-                      onClick={() => {
-                        void openPage("folders");
-                      }}
-                      type="button"
-                    >
-                      Open folders
-                    </button>
-                    <button
-                      class="button button--secondary"
-                      onClick={() => {
-                        void openPage("search");
-                      }}
-                      type="button"
-                    >
-                      Search meetings
-                    </button>
-                    <button
-                      class="button button--secondary"
-                      onClick={() => {
-                        void openPage("review");
-                      }}
-                      type="button"
-                    >
-                      Open review
-                    </button>
-                  </>
-                }
-                description="Start from one calm home view, then choose folders, search, review, or settings as separate tasks."
-                eyebrow="Home"
-                title="A quieter way to work through meetings"
-              />
-              <HomeDashboardPanel
+              <HomePageController
                 appState={state.appState}
                 folders={state.folders}
                 latestMeetings={state.homeMeetings}
                 onOpenFolder={(folderId) => {
-                  setState("selectedFolderId", folderId);
-                  setState("selectedMeetingId", null);
-                  setState("selectedMeeting", null);
-                  setState("selectedMeetingBundle", null);
-                  setState("activePage", "folders");
-                  void loadMeetings();
+                  void openPage("folders", { folderId });
                 }}
                 onOpenLatestMeeting={(meeting) => {
                   void openMeetingFromPage(meeting.id, "home", {
@@ -1637,8 +1509,14 @@ export function App() {
                 onOpenMeeting={(meeting) => {
                   void openRecentMeeting(meeting.id, meeting.folderId);
                 }}
-                onOpenReview={() => {
+                onOpenFoldersPage={() => {
+                  void openPage("folders");
+                }}
+                onOpenReviewPage={() => {
                   void openPage("review");
+                }}
+                onOpenSearchPage={() => {
+                  void openPage("search");
                 }}
                 processingIssues={state.processingIssues}
                 recentMeetings={state.recentMeetings}
@@ -1647,139 +1525,44 @@ export function App() {
               />
             </Match>
             <Match when={state.activePage === "folders"}>
-              <PageHeader
-                actions={
-                  <>
-                    <Show when={state.selectedFolderId}>
-                      <button
-                        class="button button--secondary"
-                        onClick={() => {
-                          setState("selectedFolderId", null);
-                          setState("selectedMeetingId", null);
-                          setState("selectedMeeting", null);
-                          setState("selectedMeetingBundle", null);
-                          setState("meetings", []);
-                          setState("listError", "");
-                        }}
-                        type="button"
-                      >
-                        All folders
-                      </button>
-                    </Show>
-                    <button
-                      class="button button--secondary"
-                      onClick={() => {
-                        void loadFolders(true);
-                      }}
-                      type="button"
-                    >
-                      {state.selectedFolderId ? "Refresh folder" : "Refresh folders"}
-                    </button>
-                    <Show when={state.selectedFolderId}>
-                      <button
-                        class="button button--secondary"
-                        onClick={() => {
-                          void exportNotes();
-                        }}
-                        type="button"
-                      >
-                        Export folder notes
-                      </button>
-                      <button
-                        class="button button--secondary"
-                        onClick={() => {
-                          void exportTranscripts();
-                        }}
-                        type="button"
-                      >
-                        Export folder transcripts
-                      </button>
-                    </Show>
-                  </>
-                }
-                description={
-                  selectedFolder()
-                    ? `Open one meeting at a time from ${selectedFolder()?.name || selectedFolder()?.id}. Search and review stay on their own pages.`
-                    : "Choose one folder first. The folders page should feel like a directory, not another split-screen browser."
-                }
-                eyebrow="Folders"
-                title={selectedFolder()?.name || "Browse by folder"}
+              <FoldersPageController
+                folderError={state.folderError}
+                folders={state.folders}
+                listError={state.listError}
+                meetingEmptyHint={meetingEmptyHint()}
+                meetings={state.meetings}
+                onBackToFolders={() => {
+                  setState("selectedFolderId", null);
+                  setState("selectedMeetingId", null);
+                  setState("selectedMeeting", null);
+                  setState("selectedMeetingBundle", null);
+                  setState("meetings", []);
+                  setState("listError", "");
+                }}
+                onExportNotes={() => {
+                  void exportNotes();
+                }}
+                onExportTranscripts={() => {
+                  void exportTranscripts();
+                }}
+                onOpenMeeting={(meetingId) => {
+                  void openMeetingFromPage(meetingId, "folders", {
+                    folderId: state.selectedFolderId,
+                  });
+                }}
+                onRefreshFolders={() => {
+                  void loadFolders(true);
+                }}
+                onSelectFolder={(folderId) => {
+                  void openPage("folders", { folderId });
+                }}
+                selectedFolder={selectedFolder()}
+                selectedFolderId={state.selectedFolderId}
+                selectedMeetingId={state.selectedMeetingId}
               />
-              <Show
-                when={state.selectedFolderId}
-                fallback={
-                  <FolderList
-                    error={state.folderError}
-                    folders={state.folders}
-                    onSelect={(folderId) => {
-                      setState("selectedFolderId", folderId);
-                      setState("selectedMeetingId", null);
-                      setState("selectedMeeting", null);
-                      setState("selectedMeetingBundle", null);
-                      void loadMeetings();
-                    }}
-                    selectedFolderId={state.selectedFolderId}
-                  />
-                }
-              >
-                <section class="folder-focus">
-                  <div class="folder-focus__hero">
-                    <div>
-                      <p class="folder-focus__eyebrow">Selected folder</p>
-                      <h3>{selectedFolder()?.name || selectedFolder()?.id || "Folder"}</h3>
-                      <p>
-                        {selectedFolder()?.isFavourite
-                          ? "Marked as a favourite in Granola."
-                          : "Use this focused list to choose one meeting without browsing the entire workspace."}
-                      </p>
-                    </div>
-                    <div class="folder-focus__stats">
-                      <div class="folder-focus__stat">
-                        <span class="dashboard-stat__label">Meetings</span>
-                        <strong>{String(selectedFolder()?.documentCount ?? 0)}</strong>
-                      </div>
-                      <div class="folder-focus__stat">
-                        <span class="dashboard-stat__label">Updated</span>
-                        <strong>
-                          {selectedFolder()?.updatedAt
-                            ? selectedFolder()?.updatedAt.slice(0, 10)
-                            : "Unknown"}
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-                <MeetingList
-                  description={
-                    selectedFolder()
-                      ? `${selectedFolder()?.documentCount ?? 0} meetings in ${selectedFolder()?.name || selectedFolder()?.id}.`
-                      : "Choose a folder to load its meetings."
-                  }
-                  error={state.listError}
-                  emptyHint={meetingEmptyHint()}
-                  folders={state.folders}
-                  heading={`Meetings in ${selectedFolder()?.name || "this folder"}`}
-                  meetings={state.meetings}
-                  onSelect={(meetingId) => {
-                    void openMeetingFromPage(meetingId, "folders", {
-                      folderId: state.selectedFolderId,
-                    });
-                  }}
-                  search=""
-                  selectedFolderId={state.selectedFolderId}
-                  selectedMeetingId={state.selectedMeetingId}
-                  updatedFrom=""
-                  updatedTo=""
-                />
-              </Show>
             </Match>
             <Match when={state.activePage === "search"}>
-              <PageHeader
-                description="Search is its own page now, so folder browsing and meeting reading do not compete with a wall of search controls."
-                eyebrow="Search"
-                title="Search meetings on purpose"
-              />
-              <SearchWorkspacePanel
+              <SearchPageController
                 advancedQuery={state.advancedSearchQuery}
                 onAdvancedQueryChange={(value) => {
                   setState("advancedSearchQuery", value);
@@ -1810,319 +1593,192 @@ export function App() {
                   setState("searchSubmitted", false);
                 }}
                 query={state.search}
+                searchResultsVisible={searchResultsVisible()}
+                selectedFolderId={state.selectedFolderId}
+                selectedMeetingId={state.selectedMeetingId}
                 sort={state.sort}
                 updatedFrom={state.updatedFrom}
                 updatedTo={state.updatedTo}
+                folders={state.folders}
+                hasRecentMeetings={state.recentMeetings.length > 0}
+                listError={state.listError}
+                meetingEmptyHint={meetingEmptyHint()}
+                meetings={state.meetings}
+                onOpenMeeting={(meetingId) => {
+                  void openMeetingFromPage(meetingId, "search");
+                }}
               />
-              <Show
-                when={searchResultsVisible()}
-                fallback={
-                  <BrowsePromptPanel
-                    foldersAvailable={state.folders.length}
-                    hasRecentMeetings={state.recentMeetings.length > 0}
-                  />
-                }
-              >
-                <MeetingList
-                  description={
-                    state.search
-                      ? `Results for "${state.search}".`
-                      : "Filtered results from your local meeting index."
-                  }
-                  error={state.listError}
-                  emptyHint={meetingEmptyHint()}
-                  folders={state.folders}
-                  heading="Search results"
-                  meetings={state.meetings}
-                  onSelect={(meetingId) => {
-                    void openMeetingFromPage(meetingId, "search");
-                  }}
-                  search={state.search}
-                  selectedFolderId={state.selectedFolderId}
-                  selectedMeetingId={state.selectedMeetingId}
-                  updatedFrom={state.updatedFrom}
-                  updatedTo={state.updatedTo}
-                />
-              </Show>
             </Match>
             <Match when={state.activePage === "review"}>
-              <PageHeader
-                actions={
-                  <button
-                    class="button button--secondary"
-                    onClick={() => {
-                      void connectAndRefresh(true);
-                    }}
-                    type="button"
-                  >
-                    Refresh review state
-                  </button>
-                }
-                description="Review approvals, artefacts, and processing issues in one place instead of mixing them into the meeting page."
-                eyebrow="Review"
-                title="Review queue"
+              <ReviewPageController
+                artefactDraftMarkdown={state.automationArtefactDraftMarkdown}
+                artefactDraftSummary={state.automationArtefactDraftSummary}
+                artefactDraftTitle={state.automationArtefactDraftTitle}
+                artefactError={state.automationArtefactError}
+                onApproveArtefact={() => {
+                  void resolveAutomationArtefact("approve");
+                }}
+                onApproveRun={(runId) => {
+                  void resolveAutomationRun(runId, "approve");
+                }}
+                onDraftMarkdownChange={(value) => {
+                  setState("automationArtefactDraftMarkdown", value);
+                }}
+                onDraftSummaryChange={(value) => {
+                  setState("automationArtefactDraftSummary", value);
+                }}
+                onDraftTitleChange={(value) => {
+                  setState("automationArtefactDraftTitle", value);
+                }}
+                onOpenMeeting={(meetingId) => {
+                  void openMeetingFromPage(meetingId, "review");
+                }}
+                onRecover={(issueId) => {
+                  void recoverProcessingIssue(issueId);
+                }}
+                onRefresh={() => {
+                  void connectAndRefresh(true);
+                }}
+                onRejectArtefact={() => {
+                  void resolveAutomationArtefact("reject");
+                }}
+                onRejectRun={(runId) => {
+                  void resolveAutomationRun(runId, "reject");
+                }}
+                onRerunArtefact={() => {
+                  void rerunAutomationArtefact();
+                }}
+                onReviewNoteChange={(value) => {
+                  setState("reviewNote", value);
+                }}
+                onSaveArtefact={() => {
+                  void saveAutomationArtefact();
+                }}
+                onSelectItem={(key) => {
+                  void selectReviewInboxItem(key);
+                }}
+                reviewItems={reviewInboxItems()}
+                reviewNote={state.reviewNote}
+                reviewSummary={reviewInboxSummary()}
+                selectedArtefact={selectedReviewArtefact()}
+                selectedBundle={state.selectedMeetingBundle}
+                selectedIssue={selectedReviewIssue()}
+                selectedKey={state.selectedReviewInboxKey}
+                selectedKind={selectedReviewInboxItem()?.kind}
+                selectedRun={selectedReviewRun()}
               />
-              <div class="review-layout">
-                <section class="review-layout__sidebar">
-                  <ReviewInboxPanel
-                    items={reviewInboxItems()}
-                    onSelect={(key) => {
-                      void selectReviewInboxItem(key);
-                    }}
-                    selectedKey={state.selectedReviewInboxKey}
-                    summary={reviewInboxSummary()}
-                  />
-                </section>
-                <section class="review-layout__main">
-                  <Switch>
-                    <Match when={selectedReviewInboxItem()?.kind === "issue"}>
-                      <IssueReviewPanel
-                        issue={selectedReviewIssue()}
-                        onOpenMeeting={(meetingId) => {
-                          void openMeetingFromPage(meetingId, "review");
-                        }}
-                        onRecover={(issueId) => {
-                          void recoverProcessingIssue(issueId);
-                        }}
-                      />
-                    </Match>
-                    <Match when={selectedReviewInboxItem()?.kind === "run"}>
-                      <RunReviewPanel
-                        onApprove={(runId) => {
-                          void resolveAutomationRun(runId, "approve");
-                        }}
-                        onOpenMeeting={(meetingId) => {
-                          void openMeetingFromPage(meetingId, "review");
-                        }}
-                        onReject={(runId) => {
-                          void resolveAutomationRun(runId, "reject");
-                        }}
-                        run={selectedReviewRun()}
-                      />
-                    </Match>
-                    <Match when={selectedReviewInboxItem()?.kind === "artefact"}>
-                      <ArtefactReviewPanel
-                        artefact={selectedReviewArtefact()}
-                        bundle={state.selectedMeetingBundle}
-                        draftMarkdown={state.automationArtefactDraftMarkdown}
-                        draftSummary={state.automationArtefactDraftSummary}
-                        draftTitle={state.automationArtefactDraftTitle}
-                        error={state.automationArtefactError}
-                        onApprove={() => {
-                          void resolveAutomationArtefact("approve");
-                        }}
-                        onDraftMarkdownChange={(value) => {
-                          setState("automationArtefactDraftMarkdown", value);
-                        }}
-                        onDraftSummaryChange={(value) => {
-                          setState("automationArtefactDraftSummary", value);
-                        }}
-                        onDraftTitleChange={(value) => {
-                          setState("automationArtefactDraftTitle", value);
-                        }}
-                        onReject={() => {
-                          void resolveAutomationArtefact("reject");
-                        }}
-                        onRerun={() => {
-                          void rerunAutomationArtefact();
-                        }}
-                        onReviewNoteChange={(value) => {
-                          setState("reviewNote", value);
-                        }}
-                        onSave={() => {
-                          void saveAutomationArtefact();
-                        }}
-                        reviewNote={state.reviewNote}
-                      />
-                    </Match>
-                    <Match when={true}>
-                      <div class="empty">Select something from the review inbox to inspect it.</div>
-                    </Match>
-                  </Switch>
-                </section>
-              </div>
             </Match>
             <Match when={state.activePage === "settings"}>
-              <PageHeader
-                description="Settings holds auth, automation, export history, and diagnostics so the rest of the app can stay focused on browsing and reading."
-                eyebrow="Settings"
-                title="Service settings"
+              <SettingsPageController
+                apiKeyDraft={state.apiKeyDraft}
+                appState={state.appState}
+                auth={state.appState?.auth}
+                automationRuns={state.automationRuns}
+                harnessDirty={state.harnessDirty}
+                harnessError={state.harnessError}
+                harnessExplanations={state.harnessExplanations}
+                harnessExplanationEventKind={state.harnessExplainEventKind}
+                harnesses={state.harnesses}
+                harnessTestKind={state.harnessTestKind}
+                harnessTestResult={state.harnessTestResult}
+                onApiKeyDraftChange={(value) => {
+                  setState("apiKeyDraft", value);
+                }}
+                onApproveRun={(runId) => {
+                  void resolveAutomationRun(runId, "approve");
+                }}
+                onChangeHarness={updateHarness}
+                onDuplicateHarness={duplicateHarness}
+                onExportNotes={() => {
+                  void exportNotes();
+                }}
+                onExportTranscripts={() => {
+                  void exportTranscripts();
+                }}
+                onImportDesktopSession={() => {
+                  void importDesktopSession();
+                }}
+                onLock={() => {
+                  void lockServer();
+                }}
+                onLogout={() => {
+                  void logout();
+                }}
+                onNewHarness={createHarness}
+                onOpenMeeting={(meetingId) => {
+                  void openMeetingFromPage(meetingId, "settings");
+                }}
+                onPasswordChange={(value) => {
+                  setState("serverPassword", value);
+                }}
+                onRecover={(issueId) => {
+                  void recoverProcessingIssue(issueId);
+                }}
+                onRefreshAuth={() => {
+                  void refreshAuth();
+                }}
+                onRejectRun={(runId) => {
+                  void resolveAutomationRun(runId, "reject");
+                }}
+                onReloadHarnesses={() => {
+                  void reloadHarnesses();
+                }}
+                onRemoveHarness={removeHarness}
+                onRerunJob={(jobId) => {
+                  void rerunJob(jobId);
+                }}
+                onSaveApiKey={() => {
+                  void saveApiKey();
+                }}
+                onSaveHarnesses={() => {
+                  void saveHarnesses();
+                }}
+                onSelectHarness={(id) => {
+                  setState("selectedHarnessId", id);
+                  setState("harnessTestResult", null);
+                }}
+                onSwitchMode={(mode) => {
+                  void switchAuthMode(mode);
+                }}
+                onTestHarness={() => {
+                  void testHarness();
+                }}
+                onTestKindChange={(kind) => {
+                  setState("harnessTestKind", kind);
+                }}
+                onUnlock={() => {
+                  void unlockServer();
+                }}
+                password={state.serverPassword}
+                preferredProvider={state.preferredProvider}
+                processingIssues={state.processingIssues}
+                selectedHarness={selectedHarness()}
+                selectedHarnessId={state.selectedHarnessId}
+                selectedMeeting={state.selectedMeeting}
+                serverInfo={state.serverInfo}
+                serverLocked={state.serverLocked}
+                settingsTab={state.settingsTab}
+                setSettingsTab={(tab) => {
+                  setState("settingsTab", tab);
+                }}
+                statusLabel={state.statusLabel}
               />
-              <section class="settings-shell">
-                <nav class="settings-shell__tabs">
-                  <For each={settingsTabs}>
-                    {(tab) => (
-                      <button
-                        class="workspace-tab"
-                        data-selected={state.settingsTab === tab.id ? "true" : undefined}
-                        onClick={() => {
-                          setState("settingsTab", tab.id);
-                        }}
-                        type="button"
-                      >
-                        {tab.label}
-                      </button>
-                    )}
-                  </For>
-                </nav>
-                <div class="settings-shell__body">
-                  <Switch>
-                    <Match when={state.settingsTab === "auth"}>
-                      <SecurityPanel
-                        onLock={() => {
-                          void lockServer();
-                        }}
-                        onPasswordChange={(value) => {
-                          setState("serverPassword", value);
-                        }}
-                        onUnlock={() => {
-                          void unlockServer();
-                        }}
-                        password={state.serverPassword}
-                        visible={state.serverLocked}
-                      />
-                      <AuthPanel
-                        apiKeyDraft={state.apiKeyDraft}
-                        auth={state.appState?.auth}
-                        onApiKeyDraftChange={(value) => {
-                          setState("apiKeyDraft", value);
-                        }}
-                        onImportDesktopSession={() => {
-                          void importDesktopSession();
-                        }}
-                        onLogout={() => {
-                          void logout();
-                        }}
-                        onRefresh={() => {
-                          void refreshAuth();
-                        }}
-                        onSaveApiKey={() => {
-                          void saveApiKey();
-                        }}
-                        onSwitchMode={(mode) => {
-                          void switchAuthMode(mode);
-                        }}
-                        preferredProvider={state.preferredProvider}
-                      />
-                    </Match>
-                    <Match when={state.settingsTab === "pipelines"}>
-                      <HarnessEditorPanel
-                        dirty={state.harnessDirty}
-                        error={state.harnessError}
-                        explanations={state.harnessExplanations}
-                        explanationEventKind={state.harnessExplainEventKind}
-                        harnesses={state.harnesses}
-                        onChange={updateHarness}
-                        onDuplicate={duplicateHarness}
-                        onNew={createHarness}
-                        onReload={() => {
-                          void reloadHarnesses();
-                        }}
-                        onRemove={removeHarness}
-                        onSave={() => {
-                          void saveHarnesses();
-                        }}
-                        onSelect={(id) => {
-                          setState("selectedHarnessId", id);
-                          setState("harnessTestResult", null);
-                        }}
-                        onTest={() => {
-                          void testHarness();
-                        }}
-                        onTestKindChange={(kind) => {
-                          setState("harnessTestKind", kind);
-                        }}
-                        selectedHarness={selectedHarness()}
-                        selectedHarnessId={state.selectedHarnessId}
-                        selectedMeeting={state.selectedMeeting}
-                        testKind={state.harnessTestKind}
-                        testResult={state.harnessTestResult}
-                      />
-                    </Match>
-                    <Match when={state.settingsTab === "exports"}>
-                      <section class="settings-export-actions">
-                        <div class="toolbar-actions">
-                          <button
-                            class="button button--secondary"
-                            onClick={() => {
-                              void exportNotes();
-                            }}
-                            type="button"
-                          >
-                            Export notes
-                          </button>
-                          <button
-                            class="button button--secondary"
-                            onClick={() => {
-                              void exportTranscripts();
-                            }}
-                            type="button"
-                          >
-                            Export transcripts
-                          </button>
-                        </div>
-                      </section>
-                      <ExportJobsPanel
-                        jobs={state.appState?.exports.jobs || []}
-                        onRerun={(jobId) => {
-                          void rerunJob(jobId);
-                        }}
-                      />
-                    </Match>
-                    <Match when={state.settingsTab === "diagnostics"}>
-                      <DiagnosticsPanel
-                        appState={state.appState}
-                        serverInfo={state.serverInfo}
-                        statusLabel={state.statusLabel}
-                      />
-                      <ProcessingIssuesPanel
-                        issues={state.processingIssues}
-                        onOpenMeeting={(meetingId) => {
-                          void openMeetingFromPage(meetingId, "settings");
-                        }}
-                        onRecover={(issueId) => {
-                          void recoverProcessingIssue(issueId);
-                        }}
-                      />
-                      <AutomationRunsPanel
-                        onApprove={(runId) => {
-                          void resolveAutomationRun(runId, "approve");
-                        }}
-                        onReject={(runId) => {
-                          void resolveAutomationRun(runId, "reject");
-                        }}
-                        runs={state.automationRuns}
-                      />
-                    </Match>
-                  </Switch>
-                </div>
-              </section>
             </Match>
             <Match when={state.activePage === "meeting"}>
-              <PageHeader
-                actions={
-                  <button
-                    class="button button--secondary"
-                    onClick={() => {
-                      setState("activePage", state.meetingReturnPage);
-                    }}
-                    type="button"
-                  >
-                    {meetingReturnLabel()}
-                  </button>
-                }
-                description={meetingDescription()}
-                eyebrow="Meeting"
-                title={state.selectedMeeting?.meeting.title || state.selectedMeetingId || "Meeting"}
-              />
-              <Workspace
-                bundle={state.selectedMeetingBundle}
+              <MeetingPageController
                 detailError={state.detailError}
+                meetingDescription={meetingDescription()}
+                meetingReturnLabel={meetingReturnLabel()}
+                onBack={() => {
+                  setState("activePage", state.meetingReturnPage);
+                }}
                 onSelectTab={(tab) => {
                   setState("workspaceTab", tab);
                 }}
+                selectedBundle={state.selectedMeetingBundle}
                 selectedMeeting={state.selectedMeeting}
-                tab={state.workspaceTab}
+                selectedMeetingId={state.selectedMeetingId}
+                workspaceTab={state.workspaceTab}
               />
             </Match>
           </Switch>
