@@ -1,0 +1,571 @@
+/** @jsxImportSource solid-js */
+
+import { For, Show, type JSX } from "solid-js";
+
+import type {
+  GranolaAutomationActionRun,
+  GranolaAutomationArtefact,
+  GranolaMeetingBundle,
+  GranolaProcessingIssue,
+} from "../app/index.ts";
+import type { GranolaReviewInboxItem, GranolaReviewInboxSummary } from "../review-inbox.ts";
+
+interface AutomationRunsPanelProps {
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  runs: GranolaAutomationActionRun[];
+}
+
+interface ProcessingIssuesPanelProps {
+  issues: GranolaProcessingIssue[];
+  onOpenMeeting: (meetingId: string) => void;
+  onRecover: (id: string) => void;
+}
+
+interface AutomationArtefactsPanelProps {
+  artefacts: GranolaAutomationArtefact[];
+  onSelect: (id: string) => void;
+  selectedArtefactId?: string | null;
+}
+
+interface ReviewInboxPanelProps {
+  items: GranolaReviewInboxItem[];
+  onSelect: (key: string) => void;
+  selectedKey?: string | null;
+  summary: GranolaReviewInboxSummary;
+}
+
+interface ArtefactReviewPanelProps {
+  artefact: GranolaAutomationArtefact | null;
+  bundle: GranolaMeetingBundle | null;
+  draftMarkdown: string;
+  draftSummary: string;
+  draftTitle: string;
+  error?: string;
+  onApprove: () => void;
+  onDraftMarkdownChange: (value: string) => void;
+  onDraftSummaryChange: (value: string) => void;
+  onDraftTitleChange: (value: string) => void;
+  onReject: () => void;
+  onRerun: () => void;
+  onReviewNoteChange: (value: string) => void;
+  onSave: () => void;
+  reviewNote: string;
+}
+
+export function AutomationRunsPanel(props: AutomationRunsPanelProps): JSX.Element {
+  return (
+    <section class="jobs-panel">
+      <div class="jobs-panel__head">
+        <h3>Automation Runs</h3>
+        <p>Recent action runs triggered by durable sync events.</p>
+      </div>
+      <div class="jobs-list">
+        <Show
+          when={props.runs.length > 0}
+          fallback={<div class="job-empty">No automation runs yet.</div>}
+        >
+          <For each={props.runs.slice(0, 6)}>
+            {(run) => (
+              <article class="job-card">
+                <div class="job-card__head">
+                  <div>
+                    <div class="job-card__title">{run.actionName}</div>
+                    <div class="job-card__meta">{`${run.ruleName} • ${run.id}`}</div>
+                  </div>
+                  <div class="job-card__status" data-status={run.status}>
+                    {run.status}
+                  </div>
+                </div>
+                <div class="job-card__meta">{`${run.title} • ${run.eventKind}`}</div>
+                <div class="job-card__meta">{`Started: ${run.startedAt.slice(0, 19)}`}</div>
+                <Show when={run.prompt}>
+                  <div class="job-card__meta">{run.prompt}</div>
+                </Show>
+                <Show when={run.result}>
+                  <div class="job-card__meta">{run.result}</div>
+                </Show>
+                <Show when={run.error}>
+                  <div class="job-card__meta">{run.error}</div>
+                </Show>
+                <div class="job-card__actions">
+                  <Show when={run.status === "pending"}>
+                    <>
+                      <button
+                        class="button button--secondary"
+                        onClick={() => {
+                          props.onApprove(run.id);
+                        }}
+                        type="button"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        class="button button--secondary"
+                        onClick={() => {
+                          props.onReject(run.id);
+                        }}
+                        type="button"
+                      >
+                        Reject
+                      </button>
+                    </>
+                  </Show>
+                </div>
+              </article>
+            )}
+          </For>
+        </Show>
+      </div>
+    </section>
+  );
+}
+
+export function ProcessingIssuesPanel(props: ProcessingIssuesPanelProps): JSX.Element {
+  return (
+    <section class="jobs-panel">
+      <div class="jobs-panel__head">
+        <h3>Processing Health</h3>
+        <p>Catch stale syncs, missing transcripts, and failed or outdated note pipelines.</p>
+      </div>
+      <div class="jobs-list">
+        <Show
+          when={props.issues.length > 0}
+          fallback={<div class="job-empty">No processing issues detected.</div>}
+        >
+          <For each={props.issues.slice(0, 8)}>
+            {(issue) => (
+              <article class="job-card">
+                <div class="job-card__head">
+                  <div>
+                    <div class="job-card__title">{issue.title}</div>
+                    <div class="job-card__meta">{issue.id}</div>
+                  </div>
+                  <div class="job-card__status" data-status={issue.severity}>
+                    {issue.severity}
+                  </div>
+                </div>
+                <div class="job-card__meta">{issue.kind}</div>
+                <div class="job-card__meta">{issue.detail}</div>
+                <div class="job-card__actions">
+                  <Show when={issue.meetingId}>
+                    <button
+                      class="button button--secondary"
+                      onClick={() => {
+                        props.onOpenMeeting(issue.meetingId!);
+                      }}
+                      type="button"
+                    >
+                      Open Meeting
+                    </button>
+                  </Show>
+                  <Show when={issue.recoverable}>
+                    <button
+                      class="button button--secondary"
+                      onClick={() => {
+                        props.onRecover(issue.id);
+                      }}
+                      type="button"
+                    >
+                      Recover
+                    </button>
+                  </Show>
+                </div>
+              </article>
+            )}
+          </For>
+        </Show>
+      </div>
+    </section>
+  );
+}
+
+export function ReviewInboxPanel(props: ReviewInboxPanelProps): JSX.Element {
+  return (
+    <section class="jobs-panel">
+      <div class="jobs-panel__head">
+        <h3>Review Inbox</h3>
+        <p>
+          {props.summary.total > 0
+            ? `${props.summary.total} items need attention: ${props.summary.issues} issues, ${props.summary.artefacts} artefacts, ${props.summary.runs} approvals.`
+            : "Nothing needs attention right now."}
+        </p>
+      </div>
+      <div class="jobs-list">
+        <Show
+          when={props.items.length > 0}
+          fallback={<div class="job-empty">No review items waiting.</div>}
+        >
+          <For each={props.items.slice(0, 12)}>
+            {(item) => (
+              <button
+                class="job-card job-card--button"
+                data-selected={item.key === props.selectedKey ? "true" : undefined}
+                onClick={() => {
+                  props.onSelect(item.key);
+                }}
+                type="button"
+              >
+                <div class="job-card__head">
+                  <div>
+                    <div class="job-card__title">{item.title}</div>
+                    <div class="job-card__meta">{item.subtitle}</div>
+                  </div>
+                  <div class="job-card__status" data-status={item.status}>
+                    {item.status}
+                  </div>
+                </div>
+                <Show when={item.meetingId}>
+                  <div class="job-card__meta">{item.meetingId}</div>
+                </Show>
+                <div class="job-card__meta">{item.summary}</div>
+                <div class="job-card__meta">{`Updated: ${item.timestamp.slice(0, 19)}`}</div>
+              </button>
+            )}
+          </For>
+        </Show>
+      </div>
+    </section>
+  );
+}
+
+export function AutomationArtefactsPanel(props: AutomationArtefactsPanelProps): JSX.Element {
+  return (
+    <section class="jobs-panel">
+      <div class="jobs-panel__head">
+        <h3>Review Queue</h3>
+        <p>Generated note and enrichment candidates waiting for review or follow-up.</p>
+      </div>
+      <div class="jobs-list">
+        <Show
+          when={props.artefacts.length > 0}
+          fallback={<div class="job-empty">No automation artefacts yet.</div>}
+        >
+          <For each={props.artefacts.slice(0, 10)}>
+            {(artefact) => (
+              <button
+                class="job-card job-card--button"
+                data-selected={artefact.id === props.selectedArtefactId ? "true" : undefined}
+                onClick={() => {
+                  props.onSelect(artefact.id);
+                }}
+                type="button"
+              >
+                <div class="job-card__head">
+                  <div>
+                    <div class="job-card__title">{artefact.structured.title}</div>
+                    <div class="job-card__meta">{`${artefact.kind} • ${artefact.ruleName}`}</div>
+                  </div>
+                  <div class="job-card__status" data-status={artefact.status}>
+                    {artefact.status}
+                  </div>
+                </div>
+                <div class="job-card__meta">{artefact.meetingId}</div>
+                <Show when={artefact.structured.summary}>
+                  <div class="job-card__meta">{artefact.structured.summary}</div>
+                </Show>
+                <div class="job-card__meta">{`Updated: ${artefact.updatedAt.slice(0, 19)}`}</div>
+              </button>
+            )}
+          </For>
+        </Show>
+      </div>
+    </section>
+  );
+}
+
+export function IssueReviewPanel(props: {
+  issue: GranolaProcessingIssue | null;
+  onOpenMeeting: (meetingId: string) => void;
+  onRecover: (id: string) => void;
+}): JSX.Element {
+  return (
+    <section class="review-panel">
+      <div class="jobs-panel__head">
+        <h3>Issue Review</h3>
+        <p>Inspect the issue, jump to the meeting if needed, and run recovery from one place.</p>
+      </div>
+      <Show
+        when={props.issue}
+        fallback={<div class="job-empty">Select a processing issue to inspect it.</div>}
+      >
+        {(issue) => (
+          <div class="review-body">
+            <div class="detail-meta">
+              <div class="detail-chip">{`Severity: ${issue().severity}`}</div>
+              <div class="detail-chip">{`Kind: ${issue().kind}`}</div>
+              <Show when={issue().meetingId}>
+                <div class="detail-chip">{`Meeting: ${issue().meetingId}`}</div>
+              </Show>
+            </div>
+            <section class="detail-section">
+              <h2>{issue().title}</h2>
+              <p>{issue().detail}</p>
+              <div class="job-card__actions">
+                <Show when={issue().meetingId}>
+                  <button
+                    class="button button--secondary"
+                    onClick={() => {
+                      props.onOpenMeeting(issue().meetingId!);
+                    }}
+                    type="button"
+                  >
+                    Open meeting
+                  </button>
+                </Show>
+                <Show when={issue().recoverable}>
+                  <button
+                    class="button button--secondary"
+                    onClick={() => {
+                      props.onRecover(issue().id);
+                    }}
+                    type="button"
+                  >
+                    Recover
+                  </button>
+                </Show>
+              </div>
+            </section>
+          </div>
+        )}
+      </Show>
+    </section>
+  );
+}
+
+export function RunReviewPanel(props: {
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  onOpenMeeting: (meetingId: string) => void;
+  run: GranolaAutomationActionRun | null;
+}): JSX.Element {
+  return (
+    <section class="review-panel">
+      <div class="jobs-panel__head">
+        <h3>Approval Review</h3>
+        <p>Approve or reject ask-user automation runs with the meeting context still in view.</p>
+      </div>
+      <Show
+        when={props.run}
+        fallback={<div class="job-empty">Select a pending run to review it.</div>}
+      >
+        {(run) => (
+          <div class="review-body">
+            <div class="detail-meta">
+              <div class="detail-chip">{`Status: ${run().status}`}</div>
+              <div class="detail-chip">{`Action: ${run().actionName}`}</div>
+              <div class="detail-chip">{`Rule: ${run().ruleName}`}</div>
+              <div class="detail-chip">{`Meeting: ${run().meetingId}`}</div>
+            </div>
+            <section class="detail-section">
+              <h2>{run().title}</h2>
+              <p>{run().prompt || run().result || run().error || run().eventKind}</p>
+              <div class="job-card__actions">
+                <button
+                  class="button button--secondary"
+                  onClick={() => {
+                    props.onOpenMeeting(run().meetingId);
+                  }}
+                  type="button"
+                >
+                  Open meeting
+                </button>
+                <Show when={run().status === "pending"}>
+                  <>
+                    <button
+                      class="button button--secondary"
+                      onClick={() => {
+                        props.onApprove(run().id);
+                      }}
+                      type="button"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      class="button button--secondary"
+                      onClick={() => {
+                        props.onReject(run().id);
+                      }}
+                      type="button"
+                    >
+                      Reject
+                    </button>
+                  </>
+                </Show>
+              </div>
+            </section>
+          </div>
+        )}
+      </Show>
+    </section>
+  );
+}
+
+export function ArtefactReviewPanel(props: ArtefactReviewPanelProps): JSX.Element {
+  return (
+    <section class="review-panel">
+      <div class="jobs-panel__head">
+        <h3>Artefact Review</h3>
+        <p>
+          Review generated candidate notes, compare them to the current meeting, then approve,
+          reject, edit, or rerun.
+        </p>
+      </div>
+      <Show
+        when={props.artefact}
+        fallback={
+          <div class="job-empty">
+            {props.error || "Select an automation artefact to review it."}
+          </div>
+        }
+      >
+        {(artefact) => (
+          <div class="review-body">
+            <div class="detail-meta">
+              <div class="detail-chip">{`Status: ${artefact().status}`}</div>
+              <div class="detail-chip">{`Kind: ${artefact().kind}`}</div>
+              <div class="detail-chip">{`Meeting: ${artefact().meetingId}`}</div>
+              <div class="detail-chip">{`Provider: ${artefact().provider}/${artefact().model}`}</div>
+            </div>
+            <Show when={!props.error} fallback={<div class="empty">{props.error}</div>}>
+              <div class="review-grid">
+                <section class="detail-section">
+                  <h2>Current Meeting Notes</h2>
+                  <pre class="detail-pre">
+                    {props.bundle?.meeting.noteMarkdown || "(No existing meeting notes)"}
+                  </pre>
+                </section>
+                <section class="detail-section">
+                  <h2>Candidate</h2>
+                  <label class="field-row">
+                    <span class="field-label">Title</span>
+                    <input
+                      class="field-input field-input--plain"
+                      onInput={(event) => {
+                        props.onDraftTitleChange(event.currentTarget.value);
+                      }}
+                      value={props.draftTitle}
+                    />
+                  </label>
+                  <label class="field-row">
+                    <span class="field-label">Summary</span>
+                    <textarea
+                      class="review-textarea review-textarea--summary"
+                      onInput={(event) => {
+                        props.onDraftSummaryChange(event.currentTarget.value);
+                      }}
+                    >
+                      {props.draftSummary}
+                    </textarea>
+                  </label>
+                  <label class="field-row">
+                    <span class="field-label">Markdown</span>
+                    <textarea
+                      class="review-textarea"
+                      onInput={(event) => {
+                        props.onDraftMarkdownChange(event.currentTarget.value);
+                      }}
+                    >
+                      {props.draftMarkdown}
+                    </textarea>
+                  </label>
+                  <label class="field-row">
+                    <span class="field-label">Review Note</span>
+                    <textarea
+                      class="review-textarea review-textarea--summary"
+                      onInput={(event) => {
+                        props.onReviewNoteChange(event.currentTarget.value);
+                      }}
+                    >
+                      {props.reviewNote}
+                    </textarea>
+                  </label>
+                  <div class="job-card__actions">
+                    <button class="button button--secondary" onClick={props.onSave} type="button">
+                      Save edits
+                    </button>
+                    <button
+                      class="button button--secondary"
+                      disabled={artefact().status === "superseded"}
+                      onClick={props.onApprove}
+                      type="button"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      class="button button--secondary"
+                      disabled={artefact().status === "superseded"}
+                      onClick={props.onReject}
+                      type="button"
+                    >
+                      Reject
+                    </button>
+                    <button class="button button--secondary" onClick={props.onRerun} type="button">
+                      Rerun
+                    </button>
+                  </div>
+                  <Show when={artefact().structured.actionItems.length > 0}>
+                    <div class="detail-section">
+                      <h3>Action Items</h3>
+                      <ul class="detail-list">
+                        <For each={artefact().structured.actionItems}>
+                          {(item) => (
+                            <li>
+                              <strong>{item.title}</strong>
+                              <Show when={item.owner}>
+                                <span>{` • ${item.owner}`}</span>
+                              </Show>
+                              <Show when={item.dueDate}>
+                                <span>{` • due ${item.dueDate}`}</span>
+                              </Show>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    </div>
+                  </Show>
+                  <Show when={(artefact().structured.participantSummaries?.length ?? 0) > 0}>
+                    <div class="detail-section">
+                      <h3>Participant Summaries</h3>
+                      <ul class="detail-list">
+                        <For each={artefact().structured.participantSummaries}>
+                          {(summary) => (
+                            <li>
+                              <strong>{summary.speaker}</strong>
+                              <Show when={summary.role}>
+                                <span>{` • ${summary.role}`}</span>
+                              </Show>
+                              <div>{summary.summary}</div>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    </div>
+                  </Show>
+                </section>
+              </div>
+            </Show>
+            <section class="detail-section review-history">
+              <h2>History</h2>
+              <div class="jobs-list">
+                <For each={artefact().history.slice().reverse()}>
+                  {(entry) => (
+                    <div class="job-card">
+                      <div class="job-card__head">
+                        <div class="job-card__title">{entry.action}</div>
+                        <div class="job-card__meta">{entry.at.slice(0, 19)}</div>
+                      </div>
+                      <Show when={entry.note}>
+                        <div class="job-card__meta">{entry.note}</div>
+                      </Show>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </section>
+          </div>
+        )}
+      </Show>
+    </section>
+  );
+}
