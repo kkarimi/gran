@@ -396,10 +396,10 @@ export class GranolaTuiWorkspace implements Component {
       }
 
       this.#selectedMeeting = bundle;
-      this.#selectedMeetingId = bundle.document.id;
+      this.#selectedMeetingId = bundle.source.document.id;
       this.#recentMeetingIds = [
-        bundle.document.id,
-        ...this.#recentMeetingIds.filter((candidate) => candidate !== bundle.document.id),
+        bundle.source.document.id,
+        ...this.#recentMeetingIds.filter((candidate) => candidate !== bundle.source.document.id),
       ].slice(0, 5);
       if (options.ensureMeetingVisible) {
         this.ensureMeetingVisible(bundle.meeting.meeting);
@@ -560,7 +560,7 @@ export class GranolaTuiWorkspace implements Component {
   }
 
   private async reloadAfterAuthChange(): Promise<void> {
-    const preferredMeetingId = this.#selectedMeeting?.document.id ?? this.#selectedMeetingId;
+    const preferredMeetingId = this.#selectedMeeting?.source.document.id ?? this.#selectedMeetingId;
 
     try {
       await this.loadFolders({

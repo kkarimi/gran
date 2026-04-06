@@ -439,7 +439,7 @@ describe("GranolaApp", () => {
         id: "doc-alpha-1111",
       }),
     ]);
-    expect(meeting.document.id).toBe("doc-alpha-1111");
+    expect(meeting.source.document.id).toBe("doc-alpha-1111");
     expect((await searchIndexStore.readIndex())[0]?.id).toBe("doc-bravo-2222");
   });
 

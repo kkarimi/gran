@@ -278,7 +278,7 @@ function matchesHarness(
     }
   }
 
-  const calendarEventId = context.bundle?.document.calendarEvent?.id;
+  const calendarEventId = context.bundle?.source.document.calendarEvent?.id;
   if (match.calendarEventIds?.length && !calendarEventId) {
     return false;
   }
@@ -286,7 +286,7 @@ function matchesHarness(
     return false;
   }
 
-  const recurringEventId = context.bundle?.document.calendarEvent?.recurringEventId;
+  const recurringEventId = context.bundle?.source.document.calendarEvent?.recurringEventId;
   if (match.recurringEventIds?.length && !recurringEventId) {
     return false;
   }
@@ -410,7 +410,7 @@ export function explainAgentHarnessMatch(
     }
   }
 
-  const calendarEventId = context.bundle?.document.calendarEvent?.id;
+  const calendarEventId = context.bundle?.source.document.calendarEvent?.id;
   if (match.calendarEventIds?.length) {
     matched =
       addReason(
@@ -423,7 +423,7 @@ export function explainAgentHarnessMatch(
       ) && matched;
   }
 
-  const recurringEventId = context.bundle?.document.calendarEvent?.recurringEventId;
+  const recurringEventId = context.bundle?.source.document.calendarEvent?.recurringEventId;
   if (match.recurringEventIds?.length) {
     matched =
       addReason(

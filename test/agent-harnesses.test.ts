@@ -38,19 +38,6 @@ const match: GranolaAutomationMatch = {
 };
 
 const bundle: GranolaMeetingBundle = {
-  document: {
-    calendarEvent: {
-      id: "event-123",
-      recurringEventId: "recurring-456",
-    },
-    content: "",
-    createdAt: "2024-01-01T09:00:00Z",
-    id: "doc-alpha-1111",
-    notesPlain: "Existing notes",
-    tags: ["team", "customer"],
-    title: "Alpha Sync",
-    updatedAt: "2024-01-03T10:00:00Z",
-  },
   meeting: {
     meeting: {
       createdAt: "2024-01-01T09:00:00Z",
@@ -91,6 +78,21 @@ const bundle: GranolaMeetingBundle = {
     },
     transcript: null,
     transcriptText: "Customer asked about rollout timing.",
+  },
+  source: {
+    document: {
+      calendarEvent: {
+        id: "event-123",
+        recurringEventId: "recurring-456",
+      },
+      content: "",
+      createdAt: "2024-01-01T09:00:00Z",
+      id: "doc-alpha-1111",
+      notesPlain: "Existing notes",
+      tags: ["team", "customer"],
+      title: "Alpha Sync",
+      updatedAt: "2024-01-03T10:00:00Z",
+    },
   },
 };
 

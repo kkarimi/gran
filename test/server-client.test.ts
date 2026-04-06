@@ -458,11 +458,13 @@ describe("GranolaServerClient", () => {
     const meeting = await client.findMeeting("Alpha Sync");
     expect(meeting).toEqual(
       expect.objectContaining({
-        document: expect.objectContaining({
-          id: "doc-alpha-1111",
-        }),
         meeting: expect.objectContaining({
           noteMarkdown: expect.stringContaining("# Alpha Sync"),
+        }),
+        source: expect.objectContaining({
+          document: expect.objectContaining({
+            id: "doc-alpha-1111",
+          }),
         }),
       }),
     );
@@ -575,6 +577,6 @@ describe("GranolaServerClient", () => {
     closeClient = async () => await client.close();
 
     const meeting = await client.getMeeting("doc-alpha");
-    expect(meeting.document.id).toBe("doc-alpha-1111");
+    expect(meeting.source.document.id).toBe("doc-alpha-1111");
   });
 });

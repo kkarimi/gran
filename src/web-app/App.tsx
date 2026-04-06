@@ -611,7 +611,7 @@ export function App() {
     setStatus("Testing harness…", "busy");
     try {
       const bundle =
-        state.selectedMeetingBundle?.document.id === meetingId
+        state.selectedMeetingBundle?.source.document.id === meetingId
           ? state.selectedMeetingBundle
           : await client.getMeeting(meetingId, { requireCache: true });
       const result = await client.evaluateAutomationCases(
@@ -619,7 +619,10 @@ export function App() {
           {
             bundle,
             id: `web:${meetingId}`,
-            title: bundle.meeting.meeting.title || bundle.document.title || bundle.document.id,
+            title:
+              bundle.meeting.meeting.title ||
+              bundle.source.document.title ||
+              bundle.source.document.id,
           },
         ],
         {
@@ -659,10 +662,10 @@ export function App() {
       updatePreferences((preferences) =>
         rememberRecentMeeting(preferences, bundle.meeting.meeting),
       );
-      await loadHarnessExplanations(bundle.document.id);
+      await loadHarnessExplanations(bundle.source.document.id);
       await loadAutomationArtefacts({
         preferredId: state.selectedAutomationArtefactId,
-        preferredMeetingId: bundle.document.id,
+        preferredMeetingId: bundle.source.document.id,
       });
     } catch (error) {
       setState("selectedMeetingBundle", null);
@@ -829,7 +832,7 @@ export function App() {
       setState("updatedFrom", "");
       setState("updatedTo", "");
       setState("searchSubmitted", false);
-      await openMeetingFromPage(bundle.document.id, "search", {
+      await openMeetingFromPage(bundle.source.document.id, "search", {
         folderId: bundle.meeting.meeting.folders[0]?.id || null,
       });
       setStatus("Meeting opened", "ok");

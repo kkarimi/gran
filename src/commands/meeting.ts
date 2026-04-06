@@ -10,6 +10,7 @@ import {
   type MeetingNotesOutputFormat,
   type MeetingTranscriptOutputFormat,
 } from "../meetings.ts";
+import { scopedCacheDataForMeeting } from "../app/meeting-read-model.ts";
 
 import { createCommandAppContext } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
@@ -263,7 +264,7 @@ async function notes(
   console.log("Fetching meeting from Granola API...");
   const result = await app.getMeeting(id);
 
-  console.log(renderMeetingNotes(result.document, format).trimEnd());
+  console.log(renderMeetingNotes(result.source.document, format).trimEnd());
   return 0;
 }
 
@@ -277,9 +278,13 @@ async function transcript(
 
   console.log("Fetching meeting from Granola API...");
   const result = await app.getMeeting(id);
-  const output = renderMeetingTranscript(result.document, result.cacheData, format);
+  const output = renderMeetingTranscript(
+    result.source.document,
+    scopedCacheDataForMeeting(result.source),
+    format,
+  );
   if (!output.trim()) {
-    throw new Error(`no transcript found for meeting: ${result.document.id}`);
+    throw new Error(`no transcript found for meeting: ${result.source.document.id}`);
   }
 
   console.log(output.trimEnd());
@@ -297,11 +302,13 @@ async function openMeeting(
 
   console.log("Resolving meeting from Granola API...");
   const result = await app.getMeeting(id);
-  console.log(`Preparing web workspace for ${result.document.title || result.document.id}...`);
+  console.log(
+    `Preparing web workspace for ${result.source.document.title || result.source.document.id}...`,
+  );
 
   return await runGranolaWebWorkspace(app, {
     ...resolveGranolaWebWorkspaceOptions(commandFlags),
-    targetMeetingId: result.document.id,
+    targetMeetingId: result.source.document.id,
   });
 }
 

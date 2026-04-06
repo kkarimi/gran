@@ -212,11 +212,13 @@ describe("startGranolaServer", () => {
     expect(meeting.ok).toBe(true);
     expect(await meeting.json()).toEqual(
       expect.objectContaining({
-        document: expect.objectContaining({
-          id: "doc-alpha-1111",
-        }),
         meeting: expect.objectContaining({
           noteMarkdown: expect.stringContaining("# Alpha Sync"),
+        }),
+        source: expect.objectContaining({
+          document: expect.objectContaining({
+            id: "doc-alpha-1111",
+          }),
         }),
       }),
     );
@@ -529,8 +531,10 @@ describe("startGranolaServer", () => {
     expect(resolved.ok).toBe(true);
     expect(await resolved.json()).toEqual(
       expect.objectContaining({
-        document: expect.objectContaining({
-          id: "doc-charlie-3333",
+        source: expect.objectContaining({
+          document: expect.objectContaining({
+            id: "doc-charlie-3333",
+          }),
         }),
       }),
     );

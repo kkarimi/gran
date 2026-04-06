@@ -2,25 +2,46 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, extname, join, resolve as resolvePath } from "node:path";
 
 import type { GranolaAutomationEvaluationCase, GranolaMeetingBundle } from "./app/index.ts";
+import type { CacheData, GranolaDocument } from "./types.ts";
 import { asRecord, parseJsonString, stringValue } from "./utils.ts";
 
 function parseBundle(value: unknown): GranolaMeetingBundle | undefined {
   const record = asRecord(value);
-  const document = asRecord(record?.document);
+  const source = asRecord(record?.source);
+  const sourceDocument = asRecord(source?.document);
   const meeting = asRecord(record?.meeting);
+  if (sourceDocument && meeting) {
+    return value as GranolaMeetingBundle;
+  }
+
+  const document = asRecord(record?.document);
   if (!document || !meeting) {
     return undefined;
   }
 
-  return value as GranolaMeetingBundle;
+  const documentId = stringValue(document.id).trim();
+  const cacheData = asRecord(record?.cacheData) as CacheData | undefined;
+  const cacheDocument = documentId ? cacheData?.documents?.[documentId] : undefined;
+  const transcriptSegments = documentId ? cacheData?.transcripts?.[documentId] : undefined;
+
+  return {
+    meeting: meeting as unknown as GranolaMeetingBundle["meeting"],
+    source: {
+      cacheDocument,
+      document: {
+        ...(document as unknown as GranolaDocument),
+        transcriptSegments,
+      },
+    },
+  };
 }
 
 function caseTitle(bundle: GranolaMeetingBundle, fallbackId: string): string {
   return (
     bundle.meeting.meeting.title?.trim() ||
-    bundle.document.title?.trim() ||
+    bundle.source.document.title?.trim() ||
     bundle.meeting.meeting.id ||
-    bundle.document.id ||
+    bundle.source.document.id ||
     fallbackId
   );
 }
@@ -41,7 +62,10 @@ function parseCase(
   }
 
   const id =
-    stringValue(record.id).trim() || bundle.document.id || bundle.meeting.meeting.id || fallbackId;
+    stringValue(record.id).trim() ||
+    bundle.source.document.id ||
+    bundle.meeting.meeting.id ||
+    fallbackId;
 
   return {
     bundle,

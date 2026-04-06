@@ -233,8 +233,6 @@ function createMeetingBundle(meeting: MeetingSummaryRecord): GranolaMeetingBundl
       : "[09:00:01] System: Quarterly numbers look good";
 
   return {
-    cacheData,
-    document,
     meeting: {
       meeting,
       note: {
@@ -319,6 +317,13 @@ function createMeetingBundle(meeting: MeetingSummaryRecord): GranolaMeetingBundl
         updatedAt: document.updatedAt,
       },
       transcriptText,
+    },
+    source: {
+      cacheDocument: cacheData?.documents[meeting.id],
+      document: {
+        ...document,
+        transcriptSegments: cacheData?.transcripts[meeting.id],
+      },
     },
   };
 }
@@ -863,7 +868,7 @@ describe("GranolaTuiWorkspace", () => {
     expect(harness.workspace.render(100).join("\n")).toContain("Notes source: notes");
 
     harness.workspace.handleInput("4");
-    expect(harness.workspace.render(100).join("\n")).toContain('"cacheData"');
+    expect(harness.workspace.render(100).join("\n")).toContain('"meeting": {');
 
     harness.workspace.handleInput("[");
     expect(harness.workspace.render(100).join("\n")).toContain("Notes source: notes");

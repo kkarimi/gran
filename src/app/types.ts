@@ -14,7 +14,13 @@ import type {
   GranolaAgentHarness,
   GranolaAgentHarnessMatchExplanation,
 } from "../agent-harnesses.ts";
-import type { AppConfig, CacheData, GranolaDocument, GranolaAgentProviderKind } from "../types.ts";
+import type {
+  AppConfig,
+  CacheData,
+  CacheDocument,
+  GranolaDocument,
+  GranolaAgentProviderKind,
+} from "../types.ts";
 
 export type GranolaAppAuthMode = GranolaSessionMetadata["mode"];
 export type GranolaAppSurface = "cli" | "server" | "tui" | "web";
@@ -485,9 +491,13 @@ export interface GranolaAppState {
 }
 
 export interface GranolaMeetingBundle {
-  cacheData?: CacheData;
-  document: GranolaDocument;
   meeting: MeetingRecord;
+  source: GranolaMeetingSourceRecord;
+}
+
+export interface GranolaMeetingSourceRecord {
+  cacheDocument?: CacheDocument;
+  document: GranolaDocument;
 }
 
 export type { MeetingRoleHelpersRecord };

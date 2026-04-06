@@ -17,6 +17,7 @@ import type {
   MeetingTranscriptRecord,
   TranscriptExportRecord,
 } from "./models.ts";
+import type { GranolaMeetingSourceRecord } from "./types.ts";
 
 export interface MeetingTranscriptProjection {
   loaded: boolean;
@@ -67,8 +68,68 @@ function buildRoleHelpers(
   return buildMeetingRoleHelpers(document.people, transcript?.speakers ?? []);
 }
 
+function cloneMeetingDocument(document: GranolaDocument, cacheData?: CacheData): GranolaDocument {
+  const transcriptSegments = document.transcriptSegments ?? cacheData?.transcripts[document.id];
+  return {
+    ...document,
+    calendarEvent: document.calendarEvent ? { ...document.calendarEvent } : undefined,
+    folderMemberships: document.folderMemberships?.map((folder) => ({ ...folder })),
+    people: document.people
+      ? {
+          attendees: document.people.attendees.map((person) => ({ ...person })),
+          creator: document.people.creator ? { ...document.people.creator } : undefined,
+        }
+      : undefined,
+    tags: [...document.tags],
+    transcriptSegments: transcriptSegments?.map((segment) => ({ ...segment })),
+  };
+}
+
 export function cloneFolderSummaryRecord(folder: FolderSummaryRecord): FolderSummaryRecord {
   return { ...folder };
+}
+
+export function buildMeetingSourceRecord(
+  document: GranolaDocument,
+  cacheData?: CacheData,
+): GranolaMeetingSourceRecord {
+  const cacheDocument = cacheData?.documents[document.id];
+  return {
+    cacheDocument: cacheDocument ? { ...cacheDocument } : undefined,
+    document: cloneMeetingDocument(document, cacheData),
+  };
+}
+
+export function cloneMeetingSourceRecord(
+  source: GranolaMeetingSourceRecord,
+): GranolaMeetingSourceRecord {
+  return {
+    cacheDocument: source.cacheDocument ? { ...source.cacheDocument } : undefined,
+    document: cloneMeetingDocument(source.document, scopedCacheDataForMeeting(source)),
+  };
+}
+
+export function scopedCacheDataForMeeting(
+  source: GranolaMeetingSourceRecord,
+): CacheData | undefined {
+  const transcriptSegments: NonNullable<GranolaDocument["transcriptSegments"]> =
+    source.document.transcriptSegments ?? [];
+  if (!source.cacheDocument && transcriptSegments.length === 0) {
+    return undefined;
+  }
+
+  return {
+    documents: source.cacheDocument
+      ? {
+          [source.document.id]: { ...source.cacheDocument },
+        }
+      : {},
+    transcripts: transcriptSegments.length
+      ? {
+          [source.document.id]: transcriptSegments.map((segment) => ({ ...segment })),
+        }
+      : {},
+  };
 }
 
 export function cloneMeetingSummaryRecord(meeting: MeetingSummaryRecord): MeetingSummaryRecord {

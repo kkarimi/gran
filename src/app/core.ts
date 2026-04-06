@@ -181,6 +181,7 @@ import {
   GranolaExportService,
 } from "./export-service.ts";
 import { GranolaIndexService } from "./index-service.ts";
+import { scopedCacheDataForMeeting } from "./meeting-read-model.ts";
 
 interface GranolaAppDependencies {
   agentHarnessStore?: AgentHarnessStore;
@@ -230,17 +231,18 @@ function harnessEvaluationMatch(
   generatedAt: string,
   eventKind = defaultHarnessEventKind(bundle),
 ): GranolaAutomationMatch {
+  const document = bundle.source.document;
   return {
-    eventId: `evaluate:${bundle.document.id}`,
+    eventId: `evaluate:${document.id}`,
     eventKind,
     folders: bundle.meeting.meeting.folders.map((folder) => ({ ...folder })),
-    id: `evaluate:${bundle.document.id}`,
+    id: `evaluate:${document.id}`,
     matchedAt: generatedAt,
-    meetingId: bundle.document.id,
+    meetingId: document.id,
     ruleId: "automation-evaluation",
     ruleName: "Automation evaluation",
     tags: [...bundle.meeting.meeting.tags],
-    title: bundle.meeting.meeting.title || bundle.document.title || bundle.document.id,
+    title: bundle.meeting.meeting.title || document.title || document.id,
     transcriptLoaded: bundle.meeting.meeting.transcriptLoaded,
   };
 }
@@ -322,6 +324,7 @@ function buildAutomationAgentPrompt(
   bundle?: GranolaMeetingBundle,
 ): string {
   const transcriptText = bundle ? meetingTranscriptText(bundle)?.trim() : undefined;
+  const document = bundle?.source.document;
   const context = {
     event: {
       id: match.eventId,
@@ -336,12 +339,12 @@ function buildAutomationAgentPrompt(
     })),
     meeting: bundle
       ? {
-          id: bundle.document.id,
-          notesPlain: bundle.document.notesPlain,
+          id: document!.id,
+          notesPlain: document!.notesPlain,
           roleHelpers: bundle.meeting.roleHelpers,
-          tags: [...bundle.document.tags],
-          title: bundle.document.title,
-          updatedAt: bundle.document.updatedAt,
+          tags: [...document!.tags],
+          title: document!.title,
+          updatedAt: document!.updatedAt,
         }
       : {
           id: match.meetingId,
@@ -360,9 +363,7 @@ function buildAutomationAgentPrompt(
     "```json",
     JSON.stringify(context, null, 2),
     "```",
-    bundle?.document.notesPlain?.trim()
-      ? `Existing notes:\n${bundle.document.notesPlain.trim()}`
-      : "",
+    document?.notesPlain?.trim() ? `Existing notes:\n${document.notesPlain.trim()}` : "",
     transcriptText ? `Transcript:\n${transcriptText}` : "",
   ]
     .filter(Boolean)
@@ -1081,8 +1082,9 @@ export class GranolaApp implements GranolaAppApi {
         bundle,
         match: harnessEvaluationMatch(bundle, generatedAt, eventKind),
       }),
-      meetingId: bundle.document.id,
-      meetingTitle: bundle.meeting.meeting.title || bundle.document.title || bundle.document.id,
+      meetingId: bundle.source.document.id,
+      meetingTitle:
+        bundle.meeting.meeting.title || bundle.source.document.title || bundle.source.document.id,
     };
   }
 
@@ -1689,11 +1691,11 @@ export class GranolaApp implements GranolaAppApi {
     }
 
     const scope = meetingExportScope({
-      meetingId: bundle.document.id,
-      meetingTitle: bundle.meeting.meeting.title || bundle.document.id,
+      meetingId: bundle.source.document.id,
+      meetingTitle: bundle.meeting.meeting.title || bundle.source.document.id,
     });
     const result = await this.#exports.runNotesExport({
-      documents: [bundle.document],
+      documents: [bundle.source.document],
       format: action.format ?? "markdown",
       outputDir: resolveExportOutputDir(action.outputDir ?? this.config.notes.output, scope, {
         scopedDirectory: action.scopedOutput,
@@ -1724,27 +1726,33 @@ export class GranolaApp implements GranolaAppApi {
     | undefined
   > {
     const bundle = await this.maybeReadMeetingBundleById(match.meetingId);
-    if (!bundle?.cacheData) {
+    if (!bundle) {
       return undefined;
     }
 
-    const cacheDocument = bundle.cacheData.documents[bundle.document.id];
-    const transcriptSegments = bundle.cacheData.transcripts[bundle.document.id];
+    const { source } = bundle;
+    const cacheData = scopedCacheDataForMeeting(source);
+    if (!cacheData) {
+      return undefined;
+    }
+
+    const cacheDocument = cacheData.documents[source.document.id];
+    const transcriptSegments = cacheData.transcripts[source.document.id];
     if (!cacheDocument || !transcriptSegments || transcriptSegments.length === 0) {
       return undefined;
     }
 
     const scope = meetingExportScope({
-      meetingId: bundle.document.id,
-      meetingTitle: bundle.meeting.meeting.title || bundle.document.id,
+      meetingId: source.document.id,
+      meetingTitle: bundle.meeting.meeting.title || source.document.id,
     });
     const result = await this.#exports.runTranscriptsExport({
       cacheData: {
         documents: {
-          [bundle.document.id]: cacheDocument,
+          [source.document.id]: cacheDocument,
         },
         transcripts: {
-          [bundle.document.id]: transcriptSegments,
+          [source.document.id]: transcriptSegments,
         },
       },
       format: action.format ?? "text",

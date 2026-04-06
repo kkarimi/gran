@@ -12,6 +12,7 @@ import type { CacheData, GranolaDocument, GranolaFolder, TranscriptSegment } fro
 import { granolaCacheCandidates } from "../utils.ts";
 
 import type { FolderSummaryRecord, MeetingSummaryRecord } from "./models.ts";
+import { buildMeetingSourceRecord } from "./meeting-read-model.ts";
 import type {
   GranolaAppAuthMode,
   GranolaAppAuthState,
@@ -309,9 +310,8 @@ export class GranolaCatalogService {
     );
 
     return {
-      cacheData,
-      document,
       meeting,
+      source: buildMeetingSourceRecord(document, cacheData),
     };
   }
 
@@ -333,9 +333,8 @@ export class GranolaCatalogService {
     );
 
     return {
-      cacheData,
-      document,
       meeting,
+      source: buildMeetingSourceRecord(document, cacheData),
     };
   }
 

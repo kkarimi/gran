@@ -49,7 +49,7 @@ export interface AutomationDeliveryPayload {
   generatedAt: string;
   match: GranolaAutomationMatch;
   meeting?: {
-    document: GranolaMeetingBundle["document"];
+    document: GranolaMeetingBundle["source"]["document"];
     id: string;
     meeting: GranolaMeetingBundle["meeting"];
     title: string;
@@ -122,7 +122,7 @@ function defaultMeetingTitle(
   bundle: GranolaMeetingBundle | undefined,
   match: GranolaAutomationMatch,
 ): string {
-  return bundle?.meeting.meeting.title || bundle?.document.title || match.title;
+  return bundle?.meeting.meeting.title || bundle?.source.document.title || match.title;
 }
 
 export function buildAutomationDeliveryPayload(
@@ -177,8 +177,8 @@ export function buildAutomationDeliveryPayload(
     },
     meeting: context.bundle
       ? {
-          document: context.bundle.document,
-          id: context.bundle.document.id,
+          document: context.bundle.source.document,
+          id: context.bundle.source.document.id,
           meeting: context.bundle.meeting,
           title: defaultMeetingTitle(context.bundle, context.match),
         }

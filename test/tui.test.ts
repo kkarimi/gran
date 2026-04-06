@@ -91,8 +91,6 @@ const cacheData: CacheData = {
 };
 
 const bundle: GranolaMeetingBundle = {
-  cacheData,
-  document,
   meeting: {
     meeting: meetings[0]!,
     note: {
@@ -151,6 +149,13 @@ const bundle: GranolaMeetingBundle = {
       updatedAt: document.updatedAt,
     },
     transcriptText: "[09:00:01] You: Hello team",
+  },
+  source: {
+    cacheDocument: cacheData.documents[document.id],
+    document: {
+      ...document,
+      transcriptSegments: cacheData.transcripts[document.id],
+    },
   },
 };
 

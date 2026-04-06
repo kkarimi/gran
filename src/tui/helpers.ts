@@ -4,6 +4,7 @@ import type {
   MeetingSummaryRecord,
   MeetingSummarySource,
 } from "../app/index.ts";
+import { scopedCacheDataForMeeting } from "../app/meeting-read-model.ts";
 import { renderMeetingNotes, renderMeetingTranscript } from "../meetings.ts";
 
 import type { GranolaTuiWorkspaceTab } from "./types.ts";
@@ -206,16 +207,17 @@ export function renderGranolaTuiMeetingTab(
     case "raw":
       return JSON.stringify(bundle, null, 2);
     case "transcript": {
-      const transcript = renderMeetingTranscript(bundle.document, bundle.cacheData, "text").trim();
+      const cacheData = scopedCacheDataForMeeting(bundle.source);
+      const transcript = renderMeetingTranscript(bundle.source.document, cacheData, "text").trim();
       if (transcript) {
         return transcript;
       }
 
-      return bundle.cacheData ? "(Transcript unavailable)" : "(Granola cache not loaded)";
+      return cacheData ? "(Transcript unavailable)" : "(Granola cache not loaded)";
     }
     case "notes":
     default:
-      return renderMeetingNotes(bundle.document, "markdown").trim();
+      return renderMeetingNotes(bundle.source.document, "markdown").trim();
   }
 }
 
