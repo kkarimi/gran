@@ -3,37 +3,31 @@
 import { createEffect, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 
-import type {
-  GranolaAgentHarness,
-  GranolaAutomationArtefact,
-  GranolaAppAuthMode,
-  GranolaAppAuthState,
-} from "../app/index.ts";
-import { buildGranolaReviewInbox, summariseGranolaReviewInbox } from "../review-inbox.ts";
-import { createGranolaServerClient, type GranolaServerClient } from "../server/client.ts";
-import { granolaTransportPaths } from "../transport.ts";
 import {
   buildBrowserUrlPath,
   granolaWebWorkspaceStorageKey,
-  hasScopedMeetingBrowse,
-  parseWorkspacePreferences,
-  rememberRecentMeeting,
-  serialiseWorkspacePreferences,
   nextWorkspaceTab,
+  parseWorkspacePreferences,
   parseWorkspaceTab,
-  selectMeetingId,
+  serialiseWorkspacePreferences,
   startupSelectionFromSearch,
   type WebWorkspacePreferences,
 } from "../web/client-state.ts";
 import {
+  AppStatePanel,
   PrimaryNav,
   SecurityPanel,
   type WebMainPage,
   type WebStatusTone,
-  AppStatePanel,
 } from "./components.tsx";
-import { createHarnessTemplate, duplicateHarnessTemplate } from "./harness-editor.tsx";
-import { buildStarterPipeline, deriveOnboardingState, OnboardingPanel } from "./onboarding.tsx";
+import {
+  browserConfig,
+  useHarnessController,
+  useMeetingBrowserController,
+  useReviewController,
+  useWebClientController,
+} from "./browser-hooks.ts";
+import { deriveOnboardingState, OnboardingPanel } from "./onboarding.tsx";
 import {
   FoldersPageController,
   HomePageController,
@@ -42,27 +36,7 @@ import {
   SearchPageController,
   SettingsPageController,
 } from "./page-controllers.tsx";
-import type { GranolaWebAppState, GranolaWebBrowserConfig, MeetingReturnPage } from "./types.ts";
-
-function browserConfig(): GranolaWebBrowserConfig {
-  return {
-    passwordRequired: Boolean(window.__GRANOLA_SERVER__?.passwordRequired),
-  };
-}
-
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
-  const payload = (await response.json().catch(() => ({}))) as { error?: unknown };
-  if (!response.ok) {
-    const error =
-      typeof payload.error === "string" && payload.error.trim()
-        ? payload.error
-        : response.statusText || "Request failed";
-    throw new Error(error);
-  }
-
-  return payload as T;
-}
+import type { GranolaWebAppState, MeetingReturnPage } from "./types.ts";
 
 export function App() {
   const startup = startupSelectionFromSearch(window.location.search);
@@ -130,9 +104,7 @@ export function App() {
     workspaceTab: parseWorkspaceTab(startup.workspaceTab),
   });
 
-  let client: GranolaServerClient | null = null;
   let automationPanelsHydrated = false;
-  let unsubscribe: (() => void) | undefined;
 
   const setStatus = (label: string, tone: WebStatusTone = "idle") => {
     setState({
@@ -153,629 +125,149 @@ export function App() {
     setState("savedFilters", next.savedFilters);
   };
 
-  const mergeAuthState = async (authState?: GranolaAppAuthState) => {
+  const clientController = useWebClientController({
+    origin: window.location.origin,
+    setState,
+    setStatus,
+    state,
+  });
+
+  const reviewController = useReviewController({
+    clientAccessor: clientController.clientAccessor,
+    setState,
+    setStatus,
+    state,
+  });
+
+  const harnessController = useHarnessController({
+    clientAccessor: clientController.clientAccessor,
+    setState,
+    setStatus,
+    state,
+  });
+
+  const loadReviewPanels = async () => {
+    await Promise.all([
+      reviewController.loadAutomationRuns(),
+      reviewController.loadAutomationArtefacts(),
+      reviewController.loadProcessingIssues(),
+    ]);
+  };
+
+  const browseController = useMeetingBrowserController({
+    clientAccessor: clientController.clientAccessor,
+    loadAutomationArtefacts: reviewController.loadAutomationArtefacts,
+    loadHarnessExplanations: harnessController.loadHarnessExplanations,
+    loadReviewPanels,
+    setState,
+    setStatus,
+    state,
+    updatePreferences,
+  });
+
+  const exportNotes = async () => {
+    const client = clientController.clientAccessor();
     if (!client) {
       return;
     }
 
-    const nextState = client.getState();
-
-    if (authState) {
-      setState("appState", {
-        ...nextState,
-        auth: authState,
-      });
-      return;
-    }
-
+    setStatus(state.selectedFolderId ? "Exporting folder notes…" : "Exporting notes…", "busy");
     try {
-      setState("appState", {
-        ...nextState,
-        auth: await client.inspectAuth(),
-      });
-    } catch {
-      setState("appState", nextState);
-    }
-  };
-
-  const detachClient = async () => {
-    unsubscribe?.();
-    unsubscribe = undefined;
-
-    if (client) {
-      await client.close().catch(() => undefined);
-      client = null;
-    }
-    setState("serverInfo", null);
-  };
-
-  const attachClient = async () => {
-    await detachClient();
-    client = await createGranolaServerClient(window.location.origin);
-    setState("serverInfo", client.info);
-    setState("appState", client.getState());
-    unsubscribe = client.subscribe((event) => {
-      setState("appState", event.state);
-    });
-    await mergeAuthState();
-  };
-
-  const loadFolders = async (refresh = false) => {
-    if (!client) {
-      return;
-    }
-
-    try {
-      setState("folderError", "");
-      const result = await client.listFolders({
-        forceRefresh: refresh,
-        limit: 500,
-      });
-      setState("folders", result.folders);
-      if (
-        state.selectedFolderId &&
-        !result.folders.some((folder) => folder.id === state.selectedFolderId)
-      ) {
-        setState("selectedFolderId", null);
-      }
-    } catch (error) {
-      setState("folderError", error instanceof Error ? error.message : String(error));
-      setState("folders", []);
-      setState("selectedFolderId", null);
-    }
-  };
-
-  const loadAutomationRuns = async () => {
-    if (!client) {
-      return;
-    }
-
-    try {
-      const result = await client.listAutomationRuns({ limit: 20 });
-      setState("automationRuns", result.runs);
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const loadHomeMeetings = async (refresh = false) => {
-    if (!client) {
-      return;
-    }
-
-    try {
-      setState("homeMeetingsError", "");
-      const result = await client.listMeetings({
-        forceRefresh: refresh,
-        limit: 365,
-        sort: "updated-desc",
-      });
-      setState("homeMeetings", result.meetings);
-    } catch (error) {
-      setState("homeMeetingsError", error instanceof Error ? error.message : String(error));
-      setState("homeMeetings", []);
-    }
-  };
-
-  const loadAutomationRules = async () => {
-    if (!client) {
-      return;
-    }
-
-    try {
-      const result = await client.listAutomationRules();
-      setState("automationRules", result.rules);
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setState("automationRules", []);
-    }
-  };
-
-  const applySelectedArtefactDrafts = (artefact: GranolaAutomationArtefact | null) => {
-    setState("selectedAutomationArtefactId", artefact?.id ?? null);
-    setState("automationArtefactDraftTitle", artefact?.structured.title ?? "");
-    setState("automationArtefactDraftSummary", artefact?.structured.summary ?? "");
-    setState("automationArtefactDraftMarkdown", artefact?.structured.markdown ?? "");
-    setState("reviewNote", "");
-  };
-
-  const syncSelectedArtefact = (
-    artefacts: GranolaAutomationArtefact[],
-    options: {
-      preferredId?: string | null;
-      preferredMeetingId?: string | null;
-    } = {},
-  ) => {
-    const preferred =
-      (options.preferredId
-        ? artefacts.find((candidate) => candidate.id === options.preferredId)
-        : undefined) ??
-      (options.preferredMeetingId
-        ? artefacts.find(
-            (candidate) =>
-              candidate.meetingId === options.preferredMeetingId &&
-              candidate.status === "generated",
-          )
-        : undefined) ??
-      artefacts.find((candidate) => candidate.status === "generated") ??
-      artefacts[0];
-
-    applySelectedArtefactDrafts(preferred ?? null);
-  };
-
-  const loadAutomationArtefacts = async (
-    options: {
-      preferredId?: string | null;
-      preferredMeetingId?: string | null;
-    } = {},
-  ) => {
-    if (!client) {
-      return;
-    }
-
-    try {
-      setState("automationArtefactError", "");
-      const result = await client.listAutomationArtefacts({ limit: 30 });
-      setState("automationArtefacts", result.artefacts);
-      syncSelectedArtefact(result.artefacts, {
-        preferredId: options.preferredId ?? state.selectedAutomationArtefactId,
-        preferredMeetingId: options.preferredMeetingId ?? state.selectedMeetingId,
-      });
-    } catch (error) {
-      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
-      setState("automationArtefacts", []);
-      syncSelectedArtefact([]);
-    }
-  };
-
-  const loadProcessingIssues = async () => {
-    if (!client) {
-      return;
-    }
-
-    try {
-      setState("processingIssueError", "");
-      const result = await client.listProcessingIssues({ limit: 20 });
-      setState("processingIssues", result.issues);
-    } catch (error) {
-      setState("processingIssueError", error instanceof Error ? error.message : String(error));
-      setState("processingIssues", []);
-    }
-  };
-
-  const selectHarnessId = (harnesses: GranolaAgentHarness[], preferredId?: string | null) => {
-    if (preferredId && harnesses.some((harness) => harness.id === preferredId)) {
-      return preferredId;
-    }
-
-    return harnesses[0]?.id ?? null;
-  };
-
-  const selectedHarness = () =>
-    state.harnesses.find((harness) => harness.id === state.selectedHarnessId) ?? null;
-
-  const loadHarnessExplanations = async (meetingId: string | null) => {
-    if (!client || !meetingId) {
-      setState("harnessExplainEventKind", null);
-      setState("harnessExplanations", []);
-      return;
-    }
-
-    try {
-      const result = await client.explainAgentHarnesses(meetingId);
-      setState("harnessExplainEventKind", result.eventKind);
-      setState("harnessExplanations", result.harnesses);
-    } catch (error) {
-      setState("harnessExplainEventKind", null);
-      setState("harnessExplanations", []);
-      setState("harnessError", error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const loadHarnesses = async (preferredId?: string | null) => {
-    if (!client) {
-      return;
-    }
-
-    try {
-      setState("harnessError", "");
-      const result = await client.listAgentHarnesses();
-      const nextSelectedHarnessId = selectHarnessId(
-        result.harnesses,
-        preferredId ?? state.selectedHarnessId,
-      );
-      setState("harnesses", result.harnesses);
-      setState("selectedHarnessId", nextSelectedHarnessId);
-      const nextPreferredProvider = result.harnesses.find((harness) => harness.provider)?.provider;
-      if (nextPreferredProvider) {
-        setState("preferredProvider", nextPreferredProvider);
-      }
-      setState("harnessDirty", false);
-      setState("harnessTestResult", null);
-      await loadHarnessExplanations(state.selectedMeetingId);
-    } catch (error) {
-      setState("harnessError", error instanceof Error ? error.message : String(error));
-      setState("harnesses", []);
-      setState("selectedHarnessId", null);
-      setState("harnessExplainEventKind", null);
-      setState("harnessExplanations", []);
-      setState("harnessTestResult", null);
-    }
-  };
-
-  const reviewInboxItems = () =>
-    buildGranolaReviewInbox({
-      artefacts: state.automationArtefacts,
-      issues: state.processingIssues,
-      runs: state.automationRuns,
-    });
-
-  const reviewInboxSummary = () => summariseGranolaReviewInbox(reviewInboxItems());
-
-  const selectedReviewInboxItem = () =>
-    reviewInboxItems().find((item) => item.key === state.selectedReviewInboxKey) ??
-    reviewInboxItems()[0] ??
-    null;
-
-  const selectedReviewIssue = () => {
-    const item = selectedReviewInboxItem();
-    return item?.kind === "issue" ? item.issue : null;
-  };
-
-  const selectedReviewRun = () => {
-    const item = selectedReviewInboxItem();
-    return item?.kind === "run" ? item.run : null;
-  };
-
-  const selectedReviewArtefact = () => {
-    const item = selectedReviewInboxItem();
-    return item?.kind === "artefact" ? item.artefact : selectedAutomationArtefact();
-  };
-
-  const selectedFolder = () =>
-    state.folders.find((folder) => folder.id === state.selectedFolderId) ?? null;
-
-  const openPage = async (
-    page: MeetingReturnPage,
-    options?: {
-      folderId?: string | null;
-    },
-  ) => {
-    if (page === "home") {
-      setState("activePage", "home");
-      return;
-    }
-
-    if (page === "folders") {
-      setState("activePage", "folders");
-      setState("search", "");
-      setState("updatedFrom", "");
-      setState("updatedTo", "");
-      setState("searchSubmitted", false);
-      setState("selectedFolderId", options?.folderId ?? null);
-      setState("selectedMeetingId", null);
-      setState("selectedMeeting", null);
-      setState("selectedMeetingBundle", null);
-      setState("meetings", []);
-      setState("listError", "");
-      if (state.folders.length === 0) {
-        await loadFolders(true);
-      }
-      if (options?.folderId) {
-        await loadMeetings();
-      }
-      return;
-    }
-
-    if (page === "search") {
-      setState("activePage", "search");
-      setState("selectedFolderId", null);
-      setState("selectedMeetingId", null);
-      setState("selectedMeeting", null);
-      setState("selectedMeetingBundle", null);
-      setState("searchSubmitted", false);
-      setState("meetings", []);
-      setState("listError", "");
-      return;
-    }
-
-    if (page === "review") {
-      setState("activePage", "review");
-      await Promise.all([loadAutomationRuns(), loadAutomationArtefacts(), loadProcessingIssues()]);
-      return;
-    }
-
-    setState("activePage", "settings");
-  };
-
-  const updateHarness = (nextHarness: GranolaAgentHarness) => {
-    setState(
-      "harnesses",
-      state.harnesses.map((harness) => (harness.id === nextHarness.id ? nextHarness : harness)),
-    );
-    setState("selectedHarnessId", nextHarness.id);
-    setState("harnessDirty", true);
-    setState("harnessTestResult", null);
-  };
-
-  const createHarness = () => {
-    const nextHarness = createHarnessTemplate(state.harnesses);
-    setState("harnesses", [...state.harnesses, nextHarness]);
-    setState("selectedHarnessId", nextHarness.id);
-    setState("harnessDirty", true);
-    setState("harnessTestResult", null);
-  };
-
-  const duplicateHarness = () => {
-    const harness = selectedHarness();
-    if (!harness) {
-      return;
-    }
-
-    const nextHarness = duplicateHarnessTemplate(state.harnesses, harness);
-    setState("harnesses", [...state.harnesses, nextHarness]);
-    setState("selectedHarnessId", nextHarness.id);
-    setState("harnessDirty", true);
-    setState("harnessTestResult", null);
-  };
-
-  const removeHarness = () => {
-    if (!state.selectedHarnessId) {
-      return;
-    }
-
-    const nextHarnesses = state.harnesses.filter(
-      (harness) => harness.id !== state.selectedHarnessId,
-    );
-    setState("harnesses", nextHarnesses);
-    setState("selectedHarnessId", selectHarnessId(nextHarnesses, null));
-    setState("harnessDirty", true);
-    setState("harnessTestResult", null);
-  };
-
-  const saveHarnesses = async () => {
-    if (!client) {
-      return;
-    }
-
-    setStatus("Saving harnesses…", "busy");
-    try {
-      const result = await client.saveAgentHarnesses(state.harnesses);
-      const nextSelectedHarnessId = selectHarnessId(result.harnesses, state.selectedHarnessId);
-      setState("harnesses", result.harnesses);
-      setState("selectedHarnessId", nextSelectedHarnessId);
-      const nextPreferredProvider = result.harnesses.find((harness) => harness.provider)?.provider;
-      if (nextPreferredProvider) {
-        setState("preferredProvider", nextPreferredProvider);
-      }
-      setState("harnessDirty", false);
-      setState("harnessError", "");
-      await loadHarnessExplanations(state.selectedMeetingId);
-      setStatus("Harnesses saved", "ok");
-    } catch (error) {
-      setState("harnessError", error instanceof Error ? error.message : String(error));
-      setStatus("Harness save failed", "error");
-    }
-  };
-
-  const reloadHarnesses = async () => {
-    setStatus("Reloading harnesses…", "busy");
-    await loadHarnesses(state.selectedHarnessId);
-    setStatus("Harnesses reloaded", "ok");
-  };
-
-  const createStarterPipeline = async () => {
-    if (!client) {
-      return;
-    }
-
-    setStatus("Creating starter pipeline…", "busy");
-    try {
-      const [currentHarnesses, currentRules] = await Promise.all([
-        client.listAgentHarnesses(),
-        client.listAutomationRules(),
-      ]);
-      const starter = buildStarterPipeline({
-        harnesses: currentHarnesses.harnesses,
-        provider: state.preferredProvider,
-        rules: currentRules.rules,
-      });
-
-      await client.saveAgentHarnesses(starter.harnesses);
-      await client.saveAutomationRules(starter.rules);
-      await refreshAll();
-      setStatus("Starter pipeline ready", "ok");
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Starter pipeline setup failed", "error");
-    }
-  };
-
-  const testHarness = async () => {
-    if (!client) {
-      return;
-    }
-
-    const harness = selectedHarness();
-    if (!harness) {
-      setStatus("Select a harness first", "error");
-      return;
-    }
-
-    const meetingId = state.selectedMeetingId;
-    if (!meetingId) {
-      setStatus("Select a meeting first", "error");
-      return;
-    }
-
-    setStatus("Testing harness…", "busy");
-    try {
-      const bundle =
-        state.selectedMeetingBundle?.source.document.id === meetingId
-          ? state.selectedMeetingBundle
-          : await client.getMeeting(meetingId, { requireCache: true });
-      const result = await client.evaluateAutomationCases(
-        [
-          {
-            bundle,
-            id: `web:${meetingId}`,
-            title:
-              bundle.meeting.meeting.title ||
-              bundle.source.document.title ||
-              bundle.source.document.id,
-          },
-        ],
-        {
-          harnessIds: [harness.id],
-          kind: state.harnessTestKind,
-          model: harness.model,
-          provider: harness.provider,
-        },
-      );
-      setState("harnessTestResult", result.results[0] ?? null);
-      setStatus("Harness test complete", "ok");
-    } catch (error) {
-      setState("harnessTestResult", {
-        caseId: `web:${meetingId}`,
-        caseTitle: state.selectedMeeting?.meeting.title || meetingId,
-        error: error instanceof Error ? error.message : String(error),
-        harnessId: harness.id,
-        harnessName: harness.name,
-        prompt: "",
-        status: "failed",
-      });
-      setStatus("Harness test failed", "error");
-    }
-  };
-
-  const loadMeeting = async (meetingId: string) => {
-    if (!client) {
-      return;
-    }
-
-    setState("selectedMeetingId", meetingId);
-    try {
-      setState("detailError", "");
-      const bundle = await client.getMeeting(meetingId);
-      setState("selectedMeetingBundle", bundle);
-      setState("selectedMeeting", bundle.meeting);
-      updatePreferences((preferences) =>
-        rememberRecentMeeting(preferences, bundle.meeting.meeting),
-      );
-      await loadHarnessExplanations(bundle.source.document.id);
-      await loadAutomationArtefacts({
-        preferredId: state.selectedAutomationArtefactId,
-        preferredMeetingId: bundle.source.document.id,
-      });
-    } catch (error) {
-      setState("selectedMeetingBundle", null);
-      setState("selectedMeeting", null);
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setState("harnessExplainEventKind", null);
-      setState("harnessExplanations", []);
-    }
-  };
-
-  const hasMeetingBrowseScope = () =>
-    hasScopedMeetingBrowse({
-      search: state.search,
-      selectedFolderId: state.selectedFolderId,
-      updatedFrom: state.updatedFrom,
-      updatedTo: state.updatedTo,
-    });
-
-  const loadMeetings = async (options: { preferredMeetingId?: string; refresh?: boolean } = {}) => {
-    if (!client) {
-      return;
-    }
-
-    if (!hasMeetingBrowseScope() && !options.preferredMeetingId && !state.selectedMeetingId) {
-      setState("listError", "");
-      setState("meetings", []);
-      setState("selectedMeeting", null);
-      setState("selectedMeetingBundle", null);
-      setState("detailError", "");
-      setState("harnessExplainEventKind", null);
-      setState("harnessExplanations", []);
-      await loadAutomationArtefacts({
-        preferredId: state.selectedAutomationArtefactId,
-        preferredMeetingId: null,
-      });
-      return;
-    }
-
-    try {
-      setState("listError", "");
-      const result = await client.listMeetings({
+      await client.exportNotes("markdown", {
         folderId: state.selectedFolderId || undefined,
-        forceRefresh: options.refresh,
-        limit: 100,
-        search: state.search || undefined,
-        sort: state.sort,
-        updatedFrom: state.updatedFrom || undefined,
-        updatedTo: state.updatedTo || undefined,
       });
-      const preferredMeetingId = options.preferredMeetingId ?? state.selectedMeetingId;
-      const nextMeetingId = selectMeetingId(result.meetings, preferredMeetingId);
-
-      setState("meetings", result.meetings);
-      setState("meetingSource", result.source);
-      setState("selectedMeetingId", nextMeetingId);
-
-      if (nextMeetingId) {
-        await loadMeeting(nextMeetingId);
-      } else {
-        setState("selectedMeeting", null);
-        setState("selectedMeetingBundle", null);
-        setState("detailError", "");
-        setState("harnessExplainEventKind", null);
-        setState("harnessExplanations", []);
-        await loadAutomationArtefacts({
-          preferredId: state.selectedAutomationArtefactId,
-          preferredMeetingId: null,
-        });
-      }
+      await refreshAll();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setState("listError", message);
-      setState("selectedMeeting", null);
-      setState("selectedMeetingBundle", null);
-      setState("detailError", message);
-      setState("harnessExplainEventKind", null);
-      setState("harnessExplanations", []);
+      setState("detailError", error instanceof Error ? error.message : String(error));
+      setStatus("Export failed", "error");
+    }
+  };
+
+  const exportTranscripts = async () => {
+    const client = clientController.clientAccessor();
+    if (!client) {
+      return;
+    }
+
+    setStatus(
+      state.selectedFolderId ? "Exporting folder transcripts…" : "Exporting transcripts…",
+      "busy",
+    );
+    try {
+      await client.exportTranscripts("text", {
+        folderId: state.selectedFolderId || undefined,
+      });
+      await refreshAll();
+    } catch (error) {
+      setState("detailError", error instanceof Error ? error.message : String(error));
+      setStatus("Export failed", "error");
+    }
+  };
+
+  const rerunJob = async (jobId: string) => {
+    const client = clientController.clientAccessor();
+    if (!client) {
+      return;
+    }
+
+    setStatus("Rerunning export…", "busy");
+    try {
+      await client.rerunExportJob(jobId);
+      await refreshAll();
+    } catch (error) {
+      setState("detailError", error instanceof Error ? error.message : String(error));
+      setStatus("Rerun failed", "error");
+    }
+  };
+
+  const resolveAutomationRun = async (id: string, decision: "approve" | "reject") => {
+    try {
+      await reviewController.resolveAutomationRun(id, decision);
+      await refreshAll();
+    } catch {
+      // The controller already updates status and error state.
+    }
+  };
+
+  const recoverProcessingIssue = async (id: string) => {
+    try {
+      await reviewController.recoverProcessingIssue(id);
+      await refreshAll();
+    } catch {
+      // The controller already updates status and error state.
     }
   };
 
   const refreshAll = async (forceRefresh = false) => {
-    if (!client) {
-      await attachClient();
+    if (!clientController.clientAccessor()) {
+      await clientController.attachClient();
     }
 
     setStatus(forceRefresh ? "Syncing…" : "Refreshing…", "busy");
 
     if (forceRefresh) {
-      await client?.sync({
+      await clientController.clientAccessor()?.sync({
         forceRefresh: true,
         foreground: true,
       });
     }
 
     await Promise.all([
-      loadFolders(forceRefresh),
-      loadHomeMeetings(forceRefresh),
-      loadHarnesses(),
-      loadAutomationRules(),
-      loadAutomationRuns(),
-      loadAutomationArtefacts(),
-      loadProcessingIssues(),
-      mergeAuthState(),
+      browseController.loadFolders(forceRefresh),
+      browseController.loadHomeMeetings(forceRefresh),
+      harnessController.loadHarnesses(),
+      reviewController.loadAutomationRules(),
+      reviewController.loadAutomationRuns(),
+      reviewController.loadAutomationArtefacts(),
+      reviewController.loadProcessingIssues(),
+      clientController.mergeAuthState(),
     ]);
 
-    if (state.selectedMeetingId && !hasMeetingBrowseScope()) {
-      await loadMeeting(state.selectedMeetingId);
+    if (state.selectedMeetingId && !browseController.hasMeetingBrowseScope()) {
+      await browseController.loadMeeting(state.selectedMeetingId);
       setState("meetings", []);
     } else {
-      await loadMeetings({ refresh: forceRefresh });
+      await browseController.loadMeetings({ refresh: forceRefresh });
     }
 
     setState("serverLocked", false);
@@ -798,495 +290,6 @@ export function App() {
     }
   };
 
-  const openMeetingFromPage = async (
-    meetingId: string,
-    page: MeetingReturnPage,
-    options: { folderId?: string | null } = {},
-  ) => {
-    if (options.folderId !== undefined) {
-      setState("selectedFolderId", options.folderId || null);
-    }
-
-    setState("meetingReturnPage", page);
-    setState("activePage", "meeting");
-    await loadMeeting(meetingId);
-  };
-
-  const openAdvancedMeeting = async () => {
-    if (!client) {
-      return;
-    }
-
-    const query = state.advancedSearchQuery.trim();
-    if (!query) {
-      setStatus("Enter an exact title or meeting id", "error");
-      return;
-    }
-
-    setStatus("Opening meeting…", "busy");
-    try {
-      const bundle = await client.findMeeting(query);
-      setState("advancedSearchQuery", "");
-      setState("selectedFolderId", bundle.meeting.meeting.folders[0]?.id || null);
-      setState("search", "");
-      setState("updatedFrom", "");
-      setState("updatedTo", "");
-      setState("searchSubmitted", false);
-      await openMeetingFromPage(bundle.source.document.id, "search", {
-        folderId: bundle.meeting.meeting.folders[0]?.id || null,
-      });
-      setStatus("Meeting opened", "ok");
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Advanced search failed", "error");
-    }
-  };
-
-  const saveApiKey = async () => {
-    if (!state.apiKeyDraft.trim()) {
-      setStatus("Enter a Granola API key", "error");
-      return;
-    }
-
-    setStatus("Saving API key…", "busy");
-    try {
-      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authLogin, {
-        body: JSON.stringify({
-          apiKey: state.apiKeyDraft.trim(),
-        }),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "POST",
-      });
-      setState("apiKeyDraft", "");
-      setState("detailError", "");
-      if (state.appState) {
-        setState("appState", "auth", auth);
-      }
-      setStatus("API key saved", "ok");
-    } catch (error) {
-      await mergeAuthState();
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("API key save failed", "error");
-    }
-  };
-
-  const importDesktopSession = async () => {
-    setStatus("Importing desktop session…", "busy");
-    try {
-      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authLogin, {
-        body: JSON.stringify({}),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "POST",
-      });
-      setState("detailError", "");
-      if (state.appState) {
-        setState("appState", "auth", auth);
-      }
-      setStatus("Desktop session imported", "ok");
-    } catch (error) {
-      await mergeAuthState();
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Auth import failed", "error");
-    }
-  };
-
-  const refreshAuth = async () => {
-    setStatus("Refreshing session…", "busy");
-    try {
-      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authRefresh, {
-        method: "POST",
-      });
-      await mergeAuthState(auth);
-      await refreshAll();
-    } catch (error) {
-      await mergeAuthState();
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Refresh failed", "error");
-    }
-  };
-
-  const switchAuthMode = async (mode: GranolaAppAuthMode) => {
-    setStatus("Switching auth source…", "busy");
-    try {
-      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authMode, {
-        body: JSON.stringify({ mode }),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "POST",
-      });
-      await mergeAuthState(auth);
-      await refreshAll();
-    } catch (error) {
-      await mergeAuthState();
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Switch failed", "error");
-    }
-  };
-
-  const logout = async () => {
-    setStatus("Signing out…", "busy");
-    try {
-      const auth = await requestJson<GranolaAppAuthState>(granolaTransportPaths.authLogout, {
-        method: "POST",
-      });
-      await mergeAuthState(auth);
-      await refreshAll();
-    } catch (error) {
-      await mergeAuthState();
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Sign out failed", "error");
-    }
-  };
-
-  const exportNotes = async () => {
-    if (!client) {
-      return;
-    }
-
-    setStatus(state.selectedFolderId ? "Exporting folder notes…" : "Exporting notes…", "busy");
-    try {
-      await client.exportNotes("markdown", {
-        folderId: state.selectedFolderId || undefined,
-      });
-      await refreshAll();
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Export failed", "error");
-    }
-  };
-
-  const clearFilters = async () => {
-    setState("search", "");
-    setState("sort", "updated-desc");
-    setState("updatedFrom", "");
-    setState("updatedTo", "");
-    setState("selectedFolderId", null);
-    setState("selectedMeetingId", null);
-    setState("selectedMeeting", null);
-    setState("selectedMeetingBundle", null);
-    setState("searchSubmitted", false);
-    setState("activePage", "home");
-    await loadMeetings();
-    setStatus("Back at home", "ok");
-  };
-
-  const openRecentMeeting = async (meetingId: string, folderId?: string) => {
-    await openMeetingFromPage(meetingId, folderId ? "folders" : "home", {
-      folderId: folderId || null,
-    });
-  };
-
-  const runSearch = async () => {
-    setState("activePage", "search");
-    setState("searchSubmitted", true);
-    setState("selectedMeetingId", null);
-    setState("selectedMeeting", null);
-    setState("selectedMeetingBundle", null);
-    await loadMeetings();
-    setStatus("Search updated", "ok");
-  };
-
-  const clearSearch = async () => {
-    setState("search", "");
-    setState("sort", "updated-desc");
-    setState("updatedFrom", "");
-    setState("updatedTo", "");
-    setState("selectedFolderId", null);
-    setState("selectedMeetingId", null);
-    setState("selectedMeeting", null);
-    setState("selectedMeetingBundle", null);
-    setState("searchSubmitted", false);
-    setState("meetings", []);
-    setState("listError", "");
-    setStatus("Search cleared", "ok");
-  };
-
-  const meetingEmptyHint = () => {
-    if (!state.appState) {
-      return "Connect to the local server to load meetings.";
-    }
-
-    if (state.appState.auth.lastError) {
-      return "Resolve auth first, then sync again.";
-    }
-
-    if (!state.appState.documents.loaded && !state.appState.sync.lastCompletedAt) {
-      return "Run Sync now to populate your local meeting index.";
-    }
-
-    return "Try a different folder or search, or sync again.";
-  };
-
-  const exportTranscripts = async () => {
-    if (!client) {
-      return;
-    }
-
-    setStatus(
-      state.selectedFolderId ? "Exporting folder transcripts…" : "Exporting transcripts…",
-      "busy",
-    );
-    try {
-      await client.exportTranscripts("text", {
-        folderId: state.selectedFolderId || undefined,
-      });
-      await refreshAll();
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Export failed", "error");
-    }
-  };
-
-  const rerunJob = async (jobId: string) => {
-    if (!client) {
-      return;
-    }
-
-    setStatus("Rerunning export…", "busy");
-    try {
-      await client.rerunExportJob(jobId);
-      await refreshAll();
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Rerun failed", "error");
-    }
-  };
-
-  const selectedAutomationArtefact = () =>
-    state.automationArtefacts.find(
-      (artefact) => artefact.id === state.selectedAutomationArtefactId,
-    ) || null;
-
-  const resolveAutomationRun = async (id: string, decision: "approve" | "reject") => {
-    if (!client) {
-      return;
-    }
-
-    setStatus(decision === "approve" ? "Approving automation…" : "Rejecting automation…", "busy");
-    try {
-      await client.resolveAutomationRun(id, decision);
-      await refreshAll();
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Automation decision failed", "error");
-    }
-  };
-
-  const recoverProcessingIssue = async (id: string) => {
-    if (!client) {
-      return;
-    }
-
-    setStatus("Recovering processing issue…", "busy");
-    try {
-      const result = await client.recoverProcessingIssue(id);
-      await refreshAll();
-      setStatus(
-        result.runCount > 0
-          ? `Recovered ${result.issue.kind} and re-ran ${result.runCount} pipeline${result.runCount === 1 ? "" : "s"}`
-          : `Recovered ${result.issue.kind}`,
-        "ok",
-      );
-    } catch (error) {
-      setState("processingIssueError", error instanceof Error ? error.message : String(error));
-      setStatus("Recovery failed", "error");
-    }
-  };
-
-  const selectReviewInboxItem = async (key: string) => {
-    setState("selectedReviewInboxKey", key);
-    const item = reviewInboxItems().find((candidate) => candidate.key === key);
-    if (!item) {
-      return;
-    }
-
-    try {
-      if (item.kind === "artefact") {
-        await selectAutomationArtefact(item.artefact.id);
-        return;
-      }
-
-      if (item.meetingId && item.meetingId !== state.selectedMeetingId) {
-        await loadMeeting(item.meetingId);
-      }
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Unable to open review item", "error");
-    }
-  };
-
-  const selectAutomationArtefact = async (id: string) => {
-    if (!client) {
-      return;
-    }
-
-    try {
-      const artefact =
-        state.automationArtefacts.find((candidate) => candidate.id === id) ??
-        (await client.getAutomationArtefact(id));
-      setState("selectedReviewInboxKey", `artefact:${artefact.id}`);
-      applySelectedArtefactDrafts(artefact);
-      if (artefact.meetingId !== state.selectedMeetingId) {
-        await loadMeeting(artefact.meetingId);
-      }
-    } catch (error) {
-      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
-      setStatus("Unable to open artefact", "error");
-    }
-  };
-
-  const saveAutomationArtefact = async () => {
-    if (!client || !state.selectedAutomationArtefactId) {
-      return;
-    }
-
-    setStatus("Saving artefact edits…", "busy");
-    try {
-      const artefact = await client.updateAutomationArtefact(state.selectedAutomationArtefactId, {
-        markdown: state.automationArtefactDraftMarkdown,
-        note: state.reviewNote || undefined,
-        summary: state.automationArtefactDraftSummary,
-        title: state.automationArtefactDraftTitle,
-      });
-      await loadAutomationArtefacts({
-        preferredId: artefact.id,
-        preferredMeetingId: artefact.meetingId,
-      });
-      await loadAutomationRuns();
-      setStatus("Artefact updated", "ok");
-    } catch (error) {
-      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
-      setStatus("Artefact save failed", "error");
-    }
-  };
-
-  const resolveAutomationArtefact = async (decision: "approve" | "reject") => {
-    if (!client || !state.selectedAutomationArtefactId) {
-      return;
-    }
-
-    setStatus(decision === "approve" ? "Approving artefact…" : "Rejecting artefact…", "busy");
-    try {
-      const artefact = await client.resolveAutomationArtefact(
-        state.selectedAutomationArtefactId,
-        decision,
-        {
-          note: state.reviewNote || undefined,
-        },
-      );
-      await loadAutomationArtefacts({
-        preferredId: artefact.id,
-        preferredMeetingId: artefact.meetingId,
-      });
-      await loadAutomationRuns();
-      setStatus(decision === "approve" ? "Artefact approved" : "Artefact rejected", "ok");
-    } catch (error) {
-      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
-      setStatus("Artefact decision failed", "error");
-    }
-  };
-
-  const rerunAutomationArtefact = async () => {
-    if (!client || !state.selectedAutomationArtefactId) {
-      return;
-    }
-
-    setStatus("Rerunning artefact pipeline…", "busy");
-    try {
-      const artefact = await client.rerunAutomationArtefact(state.selectedAutomationArtefactId);
-      await loadAutomationArtefacts({
-        preferredId: artefact.id,
-        preferredMeetingId: artefact.meetingId,
-      });
-      await loadAutomationRuns();
-      setStatus("Artefact rerun complete", "ok");
-    } catch (error) {
-      setState("automationArtefactError", error instanceof Error ? error.message : String(error));
-      setStatus("Artefact rerun failed", "error");
-    }
-  };
-
-  const unlockServer = async () => {
-    if (!state.serverPassword.trim()) {
-      setStatus("Enter the server password", "error");
-      return;
-    }
-
-    setStatus("Unlocking server…", "busy");
-    try {
-      await requestJson("/auth/unlock", {
-        body: JSON.stringify({ password: state.serverPassword }),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "POST",
-      });
-      setState("serverPassword", "");
-      setState("serverLocked", false);
-      await connectAndRefresh(true);
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Unlock failed", "error");
-    }
-  };
-
-  const lockServer = async () => {
-    try {
-      await requestJson("/auth/lock", {
-        method: "POST",
-      });
-    } catch {
-      // Locking is best-effort from the client perspective.
-    }
-
-    await detachClient();
-    setState({
-      activePage: "home",
-      appState: null,
-      advancedSearchQuery: "",
-      automationArtefactDraftMarkdown: "",
-      automationArtefactDraftSummary: "",
-      automationArtefactDraftTitle: "",
-      automationArtefactError: "",
-      automationArtefacts: [],
-      automationRules: [],
-      automationRuns: [],
-      detailError: "",
-      folderError: "",
-      folders: [],
-      homeMeetings: [],
-      homeMeetingsError: "",
-      harnessDirty: false,
-      harnessError: "",
-      harnessExplainEventKind: null,
-      harnessExplanations: [],
-      harnessTestResult: null,
-      harnesses: [],
-      listError: "",
-      meetings: [],
-      processingIssueError: "",
-      processingIssues: [],
-      searchSubmitted: false,
-      reviewNote: "",
-      selectedAutomationArtefactId: null,
-      selectedFolderId: null,
-      selectedHarnessId: null,
-      selectedMeeting: null,
-      selectedMeetingBundle: null,
-      selectedMeetingId: null,
-      meetingReturnPage: "home",
-      serverLocked: true,
-      serverPassword: "",
-      settingsTab: "auth",
-    });
-    setStatus("Server locked", "error");
-  };
-
   createEffect(() => {
     const nextPath = buildBrowserUrlPath(window.location.href, {
       selectedFolderId:
@@ -1303,7 +306,7 @@ export function App() {
   });
 
   createEffect(() => {
-    if (!state.appState?.automation.loaded || !client) {
+    if (!state.appState?.automation.loaded || !clientController.clientAccessor()) {
       automationPanelsHydrated = false;
       return;
     }
@@ -1313,15 +316,17 @@ export function App() {
     }
 
     automationPanelsHydrated = true;
-    void loadAutomationRuns();
-    void loadAutomationArtefacts();
-    void loadProcessingIssues();
+    void reviewController.loadAutomationRuns();
+    void reviewController.loadAutomationArtefacts();
+    void reviewController.loadProcessingIssues();
   });
 
   createEffect(() => {
     const current =
-      reviewInboxItems().find((item) => item.key === state.selectedReviewInboxKey) ??
-      reviewInboxItems()[0] ??
+      reviewController
+        .reviewInboxItems()
+        .find((item) => item.key === state.selectedReviewInboxKey) ??
+      reviewController.reviewInboxItems()[0] ??
       null;
     const nextKey = current?.key ?? null;
 
@@ -1333,7 +338,7 @@ export function App() {
       current?.kind === "artefact" &&
       current.artefact.id !== state.selectedAutomationArtefactId
     ) {
-      applySelectedArtefactDrafts(current.artefact);
+      reviewController.applySelectedArtefactDrafts(current.artefact);
     }
   });
 
@@ -1369,7 +374,7 @@ export function App() {
   });
 
   onCleanup(() => {
-    void detachClient();
+    void clientController.detachClient();
   });
 
   const onboardingState = () =>
@@ -1382,7 +387,8 @@ export function App() {
     });
 
   const showOnboarding = () => !state.serverLocked && !onboardingState().complete;
-  const searchResultsVisible = () => state.searchSubmitted && hasMeetingBrowseScope();
+  const searchResultsVisible = () =>
+    state.searchSubmitted && browseController.hasMeetingBrowseScope();
   const meetingReturnLabel = () =>
     state.meetingReturnPage === "folders"
       ? "Back to folders"
@@ -1417,20 +423,20 @@ export function App() {
             <AppStatePanel
               appState={state.appState}
               heading="Home"
-              reviewSummary={reviewInboxSummary()}
+              reviewSummary={reviewController.reviewInboxSummary()}
               serverInfo={state.serverInfo}
               statusLabel={state.statusLabel}
               statusTone={state.statusTone}
             />
             <SecurityPanel
               onLock={() => {
-                void lockServer();
+                void clientController.lockServer();
               }}
               onPasswordChange={(value) => {
                 setState("serverPassword", value);
               }}
               onUnlock={() => {
-                void unlockServer();
+                void clientController.unlockServer(connectAndRefresh);
               }}
               password={state.serverPassword}
               visible={state.serverLocked}
@@ -1445,16 +451,16 @@ export function App() {
                   setState("apiKeyDraft", value);
                 }}
                 onCreateStarterPipeline={() => {
-                  void createStarterPipeline();
+                  void harnessController.createStarterPipeline(refreshAll);
                 }}
                 onImportDesktopSession={() => {
-                  void importDesktopSession();
+                  void clientController.importDesktopSession();
                 }}
                 onRunSync={() => {
                   void connectAndRefresh(true);
                 }}
                 onSaveApiKey={() => {
-                  void saveApiKey();
+                  void clientController.saveApiKey();
                 }}
                 onSelectProvider={(provider) => {
                   setState("preferredProvider", provider);
@@ -1480,16 +486,16 @@ export function App() {
           folderCount={state.folders.length}
           onNavigate={(page) => {
             if (page === "home") {
-              void clearFilters();
+              void browseController.clearFilters();
               return;
             }
 
-            void openPage(page);
+            void browseController.openPage(page);
           }}
           onSync={() => {
             void connectAndRefresh(true);
           }}
-          reviewSummary={reviewInboxSummary()}
+          reviewSummary={reviewController.reviewInboxSummary()}
           serverInfo={state.serverInfo}
           statusLabel={state.statusLabel}
           statusTone={state.statusTone}
@@ -1502,28 +508,28 @@ export function App() {
                 folders={state.folders}
                 latestMeetings={state.homeMeetings}
                 onOpenFolder={(folderId) => {
-                  void openPage("folders", { folderId });
+                  void browseController.openPage("folders", { folderId });
                 }}
                 onOpenLatestMeeting={(meeting) => {
-                  void openMeetingFromPage(meeting.id, "home", {
+                  void browseController.openMeetingFromPage(meeting.id, "home", {
                     folderId: meeting.folders[0]?.id || null,
                   });
                 }}
                 onOpenMeeting={(meeting) => {
-                  void openRecentMeeting(meeting.id, meeting.folderId);
+                  void browseController.openRecentMeeting(meeting.id, meeting.folderId);
                 }}
                 onOpenFoldersPage={() => {
-                  void openPage("folders");
+                  void browseController.openPage("folders");
                 }}
                 onOpenReviewPage={() => {
-                  void openPage("review");
+                  void browseController.openPage("review");
                 }}
                 onOpenSearchPage={() => {
-                  void openPage("search");
+                  void browseController.openPage("search");
                 }}
                 processingIssues={state.processingIssues}
                 recentMeetings={state.recentMeetings}
-                reviewSummary={reviewInboxSummary()}
+                reviewSummary={reviewController.reviewInboxSummary()}
                 serverInfo={state.serverInfo}
               />
             </Match>
@@ -1532,15 +538,10 @@ export function App() {
                 folderError={state.folderError}
                 folders={state.folders}
                 listError={state.listError}
-                meetingEmptyHint={meetingEmptyHint()}
+                meetingEmptyHint={browseController.meetingEmptyHint()}
                 meetings={state.meetings}
                 onBackToFolders={() => {
-                  setState("selectedFolderId", null);
-                  setState("selectedMeetingId", null);
-                  setState("selectedMeeting", null);
-                  setState("selectedMeetingBundle", null);
-                  setState("meetings", []);
-                  setState("listError", "");
+                  void browseController.openPage("folders");
                 }}
                 onExportNotes={() => {
                   void exportNotes();
@@ -1549,17 +550,17 @@ export function App() {
                   void exportTranscripts();
                 }}
                 onOpenMeeting={(meetingId) => {
-                  void openMeetingFromPage(meetingId, "folders", {
+                  void browseController.openMeetingFromPage(meetingId, "folders", {
                     folderId: state.selectedFolderId,
                   });
                 }}
                 onRefreshFolders={() => {
-                  void loadFolders(true);
+                  void browseController.loadFolders(true);
                 }}
                 onSelectFolder={(folderId) => {
-                  void openPage("folders", { folderId });
+                  void browseController.openPage("folders", { folderId });
                 }}
-                selectedFolder={selectedFolder()}
+                selectedFolder={browseController.selectedFolder()}
                 selectedFolderId={state.selectedFolderId}
                 selectedMeetingId={state.selectedMeetingId}
               />
@@ -1571,17 +572,17 @@ export function App() {
                   setState("advancedSearchQuery", value);
                 }}
                 onClear={() => {
-                  void clearSearch();
+                  void browseController.clearSearch();
                 }}
                 onOpenAdvanced={() => {
-                  void openAdvancedMeeting();
+                  void browseController.openAdvancedMeeting();
                 }}
                 onQueryChange={(value) => {
                   setState("search", value.trim());
                   setState("searchSubmitted", false);
                 }}
                 onRun={() => {
-                  void runSearch();
+                  void browseController.runSearch();
                 }}
                 onSortChange={(value) => {
                   setState("sort", value);
@@ -1605,10 +606,10 @@ export function App() {
                 folders={state.folders}
                 hasRecentMeetings={state.recentMeetings.length > 0}
                 listError={state.listError}
-                meetingEmptyHint={meetingEmptyHint()}
+                meetingEmptyHint={browseController.meetingEmptyHint()}
                 meetings={state.meetings}
                 onOpenMeeting={(meetingId) => {
-                  void openMeetingFromPage(meetingId, "search");
+                  void browseController.openMeetingFromPage(meetingId, "search");
                 }}
               />
             </Match>
@@ -1619,7 +620,7 @@ export function App() {
                 artefactDraftTitle={state.automationArtefactDraftTitle}
                 artefactError={state.automationArtefactError}
                 onApproveArtefact={() => {
-                  void resolveAutomationArtefact("approve");
+                  void reviewController.resolveAutomationArtefact("approve");
                 }}
                 onApproveRun={(runId) => {
                   void resolveAutomationRun(runId, "approve");
@@ -1634,7 +635,7 @@ export function App() {
                   setState("automationArtefactDraftTitle", value);
                 }}
                 onOpenMeeting={(meetingId) => {
-                  void openMeetingFromPage(meetingId, "review");
+                  void browseController.openMeetingFromPage(meetingId, "review");
                 }}
                 onRecover={(issueId) => {
                   void recoverProcessingIssue(issueId);
@@ -1643,32 +644,34 @@ export function App() {
                   void connectAndRefresh(true);
                 }}
                 onRejectArtefact={() => {
-                  void resolveAutomationArtefact("reject");
+                  void reviewController.resolveAutomationArtefact("reject");
                 }}
                 onRejectRun={(runId) => {
                   void resolveAutomationRun(runId, "reject");
                 }}
                 onRerunArtefact={() => {
-                  void rerunAutomationArtefact();
+                  void reviewController.rerunAutomationArtefact();
                 }}
                 onReviewNoteChange={(value) => {
                   setState("reviewNote", value);
                 }}
                 onSaveArtefact={() => {
-                  void saveAutomationArtefact();
+                  void reviewController.saveAutomationArtefact();
                 }}
                 onSelectItem={(key) => {
-                  void selectReviewInboxItem(key);
+                  void reviewController.selectReviewInboxItem(key, {
+                    loadMeeting: browseController.loadMeeting,
+                  });
                 }}
-                reviewItems={reviewInboxItems()}
+                reviewItems={reviewController.reviewInboxItems()}
                 reviewNote={state.reviewNote}
-                reviewSummary={reviewInboxSummary()}
-                selectedArtefact={selectedReviewArtefact()}
+                reviewSummary={reviewController.reviewInboxSummary()}
+                selectedArtefact={reviewController.selectedReviewArtefact()}
                 selectedBundle={state.selectedMeetingBundle}
-                selectedIssue={selectedReviewIssue()}
+                selectedIssue={reviewController.selectedReviewIssue()}
                 selectedKey={state.selectedReviewInboxKey}
-                selectedKind={selectedReviewInboxItem()?.kind}
-                selectedRun={selectedReviewRun()}
+                selectedKind={reviewController.selectedReviewInboxItem()?.kind}
+                selectedRun={reviewController.selectedReviewRun()}
               />
             </Match>
             <Match when={state.activePage === "settings"}>
@@ -1690,8 +693,8 @@ export function App() {
                 onApproveRun={(runId) => {
                   void resolveAutomationRun(runId, "approve");
                 }}
-                onChangeHarness={updateHarness}
-                onDuplicateHarness={duplicateHarness}
+                onChangeHarness={harnessController.updateHarness}
+                onDuplicateHarness={harnessController.duplicateHarness}
                 onExportNotes={() => {
                   void exportNotes();
                 }}
@@ -1699,17 +702,17 @@ export function App() {
                   void exportTranscripts();
                 }}
                 onImportDesktopSession={() => {
-                  void importDesktopSession();
+                  void clientController.importDesktopSession();
                 }}
                 onLock={() => {
-                  void lockServer();
+                  void clientController.lockServer();
                 }}
                 onLogout={() => {
-                  void logout();
+                  void clientController.logout(refreshAll);
                 }}
-                onNewHarness={createHarness}
+                onNewHarness={harnessController.createHarness}
                 onOpenMeeting={(meetingId) => {
-                  void openMeetingFromPage(meetingId, "settings");
+                  void browseController.openMeetingFromPage(meetingId, "settings");
                 }}
                 onPasswordChange={(value) => {
                   setState("serverPassword", value);
@@ -1718,44 +721,44 @@ export function App() {
                   void recoverProcessingIssue(issueId);
                 }}
                 onRefreshAuth={() => {
-                  void refreshAuth();
+                  void clientController.refreshAuth(refreshAll);
                 }}
                 onRejectRun={(runId) => {
                   void resolveAutomationRun(runId, "reject");
                 }}
                 onReloadHarnesses={() => {
-                  void reloadHarnesses();
+                  void harnessController.reloadHarnesses();
                 }}
-                onRemoveHarness={removeHarness}
+                onRemoveHarness={harnessController.removeHarness}
                 onRerunJob={(jobId) => {
                   void rerunJob(jobId);
                 }}
                 onSaveApiKey={() => {
-                  void saveApiKey();
+                  void clientController.saveApiKey();
                 }}
                 onSaveHarnesses={() => {
-                  void saveHarnesses();
+                  void harnessController.saveHarnesses();
                 }}
                 onSelectHarness={(id) => {
                   setState("selectedHarnessId", id);
                   setState("harnessTestResult", null);
                 }}
                 onSwitchMode={(mode) => {
-                  void switchAuthMode(mode);
+                  void clientController.switchAuthMode(mode, refreshAll);
                 }}
                 onTestHarness={() => {
-                  void testHarness();
+                  void harnessController.testHarness();
                 }}
                 onTestKindChange={(kind) => {
                   setState("harnessTestKind", kind);
                 }}
                 onUnlock={() => {
-                  void unlockServer();
+                  void clientController.unlockServer(connectAndRefresh);
                 }}
                 password={state.serverPassword}
                 preferredProvider={state.preferredProvider}
                 processingIssues={state.processingIssues}
-                selectedHarness={selectedHarness()}
+                selectedHarness={harnessController.selectedHarness()}
                 selectedHarnessId={state.selectedHarnessId}
                 selectedMeeting={state.selectedMeeting}
                 serverInfo={state.serverInfo}
