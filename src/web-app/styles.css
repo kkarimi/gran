@@ -159,6 +159,14 @@ select {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.primary-nav__meta {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .app-main {
   display: grid;
   align-content: start;
@@ -1053,6 +1061,11 @@ select {
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.status-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
 }
 
 .detail-meta {

@@ -45,6 +45,7 @@ interface PrimaryNavProps {
   onNavigate: (page: WebNavigationPage) => void;
   onSync: () => void;
   reviewSummary: GranolaReviewInboxSummary;
+  serverInfo?: GranolaServerInfo | null;
   statusLabel: string;
   statusTone: WebStatusTone;
 }
@@ -486,6 +487,28 @@ function runtimeLabel(serverInfo?: GranolaServerInfo | null): string {
   return "Connected to local workspace";
 }
 
+function buildIdentityLabel(serverInfo?: GranolaServerInfo | null): string {
+  if (!serverInfo) {
+    return "Detecting build";
+  }
+
+  const version = serverInfo.build.version?.trim()
+    ? `v${serverInfo.build.version.trim()}`
+    : "unknown";
+  return serverInfo.build.gitCommitShort
+    ? `${version} · ${serverInfo.build.gitCommitShort}`
+    : version;
+}
+
+function buildStartedAtLabel(serverInfo?: GranolaServerInfo | null): string {
+  const startedAt = serverInfo?.runtime.startedAt;
+  if (!startedAt?.trim()) {
+    return "not recorded";
+  }
+
+  return startedAt.replace("T", " ").slice(0, 19);
+}
+
 function providerSetupHint(provider: GranolaAgentProviderKind): string {
   switch (provider) {
     case "codex":
@@ -649,6 +672,11 @@ export function PrimaryNav(props: PrimaryNavProps): JSX.Element {
         <div class="primary-nav__stat">
           <span class="status-label">Needs review</span>
           <strong>{reviewSummaryLabel(props.reviewSummary)}</strong>
+        </div>
+        <div class="primary-nav__stat">
+          <span class="status-label">Attached build</span>
+          <strong>{buildIdentityLabel(props.serverInfo)}</strong>
+          <span class="primary-nav__meta">Started {buildStartedAtLabel(props.serverInfo)}</span>
         </div>
       </section>
     </aside>
@@ -1416,7 +1444,7 @@ export function DiagnosticsPanel(props: {
   return (
     <section class="jobs-panel diagnostics-panel">
       <div class="jobs-panel__head">
-        <h3>Diagnostics</h3>
+        <h3>Diagnostics and about</h3>
         <p>
           Runtime and storage details live here so the main workspace can stay user-facing while
           still giving power users a place to inspect internals.
@@ -1424,11 +1452,19 @@ export function DiagnosticsPanel(props: {
       </div>
       <div class="diagnostics-grid">
         <section class="detail-section">
-          <h2>Runtime</h2>
+          <h2>Runtime and build</h2>
           <div class="status-grid">
             <div>
               <span class="status-label">Status badge</span>
               <strong>{props.statusLabel}</strong>
+            </div>
+            <div>
+              <span class="status-label">Build</span>
+              <strong>{buildIdentityLabel(props.serverInfo)}</strong>
+            </div>
+            <div>
+              <span class="status-label">Started</span>
+              <strong>{buildStartedAtLabel(props.serverInfo)}</strong>
             </div>
             <div>
               <span class="status-label">Transport</span>
@@ -1442,7 +1478,18 @@ export function DiagnosticsPanel(props: {
               <span class="status-label">Protocol</span>
               <strong>{String(props.serverInfo?.protocolVersion ?? "unknown")}</strong>
             </div>
+            <div>
+              <span class="status-label">Package</span>
+              <strong>{props.serverInfo?.build.packageName || "unknown"}</strong>
+            </div>
+            <div>
+              <span class="status-label">Repository</span>
+              <strong>{props.serverInfo?.build.repositoryUrl || "unknown"}</strong>
+            </div>
           </div>
+          <p class="auth-card__meta">
+            Need a fresh local build? Run <code>npm run web:restart</code>.
+          </p>
         </section>
         <section class="detail-section">
           <h2>Storage and sync</h2>

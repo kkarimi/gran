@@ -7,10 +7,10 @@ import {
   defaultGranolaServiceRecord,
   discoverGranolaService,
   inspectGranolaService,
-  isGranolaServiceProcessRunning,
   readGranolaServiceLogTail,
   removeGranolaServiceRecord,
   spawnGranolaServiceProcess,
+  stopGranolaServiceProcess,
   waitForGranolaService,
   writeGranolaServiceRecord,
 } from "../service.ts";
@@ -108,21 +108,6 @@ function printServiceRunBanner(record: {
   }
 }
 
-async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt <= timeoutMs) {
-    if (!isGranolaServiceProcessRunning(pid)) {
-      return true;
-    }
-
-    await new Promise((resolve) => {
-      setTimeout(resolve, 200);
-    });
-  }
-
-  return !isGranolaServiceProcessRunning(pid);
-}
-
 async function runServiceProcess(config: AppConfig, commandFlags: FlagValues): Promise<number> {
   const networkMode = parseNetworkMode(commandFlags.network);
   const hostname = resolveServerHostname(networkMode, commandFlags.hostname);
@@ -218,51 +203,18 @@ export const serviceCommand: CommandDefinition = {
     }
 
     if (action === "stop") {
-      const status = await inspectGranolaService({
-        cleanupStale: false,
-      });
-      if (status.kind === "missing" || status.kind === "stale" || status.kind === "invalid") {
-        printServiceStatus(status);
-        await removeGranolaServiceRecord(defaultGranolaServiceRecord().serviceStateFile);
+      const result = await stopGranolaServiceProcess();
+      if (result === "missing") {
+        console.log("Granola Toolkit service is not running.");
         return 0;
       }
 
-      if (!status.record) {
-        printServiceStatus(status);
-        return 1;
-      }
-
-      try {
-        process.kill(status.record.pid, "SIGTERM");
-      } catch (error) {
-        if (
-          error &&
-          typeof error === "object" &&
-          "code" in error &&
-          (error as { code?: string }).code === "ESRCH"
-        ) {
-          await removeGranolaServiceRecord(defaultGranolaServiceRecord().serviceStateFile);
-          console.log("Granola Toolkit service stopped.");
-          return 0;
-        }
-
-        throw error;
-      }
-
-      if (await waitForProcessExit(status.record.pid, 10_000)) {
-        await removeGranolaServiceRecord(defaultGranolaServiceRecord().serviceStateFile);
-        console.log("Granola Toolkit service stopped.");
-        return 0;
-      }
-
-      process.kill(status.record.pid, "SIGKILL");
-      if (await waitForProcessExit(status.record.pid, 2_000)) {
-        await removeGranolaServiceRecord(defaultGranolaServiceRecord().serviceStateFile);
-        console.log("Granola Toolkit service force-stopped.");
-        return 0;
-      }
-
-      throw new Error("service did not stop within 12s");
+      console.log(
+        result === "force-stopped"
+          ? "Granola Toolkit service force-stopped."
+          : "Granola Toolkit service stopped.",
+      );
+      return 0;
     }
 
     if (action === "run") {

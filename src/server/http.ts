@@ -7,6 +7,7 @@ import {
 import { type AddressInfo } from "node:net";
 
 import type { GranolaApp } from "../app/core.ts";
+import { resolveGranolaBuildInfo } from "../build-info.ts";
 import { defaultGranolaToolkitPersistenceLayout } from "../persistence/layout.ts";
 import {
   granolaTransportPaths,
@@ -406,6 +407,7 @@ export interface GranolaServerOptions {
   port?: number;
   runtime?: {
     mode?: GranolaServerRuntimeMode;
+    startedAt?: string;
     syncEnabled?: boolean;
     syncIntervalMs?: number;
   };
@@ -422,6 +424,7 @@ export async function startGranolaServer(
   const runtime = {
     mode:
       options.runtime?.mode ?? (enableWebClient ? ("web-workspace" as const) : ("server" as const)),
+    startedAt: options.runtime?.startedAt ?? new Date().toISOString(),
     syncEnabled: options.runtime?.syncEnabled ?? false,
     syncIntervalMs: options.runtime?.syncIntervalMs,
   };
@@ -432,6 +435,7 @@ export async function startGranolaServer(
       .filter(Boolean),
   };
   const serverInfo: GranolaServerInfo = {
+    build: resolveGranolaBuildInfo(),
     capabilities: {
       attach: true,
       auth: true,

@@ -12,6 +12,13 @@ import type { GranolaServerInfo } from "../src/transport.ts";
 describe("web onboarding", () => {
   test("derives setup progress from auth, sync, and automation state", () => {
     const serverInfo: GranolaServerInfo = {
+      build: {
+        gitCommit: "1234567890abcdef1234567890abcdef12345678",
+        gitCommitShort: "1234567",
+        packageName: "granola-toolkit",
+        repositoryUrl: "git+https://github.com/kkarimi/granola-toolkit.git",
+        version: "0.66.0",
+      },
       capabilities: {
         attach: true,
         auth: true,
@@ -35,6 +42,7 @@ describe("web onboarding", () => {
       protocolVersion: 2,
       runtime: {
         mode: "background-service",
+        startedAt: "2026-04-05T10:00:00.000Z",
         syncEnabled: true,
         syncIntervalMs: 60_000,
       },

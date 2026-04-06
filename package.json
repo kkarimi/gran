@@ -56,6 +56,7 @@
     "standalone:smoke": "node scripts/build-standalone.mjs --smoke-test",
     "staged:check": "node scripts/staged-check.mjs",
     "start": "node dist/cli.js",
+    "start:web": "npm run web:restart",
     "notes": "node dist/cli.js notes",
     "tui": "node dist/cli.js tui",
     "transcripts": "node dist/cli.js transcripts",
@@ -63,7 +64,8 @@
     "typecheck": "vp exec tsc --noEmit",
     "prepare": "vp config && node scripts/install-hooks.mjs",
     "web:build": "node scripts/build-web-client.mjs",
-    "web:check": "node scripts/build-web-client.mjs --check"
+    "web:check": "node scripts/build-web-client.mjs --check",
+    "web:restart": "npm run web:build && vp pack && node dist/cli.js web --restart"
   },
   "dependencies": {
     "@mariozechner/pi-tui": "^0.65.0",

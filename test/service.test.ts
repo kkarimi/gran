@@ -8,12 +8,20 @@ import {
   inspectGranolaService,
   readGranolaServiceRecord,
   spawnGranolaServiceProcess,
+  stopGranolaServiceProcess,
   writeGranolaServiceRecord,
 } from "../src/service.ts";
 import { GRANOLA_TRANSPORT_PROTOCOL_VERSION } from "../src/transport.ts";
 
 function createServerInfo() {
   return {
+    build: {
+      gitCommit: "1234567890abcdef1234567890abcdef12345678",
+      gitCommitShort: "1234567",
+      packageName: "granola-toolkit",
+      repositoryUrl: "git+https://github.com/kkarimi/granola-toolkit.git",
+      version: "0.66.0",
+    },
     capabilities: {
       attach: true,
       auth: true,
@@ -37,6 +45,7 @@ function createServerInfo() {
     protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
     runtime: {
       mode: "background-service" as const,
+      startedAt: "2026-04-05T10:00:00.000Z",
       syncEnabled: true,
       syncIntervalMs: 60_000,
     },
@@ -101,6 +110,78 @@ describe("service discovery", () => {
     });
 
     expect(status.kind).toBe("stale");
+    await expect(readGranolaServiceRecord(serviceStateFile)).resolves.toBeUndefined();
+  });
+
+  test("stopGranolaServiceProcess removes stale metadata without error", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "granola-toolkit-service-"));
+    const serviceStateFile = join(directory, "service.json");
+    await writeGranolaServiceRecord(
+      {
+        hostname: "127.0.0.1",
+        logFile: join(directory, "service.log"),
+        passwordProtected: false,
+        pid: 7890,
+        port: 4123,
+        protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+        startedAt: "2026-04-05T10:00:00.000Z",
+        syncEnabled: true,
+        syncIntervalMs: 60_000,
+        url: "http://127.0.0.1:4123/",
+      },
+      serviceStateFile,
+    );
+
+    await expect(
+      stopGranolaServiceProcess({
+        inspectOptions: {
+          isProcessRunning: () => false,
+          serviceStateFile,
+        },
+      }),
+    ).resolves.toBe("missing");
+    await expect(readGranolaServiceRecord(serviceStateFile)).resolves.toBeUndefined();
+  });
+
+  test("stopGranolaServiceProcess terminates a running service record", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "granola-toolkit-service-"));
+    const serviceStateFile = join(directory, "service.json");
+    await writeGranolaServiceRecord(
+      {
+        hostname: "127.0.0.1",
+        logFile: join(directory, "service.log"),
+        passwordProtected: false,
+        pid: 7891,
+        port: 4123,
+        protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+        startedAt: "2026-04-05T10:00:00.000Z",
+        syncEnabled: true,
+        syncIntervalMs: 60_000,
+        url: "http://127.0.0.1:4123/",
+      },
+      serviceStateFile,
+    );
+
+    let running = true;
+    const processKill = vi.spyOn(process, "kill").mockImplementation((_pid, signal) => {
+      if (signal === "SIGTERM") {
+        running = false;
+      }
+      return true;
+    });
+
+    await expect(
+      stopGranolaServiceProcess({
+        inspectOptions: {
+          fetchImpl: vi.fn(
+            async () => new Response(JSON.stringify(createServerInfo())),
+          ) as typeof fetch,
+          isProcessRunning: () => running,
+          serviceStateFile,
+        },
+      }),
+    ).resolves.toBe("stopped");
+    expect(processKill).toHaveBeenCalledWith(7891, "SIGTERM");
     await expect(readGranolaServiceRecord(serviceStateFile)).resolves.toBeUndefined();
   });
 });

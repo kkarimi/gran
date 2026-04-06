@@ -14,6 +14,13 @@ export const GRANOLA_TRANSPORT_PROTOCOL_VERSION = 2;
 export type GranolaServerRuntimeMode = "background-service" | "server" | "web-workspace";
 
 export interface GranolaServerInfo {
+  build: {
+    gitCommit?: string;
+    gitCommitShort?: string;
+    packageName: string;
+    repositoryUrl?: string;
+    version: string;
+  };
   capabilities: {
     attach: boolean;
     auth: boolean;
@@ -37,6 +44,7 @@ export interface GranolaServerInfo {
   protocolVersion: number;
   runtime: {
     mode: GranolaServerRuntimeMode;
+    startedAt: string;
     syncEnabled: boolean;
     syncIntervalMs?: number;
   };

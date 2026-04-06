@@ -149,6 +149,10 @@ describe("startGranolaServer", () => {
     expect(serverInfo.ok).toBe(true);
     expect(await serverInfo.json()).toEqual(
       expect.objectContaining({
+        build: expect.objectContaining({
+          packageName: "granola-toolkit",
+          version: expect.any(String),
+        }),
         capabilities: expect.objectContaining({
           attach: true,
           auth: true,
@@ -164,6 +168,9 @@ describe("startGranolaServer", () => {
         }),
         product: "granola-toolkit",
         protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
+        runtime: expect.objectContaining({
+          startedAt: expect.any(String),
+        }),
         transport: "local-http",
       }),
     );

@@ -1574,6 +1574,7 @@ export function App() {
             void connectAndRefresh(true);
           }}
           reviewSummary={reviewInboxSummary()}
+          serverInfo={state.serverInfo}
           statusLabel={state.statusLabel}
           statusTone={state.statusTone}
         />

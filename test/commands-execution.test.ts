@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
 
+import type { GranolaServerInfo } from "../src/transport.ts";
 import type { AppConfig } from "../src/types.ts";
 import { attachCommand } from "../src/commands/attach.ts";
 import { automationCommand } from "../src/commands/automation.ts";
@@ -38,6 +39,73 @@ function makeConfig(): AppConfig {
       cacheFile: "/tmp/cache.json",
       output: "/tmp/transcripts",
     },
+  };
+}
+
+function makeServiceRecord(overrides: Record<string, unknown> = {}) {
+  return {
+    hostname: "127.0.0.1",
+    logFile: "/tmp/service.log",
+    passwordProtected: false,
+    pid: 1111,
+    port: 4123,
+    protocolVersion: 2,
+    startedAt: "2026-04-05T10:00:00.000Z",
+    syncEnabled: true,
+    syncIntervalMs: 60_000,
+    url: "http://127.0.0.1:4123/",
+    ...overrides,
+  };
+}
+
+function makeServerInfo(overrides: Partial<GranolaServerInfo> = {}): GranolaServerInfo {
+  const build = {
+    gitCommit: "1234567890abcdef1234567890abcdef12345678",
+    gitCommitShort: "1234567",
+    packageName: "granola-toolkit",
+    repositoryUrl: "git+https://github.com/kkarimi/granola-toolkit.git",
+    version: "0.66.0",
+    ...overrides.build,
+  };
+  const runtime = {
+    mode: "background-service" as const,
+    startedAt: "2026-04-05T10:00:00.000Z",
+    syncEnabled: true,
+    syncIntervalMs: 60_000,
+    ...overrides.runtime,
+  };
+  const base: GranolaServerInfo = {
+    build,
+    capabilities: {
+      attach: true,
+      auth: true,
+      automation: true,
+      events: true,
+      exports: true,
+      folders: true,
+      meetingOpen: true,
+      processing: true,
+      sync: true,
+      webClient: true,
+    },
+    persistence: {
+      exportJobs: true,
+      meetingIndex: true,
+      sessionStore: "file",
+      syncEvents: true,
+      syncState: true,
+    },
+    product: "granola-toolkit",
+    protocolVersion: 2,
+    runtime,
+    transport: "local-http",
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    build,
+    runtime,
   };
 }
 
@@ -457,18 +525,7 @@ describe("command execution", () => {
     vi.spyOn(serviceModule, "spawnGranolaServiceProcess").mockResolvedValue(4321);
     vi.spyOn(serviceModule, "waitForGranolaService").mockResolvedValue({
       kind: "running",
-      record: {
-        hostname: "127.0.0.1",
-        logFile: "/tmp/service.log",
-        passwordProtected: false,
-        pid: 4321,
-        port: 4123,
-        protocolVersion: 2,
-        startedAt: "2026-04-05T10:00:00.000Z",
-        syncEnabled: true,
-        syncIntervalMs: 60_000,
-        url: "http://127.0.0.1:4123/",
-      },
+      record: makeServiceRecord({ pid: 4321 }),
     });
 
     const exitCode = await serviceCommand.run(
@@ -492,26 +549,7 @@ describe("command execution", () => {
 
   test("service stop terminates a running background process", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    const processKill = vi.spyOn(process, "kill").mockImplementation(() => true);
-    vi.spyOn(serviceModule, "inspectGranolaService").mockResolvedValue({
-      kind: "running",
-      record: {
-        hostname: "127.0.0.1",
-        logFile: "/tmp/service.log",
-        passwordProtected: false,
-        pid: 9876,
-        port: 4123,
-        protocolVersion: 2,
-        startedAt: "2026-04-05T10:00:00.000Z",
-        syncEnabled: true,
-        syncIntervalMs: 60_000,
-        url: "http://127.0.0.1:4123/",
-      },
-    });
-    vi.spyOn(serviceModule, "isGranolaServiceProcessRunning").mockReturnValue(false);
-    const removeRecord = vi
-      .spyOn(serviceModule, "removeGranolaServiceRecord")
-      .mockResolvedValue(undefined);
+    vi.spyOn(serviceModule, "stopGranolaServiceProcess").mockResolvedValue("stopped");
 
     const exitCode = await serviceCommand.run(
       makeContext({
@@ -520,55 +558,20 @@ describe("command execution", () => {
     );
 
     expect(exitCode).toBe(0);
-    expect(processKill).toHaveBeenCalledWith(9876, "SIGTERM");
-    expect(removeRecord).toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith("Granola Toolkit service stopped.");
   });
 
   test("service stop force-stops an unreachable background process", async () => {
-    vi.useFakeTimers();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    let running = true;
-    const processKill = vi.spyOn(process, "kill").mockImplementation((_pid, signal) => {
-      if (signal === "SIGKILL") {
-        running = false;
-      }
-      return true;
-    });
-    vi.spyOn(serviceModule, "inspectGranolaService").mockResolvedValue({
-      kind: "unreachable",
-      record: {
-        hostname: "127.0.0.1",
-        logFile: "/tmp/service.log",
-        passwordProtected: false,
-        pid: 9876,
-        port: 4123,
-        protocolVersion: 2,
-        startedAt: "2026-04-05T10:00:00.000Z",
-        syncEnabled: true,
-        syncIntervalMs: 60_000,
-        url: "http://127.0.0.1:4123/",
-      },
-    });
-    vi.spyOn(serviceModule, "isGranolaServiceProcessRunning").mockImplementation(() => running);
-    const removeRecord = vi
-      .spyOn(serviceModule, "removeGranolaServiceRecord")
-      .mockResolvedValue(undefined);
+    vi.spyOn(serviceModule, "stopGranolaServiceProcess").mockResolvedValue("force-stopped");
 
-    const stopPromise = serviceCommand.run(
+    const exitCode = await serviceCommand.run(
       makeContext({
         commandArgs: ["stop"],
       }),
     );
-    await vi.advanceTimersByTimeAsync(10_500);
-    await vi.advanceTimersByTimeAsync(500);
-    const exitCode = await stopPromise;
-    vi.useRealTimers();
 
     expect(exitCode).toBe(0);
-    expect(processKill).toHaveBeenNthCalledWith(1, 9876, "SIGTERM");
-    expect(processKill).toHaveBeenNthCalledWith(2, 9876, "SIGKILL");
-    expect(removeRecord).toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith("Granola Toolkit service force-stopped.");
   });
 
@@ -1374,18 +1377,7 @@ describe("command execution", () => {
   test("attach command discovers the background service when no URL is provided", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const app = {} as never;
-    vi.spyOn(serviceModule, "discoverGranolaService").mockResolvedValue({
-      hostname: "127.0.0.1",
-      logFile: "/tmp/service.log",
-      passwordProtected: false,
-      pid: 1111,
-      port: 4123,
-      protocolVersion: 2,
-      startedAt: "2026-04-05T10:00:00.000Z",
-      syncEnabled: true,
-      syncIntervalMs: 60_000,
-      url: "http://127.0.0.1:4123/",
-    });
+    vi.spyOn(serviceModule, "discoverGranolaService").mockResolvedValue(makeServiceRecord());
     vi.spyOn(serverClientModule, "createGranolaServerClient").mockResolvedValue(app);
     const runGranolaTui = vi.spyOn(tuiWorkspaceModule, "runGranolaTui").mockResolvedValue(0);
 
@@ -1413,18 +1405,7 @@ describe("command execution", () => {
   test("web command reuses an existing background service when no runtime overrides are passed", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const openExternalUrl = vi.spyOn(browserModule, "openExternalUrl").mockResolvedValue();
-    vi.spyOn(serviceModule, "discoverGranolaService").mockResolvedValue({
-      hostname: "127.0.0.1",
-      logFile: "/tmp/service.log",
-      passwordProtected: false,
-      pid: 1111,
-      port: 4123,
-      protocolVersion: 2,
-      startedAt: "2026-04-05T10:00:00.000Z",
-      syncEnabled: true,
-      syncIntervalMs: 60_000,
-      url: "http://127.0.0.1:4123/",
-    });
+    vi.spyOn(serviceModule, "discoverGranolaService").mockResolvedValue(makeServiceRecord());
     const loadConfig = vi.spyOn(configModule, "loadConfig");
     const createGranolaApp = vi.spyOn(appModule, "createGranolaApp");
 
@@ -1455,48 +1436,9 @@ describe("command execution", () => {
     vi.spyOn(serviceModule, "discoverGranolaService").mockResolvedValue(undefined);
     vi.spyOn(serviceModule, "spawnGranolaServiceProcess").mockResolvedValue(2222);
     vi.spyOn(serviceModule, "waitForGranolaService").mockResolvedValue({
-      info: {
-        capabilities: {
-          attach: true,
-          auth: true,
-          automation: true,
-          events: true,
-          exports: true,
-          folders: true,
-          meetingOpen: true,
-          processing: true,
-          sync: true,
-          webClient: true,
-        },
-        persistence: {
-          exportJobs: true,
-          meetingIndex: true,
-          sessionStore: "file",
-          syncEvents: true,
-          syncState: true,
-        },
-        product: "granola-toolkit",
-        protocolVersion: 2,
-        runtime: {
-          mode: "background-service",
-          syncEnabled: true,
-          syncIntervalMs: 60_000,
-        },
-        transport: "local-http",
-      },
+      info: makeServerInfo(),
       kind: "running",
-      record: {
-        hostname: "127.0.0.1",
-        logFile: "/tmp/service.log",
-        passwordProtected: false,
-        pid: 2222,
-        port: 4123,
-        protocolVersion: 2,
-        startedAt: "2026-04-05T10:00:00.000Z",
-        syncEnabled: true,
-        syncIntervalMs: 60_000,
-        url: "http://127.0.0.1:4123/",
-      },
+      record: makeServiceRecord({ pid: 2222 }),
     });
 
     const exitCode = await webCommand.run(
@@ -1522,6 +1464,48 @@ describe("command execution", () => {
     );
     expect(log).toHaveBeenCalledWith(
       "Granola Toolkit background service started on http://127.0.0.1:4123/",
+    );
+  });
+
+  test("web command restarts the background service before opening the browser", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const openExternalUrl = vi.spyOn(browserModule, "openExternalUrl").mockResolvedValue();
+    const loadConfig = vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(serviceModule, "stopGranolaServiceProcess").mockResolvedValue("stopped");
+    const discoverGranolaService = vi.spyOn(serviceModule, "discoverGranolaService");
+    vi.spyOn(serviceModule, "spawnGranolaServiceProcess").mockResolvedValue(3333);
+    vi.spyOn(serviceModule, "waitForGranolaService").mockResolvedValue({
+      info: makeServerInfo(),
+      kind: "running",
+      record: makeServiceRecord({ pid: 3333 }),
+    });
+
+    const exitCode = await webCommand.run(
+      makeContext({
+        commandFlags: {
+          meeting: "doc-alpha-1111",
+          restart: true,
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(loadConfig).toHaveBeenCalled();
+    expect(discoverGranolaService).not.toHaveBeenCalled();
+    expect(serviceModule.stopGranolaServiceProcess).toHaveBeenCalledWith();
+    expect(serviceModule.spawnGranolaServiceProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commandArgs: [],
+        env: expect.any(Object),
+        logFile: expect.any(String),
+      }),
+    );
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      new URL("http://127.0.0.1:4123/?meeting=doc-alpha-1111"),
+    );
+    expect(log).toHaveBeenCalledWith("Granola Toolkit stopped the previous background service.");
+    expect(log).toHaveBeenCalledWith(
+      "Granola Toolkit background service restarted on http://127.0.0.1:4123/",
     );
   });
 });
