@@ -14,6 +14,7 @@ import type {
   GranolaAgentHarness,
   GranolaAgentHarnessMatchExplanation,
 } from "../agent-harnesses.ts";
+import type { GranolaPluginCapability } from "../plugin-registry.ts";
 import type {
   AppConfig,
   CacheData,
@@ -444,9 +445,10 @@ export interface GranolaAppAutomationState {
   runsFile?: string;
 }
 
-export type GranolaAppPluginId = "automation" | "markdown-viewer";
+export type GranolaAppPluginId = string;
 
 export interface GranolaAppPluginState {
+  capabilities: GranolaPluginCapability[];
   configurable: boolean;
   description: string;
   enabled: boolean;
@@ -456,8 +458,7 @@ export interface GranolaAppPluginState {
 }
 
 export interface GranolaAppPluginsState {
-  automation: GranolaAppPluginState;
-  markdownViewer: GranolaAppPluginState;
+  items: GranolaAppPluginState[];
   loaded: boolean;
 }
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
 
-import type { GranolaServerInfo } from "../src/transport.ts";
+import { GRANOLA_TRANSPORT_PROTOCOL_VERSION, type GranolaServerInfo } from "../src/transport.ts";
 import type { AppConfig } from "../src/types.ts";
 import { attachCommand } from "../src/commands/attach.ts";
 import { automationCommand } from "../src/commands/automation.ts";
@@ -49,7 +49,7 @@ function makeServiceRecord(overrides: Record<string, unknown> = {}) {
     passwordProtected: false,
     pid: 1111,
     port: 4123,
-    protocolVersion: 2,
+    protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
     startedAt: "2026-04-05T10:00:00.000Z",
     syncEnabled: true,
     syncIntervalMs: 60_000,
@@ -97,7 +97,7 @@ function makeServerInfo(overrides: Partial<GranolaServerInfo> = {}): GranolaServ
       syncState: true,
     },
     product: "granola-toolkit",
-    protocolVersion: 2,
+    protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
     runtime,
     transport: "local-http",
   };

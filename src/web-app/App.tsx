@@ -14,6 +14,17 @@ import {
   type WebWorkspacePreferences,
 } from "../web/client-state.ts";
 import {
+  buildPluginState,
+  findPluginState,
+  isPluginCapabilityEnabled,
+  pluginSupportsCapability,
+} from "../app/plugin-state.ts";
+import {
+  defaultPluginDefinitions,
+  GRANOLA_AUTOMATION_PLUGIN_ID,
+  GRANOLA_MARKDOWN_VIEWER_PLUGIN_ID,
+} from "../plugin-registry.ts";
+import {
   AppStatePanel,
   PrimaryNav,
   SecurityPanel,
@@ -105,26 +116,31 @@ export function App() {
   });
 
   let automationPanelsHydrated = false;
-  const automationEnabled = () => state.appState?.plugins.automation.enabled === true;
-  const markdownViewerEnabled = () => state.appState?.plugins.markdownViewer.enabled !== false;
-  const automationPlugin = () =>
-    state.appState?.plugins.automation ?? {
-      configurable: true,
-      description: "",
-      enabled: false,
-      id: "automation" as const,
-      label: "Automation",
-      shipped: true,
-    };
-  const markdownViewerPlugin = () =>
-    state.appState?.plugins.markdownViewer ?? {
-      configurable: true,
-      description: "",
-      enabled: true,
-      id: "markdown-viewer" as const,
-      label: "Markdown Viewer",
-      shipped: true,
-    };
+  const fallbackPlugins = defaultPluginDefinitions().map((definition) =>
+    buildPluginState(definition, definition.defaultEnabled),
+  );
+  const plugins = () => state.appState?.plugins.items ?? fallbackPlugins;
+  const automationEnabled = () => isPluginCapabilityEnabled(state.appState?.plugins, "automation");
+  const markdownViewerEnabled = () =>
+    isPluginCapabilityEnabled(state.appState?.plugins, "markdown-rendering", true);
+  const replacePluginState = (nextPlugin: ReturnType<typeof buildPluginState>) => {
+    if (!state.appState) {
+      return;
+    }
+
+    setState("appState", "plugins", (current) => ({
+      items: current.items.map((plugin) => (plugin.id === nextPlugin.id ? nextPlugin : plugin)),
+      loaded: true,
+    }));
+  };
+  const pluginDetailsById = () => ({
+    [GRANOLA_AUTOMATION_PLUGIN_ID]: automationEnabled()
+      ? "Automation is live. Configure harnesses below, then use Review to inspect generated artefacts and approvals."
+      : "Enable this to unlock harnesses, review queues, automation commands, and post-meeting processing.",
+    [GRANOLA_MARKDOWN_VIEWER_PLUGIN_ID]: markdownViewerEnabled()
+      ? "Notes and markdown artefacts render as readable documents in the browser."
+      : "Disable this if you prefer raw markdown everywhere in the web workspace.",
+  });
 
   const setStatus = (label: string, tone: WebStatusTone = "idle") => {
     setState({
@@ -458,21 +474,28 @@ export function App() {
     return `${meeting.updatedAt.slice(0, 10)} • ${folderLabel} • ${transcriptLabel}`;
   };
 
-  const toggleAutomationPlugin = async (enabled: boolean) => {
+  const togglePlugin = async (id: string, enabled: boolean) => {
     const client = clientController.clientAccessor();
     if (!client) {
       return;
     }
 
-    setStatus(enabled ? "Enabling automation plugin…" : "Disabling automation plugin…", "busy");
+    const plugin =
+      findPluginState(state.appState?.plugins, id) ??
+      plugins().find((candidate) => candidate.id === id);
+    const pluginLabel = plugin?.label ?? "Plugin";
+    setStatus(
+      enabled
+        ? `Enabling ${pluginLabel.toLowerCase()}…`
+        : `Disabling ${pluginLabel.toLowerCase()}…`,
+      "busy",
+    );
     try {
-      const plugin = await client.setPluginEnabled("automation", enabled);
-      if (state.appState) {
-        setState("appState", "plugins", "automation", plugin);
-      }
+      const nextPlugin = await client.setPluginEnabled(id, enabled);
+      replacePluginState(nextPlugin);
       setState("settingsTab", "plugins");
 
-      if (!enabled) {
+      if (pluginSupportsCapability(nextPlugin, "automation") && !enabled) {
         setState("activePage", "settings");
         setState("automationArtefacts", []);
         setState("automationRules", []);
@@ -483,38 +506,20 @@ export function App() {
         setState("processingIssues", []);
         setState("selectedAutomationArtefactId", null);
         setState("selectedReviewInboxKey", null);
-        setStatus("Automation plugin disabled", "ok");
+        setStatus(`${pluginLabel} disabled`, "ok");
         return;
       }
 
-      await Promise.all([
-        harnessController.loadHarnesses(),
-        reviewController.loadAutomationRules(),
-        reviewController.loadAutomationRuns(),
-        reviewController.loadAutomationArtefacts(),
-        reviewController.loadProcessingIssues(),
-      ]);
-      setStatus("Automation plugin enabled", "ok");
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Plugin update failed", "error");
-    }
-  };
-
-  const toggleMarkdownViewerPlugin = async (enabled: boolean) => {
-    const client = clientController.clientAccessor();
-    if (!client) {
-      return;
-    }
-
-    setStatus(enabled ? "Enabling markdown viewer…" : "Disabling markdown viewer…", "busy");
-    try {
-      const plugin = await client.setPluginEnabled("markdown-viewer", enabled);
-      if (state.appState) {
-        setState("appState", "plugins", "markdownViewer", plugin);
+      if (pluginSupportsCapability(nextPlugin, "automation") && enabled) {
+        await Promise.all([
+          harnessController.loadHarnesses(),
+          reviewController.loadAutomationRules(),
+          reviewController.loadAutomationRuns(),
+          reviewController.loadAutomationArtefacts(),
+          reviewController.loadProcessingIssues(),
+        ]);
       }
-      setState("settingsTab", "plugins");
-      setStatus(enabled ? "Markdown viewer enabled" : "Markdown viewer disabled", "ok");
+      setStatus(`${pluginLabel} ${enabled ? "enabled" : "disabled"}`, "ok");
     } catch (error) {
       setState("detailError", error instanceof Error ? error.message : String(error));
       setStatus("Plugin update failed", "error");
@@ -741,8 +746,6 @@ export function App() {
                     harnesses={state.harnesses}
                     harnessTestKind={state.harnessTestKind}
                     harnessTestResult={state.harnessTestResult}
-                    markdownViewerEnabled={markdownViewerEnabled()}
-                    markdownViewerPlugin={markdownViewerPlugin()}
                     onApiKeyDraftChange={(value) => {
                       setState("apiKeyDraft", value);
                     }}
@@ -799,11 +802,8 @@ export function App() {
                       setState("selectedHarnessId", id);
                       setState("harnessTestResult", null);
                     }}
-                    onToggleAutomation={(enabled) => {
-                      void toggleAutomationPlugin(enabled);
-                    }}
-                    onToggleMarkdownViewer={(enabled) => {
-                      void toggleMarkdownViewerPlugin(enabled);
+                    onTogglePlugin={(id, enabled) => {
+                      void togglePlugin(id, enabled);
                     }}
                     onSwitchMode={(mode) => {
                       void clientController.switchAuthMode(mode, refreshAll);
@@ -818,7 +818,8 @@ export function App() {
                       void clientController.unlockServer(connectAndRefresh);
                     }}
                     password={state.serverPassword}
-                    plugin={automationPlugin()}
+                    pluginDetailsById={pluginDetailsById()}
+                    plugins={plugins()}
                     preferredProvider={state.preferredProvider}
                     processingIssues={state.processingIssues}
                     selectedHarness={harnessController.selectedHarness()}
@@ -910,8 +911,6 @@ export function App() {
                 harnesses={state.harnesses}
                 harnessTestKind={state.harnessTestKind}
                 harnessTestResult={state.harnessTestResult}
-                markdownViewerEnabled={markdownViewerEnabled()}
-                markdownViewerPlugin={markdownViewerPlugin()}
                 onApiKeyDraftChange={(value) => {
                   setState("apiKeyDraft", value);
                 }}
@@ -968,11 +967,8 @@ export function App() {
                   setState("selectedHarnessId", id);
                   setState("harnessTestResult", null);
                 }}
-                onToggleAutomation={(enabled) => {
-                  void toggleAutomationPlugin(enabled);
-                }}
-                onToggleMarkdownViewer={(enabled) => {
-                  void toggleMarkdownViewerPlugin(enabled);
+                onTogglePlugin={(id, enabled) => {
+                  void togglePlugin(id, enabled);
                 }}
                 onSwitchMode={(mode) => {
                   void clientController.switchAuthMode(mode, refreshAll);
@@ -987,7 +983,8 @@ export function App() {
                   void clientController.unlockServer(connectAndRefresh);
                 }}
                 password={state.serverPassword}
-                plugin={automationPlugin()}
+                pluginDetailsById={pluginDetailsById()}
+                plugins={plugins()}
                 preferredProvider={state.preferredProvider}
                 processingIssues={state.processingIssues}
                 selectedHarness={harnessController.selectedHarness()}

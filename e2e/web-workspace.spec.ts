@@ -217,7 +217,9 @@ test.describe("toolkit web workspace", () => {
         .getByRole("button", { name: /Settings/i })
         .click();
       await page.locator(".settings-shell").getByRole("button", { name: "Plugins" }).click();
-      await expect(page.getByText("Optional capabilities ship with the toolkit")).toBeVisible();
+      await expect(
+        page.getByText("Shipped capabilities are loaded from the toolkit plugin registry"),
+      ).toBeVisible();
       await page.getByRole("button", { name: "Enable automation" }).click();
       await expect(page.getByRole("heading", { name: "Harness Editor" })).toBeVisible({
         timeout: 20_000,

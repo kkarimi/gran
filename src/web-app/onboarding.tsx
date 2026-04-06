@@ -9,6 +9,7 @@ import type {
   GranolaAppState,
   GranolaAutomationRule,
 } from "../app/index.ts";
+import { isPluginCapabilityEnabled } from "../app/plugin-state.ts";
 import { defaultGranolaAgentModel, granolaAgentProviderLabel } from "../agent-defaults.ts";
 import type { GranolaServerInfo } from "../transport.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
@@ -152,7 +153,7 @@ export function deriveOnboardingState(input: {
   serverInfo?: GranolaServerInfo | null;
 }): GranolaOnboardingState {
   const auth = input.appState?.auth;
-  const automationEnabled = input.appState?.plugins.automation.enabled === true;
+  const automationEnabled = isPluginCapabilityEnabled(input.appState?.plugins, "automation");
   const connected = Boolean(auth?.apiKeyAvailable || auth?.storedSessionAvailable);
   const synced = Boolean(input.appState?.sync.lastCompletedAt);
   const pipelineReady =

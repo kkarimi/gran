@@ -444,8 +444,6 @@ export function SettingsPageController(props: {
   harnesses: GranolaAgentHarness[];
   harnessTestKind: GranolaAutomationArtefactKind;
   harnessTestResult: GranolaAutomationEvaluationRun | null;
-  markdownViewerEnabled: boolean;
-  markdownViewerPlugin: GranolaAppPluginState;
   onApiKeyDraftChange: (value: string) => void;
   onApproveRun: (runId: string) => void;
   onChangeHarness: (harness: GranolaAgentHarness) => void;
@@ -467,8 +465,7 @@ export function SettingsPageController(props: {
   onSaveApiKey: () => void;
   onSaveHarnesses: () => void;
   onSelectHarness: (id: string) => void;
-  onToggleAutomation: (enabled: boolean) => void;
-  onToggleMarkdownViewer: (enabled: boolean) => void;
+  onTogglePlugin: (id: string, enabled: boolean) => void;
   onSwitchMode: (mode: GranolaAppAuthMode) => void;
   onTestHarness: () => void;
   onTestKindChange: (kind: GranolaAutomationArtefactKind) => void;
@@ -476,7 +473,8 @@ export function SettingsPageController(props: {
   password: string;
   preferredProvider: GranolaAgentProviderKind;
   processingIssues: import("../app/index.ts").GranolaProcessingIssue[];
-  plugin: GranolaAppPluginState;
+  pluginDetailsById: Record<string, string>;
+  plugins: GranolaAppPluginState[];
   selectedHarness: GranolaAgentHarness | null;
   selectedHarnessId: string | null;
   selectedMeeting: MeetingRecord | null;
@@ -539,12 +537,9 @@ export function SettingsPageController(props: {
             </Match>
             <Match when={props.settingsTab === "plugins"}>
               <PluginsPanel
-                automationEnabled={props.automationEnabled}
-                markdownViewerEnabled={props.markdownViewerEnabled}
-                markdownViewerPlugin={props.markdownViewerPlugin}
-                onToggleAutomation={(enabled) => props.onToggleAutomation(enabled)}
-                onToggleMarkdownViewer={(enabled) => props.onToggleMarkdownViewer(enabled)}
-                plugin={props.plugin}
+                detailsById={props.pluginDetailsById}
+                onTogglePlugin={(id, enabled) => props.onTogglePlugin(id, enabled)}
+                plugins={props.plugins}
               />
               <Show when={props.automationEnabled}>
                 <HarnessEditorPanel

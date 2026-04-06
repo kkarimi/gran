@@ -161,8 +161,7 @@ export interface AppConfig {
   debug: boolean;
   notes: NotesOptions;
   plugins?: {
-    automationEnabled: boolean;
-    markdownViewerEnabled: boolean;
+    enabled: Record<string, boolean>;
     settingsFile: string;
   };
   supabase?: string;

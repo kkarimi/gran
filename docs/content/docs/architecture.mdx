@@ -125,6 +125,39 @@ Current registries:
 This is not a plugin system yet. The current goal is simpler: make new capabilities pluggable
 without reopening unrelated modules.
 
+## Plugins
+
+The shipped plugin layer now follows the same rule: declare once, project everywhere.
+
+Key modules:
+
+- `src/plugin-registry.ts`: shipped plugin definitions, ids, defaults, labels, and capabilities
+- `src/plugins.ts`: persisted plugin enablement using a generic `enabled` map
+- `src/app/plugin-state.ts`: projection helpers and capability checks
+- `src/server/routes/plugins.ts`: generic plugin list and toggle routes
+
+The important boundary is this:
+
+1. The registry knows concrete plugin ids.
+2. Persistence stores generic enablement by id.
+3. App/web/TUI code consume plugin lists and capabilities.
+
+That means feature code should usually ask questions like:
+
+- "is automation capability enabled?"
+- "is markdown rendering available?"
+
+It should not usually ask:
+
+- "is the automation plugin object stored on this exact field name?"
+
+That distinction keeps future plugin work sane. One plugin can expose one or more capabilities, and
+feature surfaces can stay decoupled from the current built-in plugin set.
+
+Compatibility still matters. The config layer keeps old keys like
+`automation-plugin-enabled` and `markdown-viewer-plugin-enabled` working, but it normalises them
+into the generic plugin map before the rest of the app sees them.
+
 ## Where New Code Should Go
 
 When adding a feature, use this bias:

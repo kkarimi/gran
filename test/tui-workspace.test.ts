@@ -4,6 +4,8 @@ import { afterEach, describe, expect, test, vi } from "vite-plus/test";
 import type {
   FolderSummaryRecord,
   GranolaAppAuthState,
+  GranolaAppPluginState,
+  GranolaAppPluginsResult,
   GranolaAppState,
   GranolaAppStateEvent,
   GranolaMeetingBundle,
@@ -384,22 +386,26 @@ function createAppState(): GranolaAppState {
       meetingCount: 2,
     },
     plugins: {
-      automation: {
-        configurable: true,
-        description: "Automation plugin",
-        enabled: true,
-        id: "automation",
-        label: "Automation",
-        shipped: true,
-      },
-      markdownViewer: {
-        configurable: true,
-        description: "Markdown viewer plugin",
-        enabled: true,
-        id: "markdown-viewer",
-        label: "Markdown Viewer",
-        shipped: true,
-      },
+      items: [
+        {
+          capabilities: ["automation"],
+          configurable: true,
+          description: "Automation plugin",
+          enabled: true,
+          id: "automation",
+          label: "Automation",
+          shipped: true,
+        },
+        {
+          capabilities: ["markdown-rendering"],
+          configurable: true,
+          description: "Markdown viewer plugin",
+          enabled: true,
+          id: "markdown-viewer",
+          label: "Markdown Viewer",
+          shipped: true,
+        },
+      ],
       loaded: true,
     },
     sync: {
@@ -629,20 +635,22 @@ function createWorkspaceHarness(
     runCount: 0,
     syncRan: true,
   }));
+  const automationPluginState = {
+    capabilities: ["automation"],
+    configurable: true,
+    description: "Automation plugin",
+    enabled: true,
+    id: "automation" as const,
+    label: "Automation",
+    shipped: true,
+  } satisfies GranolaAppPluginState;
 
   const app: GranolaTuiApp = {
-    listPlugins: vi.fn(async () => ({
-      plugins: [
-        {
-          configurable: true,
-          description: "Automation plugin",
-          enabled: true,
-          id: "automation" as const,
-          label: "Automation",
-          shipped: true,
-        },
-      ],
-    })),
+    listPlugins: vi.fn(
+      async (): Promise<GranolaAppPluginsResult> => ({
+        plugins: [automationPluginState],
+      }),
+    ),
     explainAgentHarnesses: vi.fn(async () => ({
       eventKind: "transcript.ready" as const,
       harnesses: [],
@@ -786,14 +794,7 @@ function createWorkspaceHarness(
         listeners.delete(listener);
       };
     },
-    setPluginEnabled: vi.fn(async () => ({
-      configurable: true,
-      description: "Automation plugin",
-      enabled: true,
-      id: "automation" as const,
-      label: "Automation",
-      shipped: true,
-    })),
+    setPluginEnabled: vi.fn(async (): Promise<GranolaAppPluginState> => automationPluginState),
     switchAuthMode: vi.fn(async () => state.auth),
     updateAutomationArtefact: vi.fn(),
   };

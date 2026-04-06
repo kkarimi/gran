@@ -3,6 +3,7 @@
 import { For, Show, type JSX } from "solid-js";
 
 import type { GranolaAppState } from "../app/index.ts";
+import { isPluginCapabilityEnabled } from "../app/plugin-state.ts";
 import type { GranolaReviewInboxSummary } from "../review-inbox.ts";
 import type { GranolaServerInfo } from "../transport.ts";
 import { describeAuthStatus, describeSyncStatus } from "../web/client-state.ts";
@@ -139,7 +140,7 @@ export function AppStatePanel(props: {
 }): JSX.Element {
   const syncStatus = () => describeSyncStatus(props.appState?.sync ?? {});
   const authStatus = () => describeAuthStatus(props.appState?.auth);
-  const automationEnabled = () => props.appState?.plugins.automation.enabled === true;
+  const automationEnabled = () => isPluginCapabilityEnabled(props.appState?.plugins, "automation");
   const indexedMeetings = () =>
     props.appState?.index.loaded
       ? props.appState.index.meetingCount

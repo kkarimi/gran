@@ -38,12 +38,9 @@ interface ExportJobsPanelProps {
 }
 
 interface PluginsPanelProps {
-  automationEnabled: boolean;
-  markdownViewerEnabled: boolean;
-  markdownViewerPlugin: GranolaAppPluginState;
-  onToggleAutomation: (enabled: boolean) => void;
-  onToggleMarkdownViewer: (enabled: boolean) => void;
-  plugin: GranolaAppPluginState;
+  detailsById?: Record<string, string>;
+  onTogglePlugin: (id: string, enabled: boolean) => void;
+  plugins: GranolaAppPluginState[];
 }
 
 export function DiagnosticsPanel(props: {
@@ -314,12 +311,7 @@ export function AuthPanel(props: AuthPanelProps): JSX.Element {
 }
 
 export function PluginsPanel(props: PluginsPanelProps): JSX.Element {
-  const renderPluginCard = (input: {
-    detail: string;
-    enabled: boolean;
-    onToggle: (enabled: boolean) => void;
-    plugin: GranolaAppPluginState;
-  }) => (
+  const renderPluginCard = (input: { detail: string; plugin: GranolaAppPluginState }) => (
     <div class="auth-card">
       <div class="status-grid">
         <div>
@@ -332,7 +324,7 @@ export function PluginsPanel(props: PluginsPanelProps): JSX.Element {
         </div>
         <div>
           <span class="status-label">Status</span>
-          <strong>{input.enabled ? "enabled" : "disabled"}</strong>
+          <strong>{input.plugin.enabled ? "enabled" : "disabled"}</strong>
         </div>
         <div>
           <span class="status-label">Configurable</span>
@@ -345,11 +337,11 @@ export function PluginsPanel(props: PluginsPanelProps): JSX.Element {
         <button
           class="button button--secondary"
           onClick={() => {
-            input.onToggle(!input.enabled);
+            props.onTogglePlugin(input.plugin.id, !input.plugin.enabled);
           }}
           type="button"
         >
-          {input.enabled
+          {input.plugin.enabled
             ? `Disable ${input.plugin.label.toLowerCase()}`
             : `Enable ${input.plugin.label.toLowerCase()}`}
         </button>
@@ -361,25 +353,28 @@ export function PluginsPanel(props: PluginsPanelProps): JSX.Element {
     <section class="auth-panel">
       <div class="auth-panel__head">
         <h3>Plugins</h3>
-        <p>Optional capabilities ship with the toolkit but stay off until you turn them on.</p>
+        <p>
+          Shipped capabilities are loaded from the toolkit plugin registry and can be enabled here.
+        </p>
       </div>
       <div class="auth-panel__body">
-        {renderPluginCard({
-          detail: props.markdownViewerEnabled
-            ? "Notes and markdown artefacts render as readable documents in the browser."
-            : "Disable this if you prefer raw markdown everywhere in the web workspace.",
-          enabled: props.markdownViewerEnabled,
-          onToggle: props.onToggleMarkdownViewer,
-          plugin: props.markdownViewerPlugin,
-        })}
-        {renderPluginCard({
-          detail: props.automationEnabled
-            ? "Automation is live. Configure harnesses below, then use Review to inspect generated artefacts and approvals."
-            : "Enable this to unlock harnesses, review queues, automation commands, and post-meeting processing.",
-          enabled: props.automationEnabled,
-          onToggle: props.onToggleAutomation,
-          plugin: props.plugin,
-        })}
+        <Show
+          when={props.plugins.length > 0}
+          fallback={<div class="auth-card__meta">No plugins loaded yet.</div>}
+        >
+          <For each={props.plugins}>
+            {(plugin) =>
+              renderPluginCard({
+                detail:
+                  props.detailsById?.[plugin.id] ??
+                  (plugin.enabled
+                    ? `${plugin.label} is enabled for this workspace.`
+                    : `${plugin.label} is shipped but currently disabled.`),
+                plugin,
+              })
+            }
+          </For>
+        </Show>
       </div>
     </section>
   );

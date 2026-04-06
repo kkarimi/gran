@@ -284,22 +284,26 @@ describe("buildGranolaTuiSummary", () => {
           meetingCount: 2,
         },
         plugins: {
-          automation: {
-            configurable: true,
-            description: "Automation plugin",
-            enabled: true,
-            id: "automation",
-            label: "Automation",
-            shipped: true,
-          },
-          markdownViewer: {
-            configurable: true,
-            description: "Markdown viewer plugin",
-            enabled: true,
-            id: "markdown-viewer",
-            label: "Markdown Viewer",
-            shipped: true,
-          },
+          items: [
+            {
+              capabilities: ["automation"],
+              configurable: true,
+              description: "Automation plugin",
+              enabled: true,
+              id: "automation",
+              label: "Automation",
+              shipped: true,
+            },
+            {
+              capabilities: ["markdown-rendering"],
+              configurable: true,
+              description: "Markdown viewer plugin",
+              enabled: true,
+              id: "markdown-viewer",
+              label: "Markdown Viewer",
+              shipped: true,
+            },
+          ],
           loaded: true,
         },
         sync: {

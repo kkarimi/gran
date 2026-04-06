@@ -296,8 +296,10 @@ export async function startToolkitWebServer(
         timeoutMs: 120_000,
       },
       plugins: {
-        automationEnabled: scenario !== "cold-start",
-        markdownViewerEnabled: true,
+        enabled: {
+          automation: scenario !== "cold-start",
+          "markdown-viewer": true,
+        },
         settingsFile: join(outputRoot, "plugins.json"),
       },
       supabase: "/tmp/supabase.json",

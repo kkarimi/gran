@@ -79,6 +79,12 @@ import {
 import { createDefaultPkmTargetStore, type PkmTargetStore } from "../pkm-targets.ts";
 import { createDefaultPluginSettingsStore, type PluginSettingsStore } from "../plugins.ts";
 import {
+  createDefaultPluginRegistry,
+  defaultPluginEnabledMap,
+  GRANOLA_AUTOMATION_PLUGIN_ID,
+  type GranolaPluginRegistry,
+} from "../plugin-registry.ts";
+import {
   defaultSyncEventsFilePath,
   createDefaultSyncStateStore,
   defaultSyncStateFilePath,
@@ -161,6 +167,12 @@ import type {
 } from "./types.ts";
 import type { FolderRecord, FolderSummaryRecord, MeetingSummaryRecord } from "./models.ts";
 import {
+  buildPluginState,
+  buildPluginsState,
+  clonePluginsState,
+  isPluginCapabilityEnabled,
+} from "./plugin-state.ts";
+import {
   GranolaCatalogService,
   type GranolaCatalogClient,
   type GranolaCatalogLiveSnapshot,
@@ -205,6 +217,7 @@ interface GranolaAppDependencies {
   meetingIndex?: MeetingSummaryRecord[];
   meetingIndexStore?: MeetingIndexStore;
   pkmTargetStore?: PkmTargetStore;
+  pluginRegistry?: GranolaPluginRegistry;
   pluginSettingsStore?: PluginSettingsStore;
   now?: () => Date;
   searchIndex?: GranolaSearchIndexEntry[];
@@ -298,34 +311,6 @@ function cloneMeetingSummary(meeting: MeetingSummaryRecord): MeetingSummaryRecor
       ? meeting.folders.map((folder) => cloneFolderSummary(folder))
       : [],
     tags: [...meeting.tags],
-  };
-}
-
-function clonePluginState(plugin: GranolaAppPluginState): GranolaAppPluginState {
-  return { ...plugin };
-}
-
-function defaultMarkdownViewerPluginState(enabled: boolean): GranolaAppPluginState {
-  return {
-    configurable: true,
-    description:
-      "Render meeting notes and markdown artefacts as readable documents in the browser while keeping the raw markdown available.",
-    enabled,
-    id: "markdown-viewer",
-    label: "Markdown Viewer",
-    shipped: true,
-  };
-}
-
-function defaultAutomationPluginState(enabled: boolean): GranolaAppPluginState {
-  return {
-    configurable: true,
-    description:
-      "Generate reviewable notes and enrichments, run harnesses, and process post-meeting automations.",
-    enabled,
-    id: "automation",
-    label: "Automation",
-    shipped: true,
   };
 }
 
@@ -438,11 +423,7 @@ function cloneState(state: GranolaAppState): GranolaAppState {
       transcripts: cloneGranolaExportRunState(state.exports.transcripts),
     },
     index: { ...state.index },
-    plugins: {
-      automation: clonePluginState(state.plugins.automation),
-      markdownViewer: clonePluginState(state.plugins.markdownViewer),
-      loaded: state.plugins.loaded,
-    },
+    plugins: clonePluginsState(state.plugins),
     sync: cloneSyncState(state.sync),
     ui: { ...state.ui },
   };
@@ -452,7 +433,14 @@ function defaultState(
   config: AppConfig,
   auth: GranolaAppAuthState,
   surface: GranolaAppSurface,
+  pluginRegistry: GranolaPluginRegistry,
 ): GranolaAppState {
+  const pluginDefinitions = pluginRegistry.listPlugins();
+  const enabledPlugins = {
+    ...defaultPluginEnabledMap(pluginDefinitions),
+    ...config.plugins?.enabled,
+  };
+
   return {
     auth: { ...auth },
     automation: {
@@ -500,13 +488,7 @@ function defaultState(
       loaded: false,
       meetingCount: 0,
     },
-    plugins: {
-      automation: defaultAutomationPluginState(config.plugins?.automationEnabled === true),
-      markdownViewer: defaultMarkdownViewerPluginState(
-        config.plugins?.markdownViewerEnabled !== false,
-      ),
-      loaded: true,
-    },
+    plugins: buildPluginsState(pluginDefinitions, enabledPlugins),
     sync: {
       eventCount: 0,
       eventsFile: defaultSyncEventsFilePath(),
@@ -527,6 +509,7 @@ export class GranolaApp implements GranolaAppApi {
   #exports: GranolaExportService;
   #index: GranolaIndexService;
   #listeners = new Set<(event: GranolaAppStateEvent) => void>();
+  readonly #pluginRegistry: GranolaPluginRegistry;
   readonly #state: GranolaAppState;
 
   constructor(
@@ -534,8 +517,12 @@ export class GranolaApp implements GranolaAppApi {
     private readonly deps: GranolaAppDependencies,
     options: { surface?: GranolaAppSurface } = {},
   ) {
+    this.#pluginRegistry = deps.pluginRegistry ?? createDefaultPluginRegistry();
+    const configuredPluginEnabled = {
+      ...config.plugins?.enabled,
+    };
     const automationPluginEnabled =
-      config.plugins?.automationEnabled ??
+      configuredPluginEnabled[GRANOLA_AUTOMATION_PLUGIN_ID] ??
       Boolean(
         deps.agentHarnessStore ||
         deps.agentRunner ||
@@ -552,13 +539,16 @@ export class GranolaApp implements GranolaAppApi {
       {
         ...config,
         plugins: {
-          automationEnabled: automationPluginEnabled,
-          markdownViewerEnabled: config.plugins?.markdownViewerEnabled !== false,
+          enabled: {
+            ...configuredPluginEnabled,
+            [GRANOLA_AUTOMATION_PLUGIN_ID]: automationPluginEnabled,
+          },
           settingsFile: config.plugins?.settingsFile ?? "",
         },
       },
       deps.auth,
       options.surface ?? "cli",
+      this.#pluginRegistry,
     );
     const createGranolaClient =
       deps.createGranolaClient ??
@@ -718,7 +708,7 @@ export class GranolaApp implements GranolaAppApi {
   }
 
   private automationPluginEnabled(): boolean {
-    return this.#state.plugins.automation.enabled;
+    return isPluginCapabilityEnabled(this.#state.plugins, "automation");
   }
 
   private assertAutomationPluginEnabled(): void {
@@ -793,33 +783,29 @@ export class GranolaApp implements GranolaAppApi {
 
   async listPlugins(): Promise<GranolaAppPluginsResult> {
     return {
-      plugins: [
-        clonePluginState(this.#state.plugins.markdownViewer),
-        clonePluginState(this.#state.plugins.automation),
-      ],
+      plugins: this.#state.plugins.items.map((plugin) => ({ ...plugin })),
     };
   }
 
   async setPluginEnabled(id: GranolaAppPluginId, enabled: boolean): Promise<GranolaAppPluginState> {
-    const nextPlugin =
-      id === "automation"
-        ? defaultAutomationPluginState(enabled)
-        : defaultMarkdownViewerPluginState(enabled);
+    const definition = this.#pluginRegistry.getPlugin(id);
+    if (!definition) {
+      throw new Error(`plugin not found: ${id}`);
+    }
+
+    const nextPlugin = buildPluginState(definition, enabled);
     this.#state.plugins = {
-      ...this.#state.plugins,
-      automation:
-        id === "automation" ? nextPlugin : clonePluginState(this.#state.plugins.automation),
-      markdownViewer:
-        id === "markdown-viewer"
-          ? nextPlugin
-          : clonePluginState(this.#state.plugins.markdownViewer),
+      items: this.#state.plugins.items.map((plugin) =>
+        plugin.id === id ? nextPlugin : { ...plugin },
+      ),
       loaded: true,
     };
     this.#state.config = {
       ...this.#state.config,
       plugins: {
-        automationEnabled: this.#state.plugins.automation.enabled,
-        markdownViewerEnabled: this.#state.plugins.markdownViewer.enabled,
+        enabled: Object.fromEntries(
+          this.#state.plugins.items.map((plugin) => [plugin.id, plugin.enabled]),
+        ),
         settingsFile:
           this.#state.config.plugins?.settingsFile ?? this.config.plugins?.settingsFile ?? "",
       },
@@ -827,13 +813,14 @@ export class GranolaApp implements GranolaAppApi {
 
     if (this.deps.pluginSettingsStore) {
       await this.deps.pluginSettingsStore.writeSettings({
-        automationEnabled: this.#state.plugins.automation.enabled,
-        markdownViewerEnabled: this.#state.plugins.markdownViewer.enabled,
+        enabled: Object.fromEntries(
+          this.#state.plugins.items.map((plugin) => [plugin.id, plugin.enabled]),
+        ),
       });
     }
 
     this.emitStateUpdate();
-    return clonePluginState(nextPlugin);
+    return { ...nextPlugin };
   }
 
   async inspectSync(): Promise<GranolaAppSyncState> {
@@ -1862,7 +1849,11 @@ export async function createGranolaApp(
   const meetingIndexStore = createDefaultMeetingIndexStore();
   const meetingIndex = await meetingIndexStore.readIndex();
   const pkmTargetStore = createDefaultPkmTargetStore(config.automation?.pkmTargetsFile);
-  const pluginSettingsStore = createDefaultPluginSettingsStore(config.plugins?.settingsFile);
+  const pluginRegistry = createDefaultPluginRegistry();
+  const pluginSettingsStore = createDefaultPluginSettingsStore(
+    config.plugins?.settingsFile,
+    pluginRegistry.listPlugins(),
+  );
   const searchIndexStore = createDefaultSearchIndexStore();
   const searchIndex = await searchIndexStore.readIndex();
   const syncEventStore = createDefaultSyncEventStore();
@@ -1897,6 +1888,7 @@ export async function createGranolaApp(
       meetingIndexStore,
       now: options.now,
       pkmTargetStore,
+      pluginRegistry,
       pluginSettingsStore,
       searchIndex,
       searchIndexStore,
