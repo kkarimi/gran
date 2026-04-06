@@ -178,6 +178,7 @@ import {
   type GranolaCatalogClient,
   type GranolaCatalogLiveSnapshot,
 } from "./catalog.ts";
+import { GranolaAuthService } from "./auth-service.ts";
 import {
   cloneGranolaExportJobState,
   cloneGranolaExportRunState,
@@ -478,6 +479,7 @@ export class GranolaApp implements GranolaAppApi {
   #automationArtefacts: GranolaAutomationArtefact[];
   #automationMatches: GranolaAutomationMatch[];
   #automationRules: GranolaAutomationRule[];
+  #auth: GranolaAuthService;
   #catalog: GranolaCatalogService;
   #exports: GranolaExportService;
   #meetingIndex: MeetingSummaryRecord[];
@@ -492,6 +494,16 @@ export class GranolaApp implements GranolaAppApi {
     options: { surface?: GranolaAppSurface } = {},
   ) {
     this.#state = defaultState(config, deps.auth, options.surface ?? "cli");
+    this.#auth = new GranolaAuthService({
+      authController: deps.authController,
+      emitStateUpdate: () => {
+        this.emitStateUpdate();
+      },
+      resetRemoteState: () => {
+        this.resetRemoteState();
+      },
+      state: this.#state,
+    });
     this.#catalog = new GranolaCatalogService(config, {
       cacheLoader: deps.cacheLoader,
       createGranolaClient: deps.createGranolaClient,
@@ -980,28 +992,6 @@ export class GranolaApp implements GranolaAppApi {
     return `sync-${this.nowIso().replaceAll(/[-:.]/g, "").replace("T", "").replace("Z", "")}`;
   }
 
-  private applyAuthState(
-    auth: GranolaAppAuthState,
-    options: {
-      resetDocuments?: boolean;
-      view?: GranolaAppState["ui"]["view"];
-    } = {},
-  ): GranolaAppAuthState {
-    if (options.resetDocuments) {
-      this.resetRemoteState();
-    }
-
-    this.#state.auth = { ...auth };
-    if (options.view) {
-      this.#state.ui = {
-        ...this.#state.ui,
-        view: options.view,
-      };
-    }
-    this.emitStateUpdate();
-    return { ...auth };
-  }
-
   private async persistMeetingIndex(meetings: MeetingSummaryRecord[]): Promise<void> {
     this.#meetingIndex = meetings.map((meeting) => cloneMeetingSummary(meeting));
     this.#state.index = {
@@ -1080,21 +1070,8 @@ export class GranolaApp implements GranolaAppApi {
     return await this.#catalog.loadFolders(options);
   }
 
-  private requireAuthController(): DefaultGranolaAuthController {
-    if (!this.deps.authController) {
-      throw new Error("Granola auth control is not configured");
-    }
-
-    return this.deps.authController;
-  }
-
   async inspectAuth(): Promise<GranolaAppAuthState> {
-    if (!this.deps.authController) {
-      return { ...this.#state.auth };
-    }
-
-    const auth = await this.deps.authController.inspect();
-    return this.applyAuthState(auth, { view: "auth" });
+    return await this.#auth.inspectAuth();
   }
 
   async inspectSync(): Promise<GranolaAppSyncState> {
@@ -1779,59 +1756,19 @@ export class GranolaApp implements GranolaAppApi {
   async loginAuth(
     options: { apiKey?: string; supabasePath?: string } = {},
   ): Promise<GranolaAppAuthState> {
-    const controller = this.requireAuthController();
-
-    try {
-      const auth = await controller.login(options);
-      return this.applyAuthState(auth, {
-        resetDocuments: true,
-        view: "auth",
-      });
-    } catch (error) {
-      const auth = await controller.inspect();
-      this.applyAuthState(auth, { view: "auth" });
-      throw error;
-    }
+    return await this.#auth.loginAuth(options);
   }
 
   async logoutAuth(): Promise<GranolaAppAuthState> {
-    const auth = await this.requireAuthController().logout();
-    return this.applyAuthState(auth, {
-      resetDocuments: true,
-      view: "auth",
-    });
+    return await this.#auth.logoutAuth();
   }
 
   async refreshAuth(): Promise<GranolaAppAuthState> {
-    const controller = this.requireAuthController();
-
-    try {
-      const auth = await controller.refresh();
-      return this.applyAuthState(auth, {
-        resetDocuments: true,
-        view: "auth",
-      });
-    } catch (error) {
-      const auth = await controller.inspect();
-      this.applyAuthState(auth, { view: "auth" });
-      throw error;
-    }
+    return await this.#auth.refreshAuth();
   }
 
   async switchAuthMode(mode: GranolaAppAuthMode): Promise<GranolaAppAuthState> {
-    const controller = this.requireAuthController();
-
-    try {
-      const auth = await controller.switchMode(mode);
-      return this.applyAuthState(auth, {
-        resetDocuments: true,
-        view: "auth",
-      });
-    } catch (error) {
-      const auth = await controller.inspect();
-      this.applyAuthState(auth, { view: "auth" });
-      throw error;
-    }
+    return await this.#auth.switchAuthMode(mode);
   }
 
   private async maybeReadMeetingBundleById(
