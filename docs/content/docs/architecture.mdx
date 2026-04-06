@@ -1,0 +1,152 @@
+---
+title: Architecture
+description: Service boundaries, canonical read models, and extension seams in Granola Toolkit.
+---
+
+Granola Toolkit stays in one repo and one package, but it no longer expects one module to do every
+job. The current shape is intentionally layered so new UI work, new automation actions, and future
+platform support can land on stable seams instead of piling more logic into one place.
+
+## Runtime Shape
+
+At a high level the toolkit now looks like this:
+
+1. Surfaces: CLI commands, the web workspace, and the TUI.
+2. Controllers: command helpers and page controllers that own view state and user flows.
+3. App services: auth, catalog, index/search, exports, automation, review, and sync orchestration.
+4. Adapters: Granola API clients, cache readers, persistence layout, and browser/server transport.
+5. Registries: agent providers, automation actions, exporters, and sync adapters.
+
+That layering matters for one reason: domain services should not decide how a page is laid out or
+which tab the user sees next.
+
+## Service Boundaries
+
+### App core as facade
+
+`src/app/core.ts` still exposes the top-level app API, but it now composes narrower services
+instead of owning every detail directly.
+
+Use the core when a surface needs one place to ask for:
+
+- meetings, folders, search results, and sync state
+- export jobs and review state
+- automation runs and approvals
+- auth and provider status
+
+The core should coordinate services and publish state. It should not become a second UI layer.
+
+### Catalog read service
+
+`src/app/catalog.ts` owns read-side loading:
+
+- documents
+- folders
+- cache snapshots
+- meeting bundles
+
+If a feature needs to fetch and assemble meeting source data, that work should start here instead
+of being rebuilt inside commands or controllers.
+
+### Auth service
+
+`src/app/auth-service.ts` owns auth state, resolution order, and session lifecycle. Surfaces should
+ask for auth state or invoke auth actions through the app, not reimplement provider precedence.
+
+### Export service
+
+`src/app/export-service.ts` owns export jobs, reruns, and request preparation. It knows how to turn
+app state plus export scope into one resolved export request, while exporter definitions handle the
+actual output work.
+
+### Index service
+
+`src/app/index-service.ts` owns search/index persistence and reuse. Search surfaces should talk to
+the app or the index service, not compute their own meeting indexes ad hoc.
+
+## Canonical Read Models
+
+The toolkit used to derive meeting state in several places. That caused drift around transcript
+availability, summary presence, and search metadata.
+
+The canonical read-model layer now lives in:
+
+- `src/app/models.ts`
+- `src/app/meeting-read-model.ts`
+
+Those modules define the shared meeting, folder, and summary projections used by:
+
+- sync and processing
+- search/indexing
+- web and TUI surfaces
+- automation and evaluations
+
+Two rules matter here:
+
+1. Derived meeting semantics should be computed once in the read-model layer.
+2. Raw transport payloads should stay behind explicit source records instead of leaking through the
+   rest of the app.
+
+That is why meeting bundles now carry a narrow `source` object instead of exposing every raw cache
+and API shape directly.
+
+## View State Lives In Surfaces
+
+The web app and TUI each need page, selection, tab, and focus state. That state now belongs in the
+surface layer:
+
+- `src/web-app/page-controllers.tsx`
+- `src/tui/workspace.ts`
+- `src/tui/palette.ts`
+
+App services can expose data and actions, but they should not decide:
+
+- which page opens next
+- which meeting tab becomes active
+- which folder view the user should land on
+
+If a change feels like browser-only or TUI-only navigation logic, it probably belongs outside the
+app core.
+
+## Extension Seams
+
+The toolkit now prefers registries over hard-coded switch statements when a capability is likely to
+grow.
+
+Current registries:
+
+- `src/agent-provider-registry.ts`: Codex, OpenAI-compatible, OpenRouter, and future agent runners
+- `src/automation-action-registry.ts`: automation actions like agent runs, exports, webhooks, and
+  file writes
+- `src/app/export-registry.ts`: note and transcript exporters
+- `src/client/sync-adapter-registry.ts`: sync/runtime adapters for Granola access modes
+- `src/registry.ts`: the shared minimal registry primitive
+
+This is not a plugin system yet. The current goal is simpler: make new capabilities pluggable
+without reopening unrelated modules.
+
+## Where New Code Should Go
+
+When adding a feature, use this bias:
+
+- New derived meeting or folder semantics: `src/app/models.ts` or `src/app/meeting-read-model.ts`
+- New transport/runtime mode: sync adapter registry
+- New automation action: automation action registry
+- New agent backend: agent provider registry
+- New export kind or rerun behaviour: export registry
+- New page-specific web behaviour: page controller or web component
+- New TUI interaction flow: TUI workspace or palette modules
+
+Avoid adding new product behaviour straight into `src/app/core.ts` unless it truly coordinates more
+than one service boundary.
+
+## Design Constraints
+
+The current architecture intentionally stays conservative:
+
+- single package
+- shared TypeScript domain
+- one app facade for surfaces
+- explicit registries before plugins
+
+That keeps the codebase easier to ship today while still making future platform work possible.

@@ -23,6 +23,7 @@ It has three user-facing surfaces on one shared TypeScript core:
 
 <Cards>
   <Card title="Getting started" href="/docs/getting-started" />
+  <Card title="Architecture" href="/docs/architecture" />
   <Card title="Exporting notes and transcripts" href="/docs/exporting" />
   <Card title="Meetings and folders" href="/docs/meetings-and-folders" />
   <Card title="Server, web, and TUI" href="/docs/server-web-and-tui" />
@@ -37,6 +38,11 @@ It has three user-facing surfaces on one shared TypeScript core:
 
 CLI commands, the browser workspace, and the TUI all talk to the same application core for auth,
 meeting discovery, folders, transcripts, notes, and export jobs.
+
+### Explicit service seams
+
+Catalog loading, auth, exports, indexing, and extension points now live behind service boundaries
+and registries so new capabilities do not have to reopen one giant module.
 
 ### Local-first server
 
