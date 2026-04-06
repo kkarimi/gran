@@ -1512,6 +1512,112 @@ select {
   line-height: 1.55;
 }
 
+.markdown-document {
+  color: var(--ink);
+  line-height: 1.7;
+}
+
+.markdown-document > :first-child {
+  margin-top: 0;
+}
+
+.markdown-document > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-document h1,
+.markdown-document h2,
+.markdown-document h3,
+.markdown-document h4 {
+  margin: 1.2em 0 0.55em;
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.markdown-document h1 {
+  font-size: 1.85rem;
+}
+
+.markdown-document h2 {
+  font-size: 1.35rem;
+}
+
+.markdown-document h3 {
+  font-size: 1.08rem;
+}
+
+.markdown-document p,
+.markdown-document ul,
+.markdown-document ol,
+.markdown-document blockquote,
+.markdown-document pre,
+.markdown-document table,
+.markdown-document hr {
+  margin: 0 0 1rem;
+}
+
+.markdown-document ul,
+.markdown-document ol {
+  padding-left: 1.3rem;
+}
+
+.markdown-document li + li {
+  margin-top: 0.35rem;
+}
+
+.markdown-document blockquote {
+  margin-left: 0;
+  padding-left: 1rem;
+  border-left: 3px solid rgba(13, 106, 109, 0.22);
+  color: var(--muted);
+}
+
+.markdown-document code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  padding: 0.1em 0.35em;
+  border-radius: 8px;
+  background: rgba(14, 27, 48, 0.06);
+}
+
+.markdown-document pre {
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(14, 27, 48, 0.06);
+}
+
+.markdown-document pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown-document table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-document th,
+.markdown-document td {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-document th {
+  background: rgba(14, 27, 48, 0.04);
+}
+
+.markdown-document a {
+  color: var(--accent);
+}
+
+.markdown-document__empty {
+  color: var(--muted);
+}
+
 .detail-list {
   margin: 0;
   padding-left: 18px;
@@ -1541,6 +1647,10 @@ select {
 
 .review-history {
   margin-bottom: 0;
+}
+
+.detail-section--preview {
+  margin-top: 18px;
 }
 
 .empty {

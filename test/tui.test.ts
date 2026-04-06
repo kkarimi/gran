@@ -292,6 +292,14 @@ describe("buildGranolaTuiSummary", () => {
             label: "Automation",
             shipped: true,
           },
+          markdownViewer: {
+            configurable: true,
+            description: "Markdown viewer plugin",
+            enabled: true,
+            id: "markdown-viewer",
+            label: "Markdown Viewer",
+            shipped: true,
+          },
           loaded: true,
         },
         sync: {

@@ -106,6 +106,25 @@ export function App() {
 
   let automationPanelsHydrated = false;
   const automationEnabled = () => state.appState?.plugins.automation.enabled === true;
+  const markdownViewerEnabled = () => state.appState?.plugins.markdownViewer.enabled !== false;
+  const automationPlugin = () =>
+    state.appState?.plugins.automation ?? {
+      configurable: true,
+      description: "",
+      enabled: false,
+      id: "automation" as const,
+      label: "Automation",
+      shipped: true,
+    };
+  const markdownViewerPlugin = () =>
+    state.appState?.plugins.markdownViewer ?? {
+      configurable: true,
+      description: "",
+      enabled: true,
+      id: "markdown-viewer" as const,
+      label: "Markdown Viewer",
+      shipped: true,
+    };
 
   const setStatus = (label: string, tone: WebStatusTone = "idle") => {
     setState({
@@ -482,6 +501,26 @@ export function App() {
     }
   };
 
+  const toggleMarkdownViewerPlugin = async (enabled: boolean) => {
+    const client = clientController.clientAccessor();
+    if (!client) {
+      return;
+    }
+
+    setStatus(enabled ? "Enabling markdown viewer…" : "Disabling markdown viewer…", "busy");
+    try {
+      const plugin = await client.setPluginEnabled("markdown-viewer", enabled);
+      if (state.appState) {
+        setState("appState", "plugins", "markdownViewer", plugin);
+      }
+      setState("settingsTab", "plugins");
+      setStatus(enabled ? "Markdown viewer enabled" : "Markdown viewer disabled", "ok");
+    } catch (error) {
+      setState("detailError", error instanceof Error ? error.message : String(error));
+      setStatus("Plugin update failed", "error");
+    }
+  };
+
   return (
     <Show
       when={!state.serverLocked && !showOnboarding()}
@@ -702,6 +741,8 @@ export function App() {
                     harnesses={state.harnesses}
                     harnessTestKind={state.harnessTestKind}
                     harnessTestResult={state.harnessTestResult}
+                    markdownViewerEnabled={markdownViewerEnabled()}
+                    markdownViewerPlugin={markdownViewerPlugin()}
                     onApiKeyDraftChange={(value) => {
                       setState("apiKeyDraft", value);
                     }}
@@ -761,6 +802,9 @@ export function App() {
                     onToggleAutomation={(enabled) => {
                       void toggleAutomationPlugin(enabled);
                     }}
+                    onToggleMarkdownViewer={(enabled) => {
+                      void toggleMarkdownViewerPlugin(enabled);
+                    }}
                     onSwitchMode={(mode) => {
                       void clientController.switchAuthMode(mode, refreshAll);
                     }}
@@ -774,16 +818,7 @@ export function App() {
                       void clientController.unlockServer(connectAndRefresh);
                     }}
                     password={state.serverPassword}
-                    plugin={
-                      state.appState?.plugins.automation ?? {
-                        configurable: true,
-                        description: "",
-                        enabled: false,
-                        id: "automation",
-                        label: "Automation",
-                        shipped: true,
-                      }
-                    }
+                    plugin={automationPlugin()}
                     preferredProvider={state.preferredProvider}
                     processingIssues={state.processingIssues}
                     selectedHarness={harnessController.selectedHarness()}
@@ -804,6 +839,7 @@ export function App() {
                   artefactDraftSummary={state.automationArtefactDraftSummary}
                   artefactDraftTitle={state.automationArtefactDraftTitle}
                   artefactError={state.automationArtefactError}
+                  markdownViewerEnabled={markdownViewerEnabled()}
                   onApproveArtefact={() => {
                     void reviewController.resolveAutomationArtefact("approve");
                   }}
@@ -874,6 +910,8 @@ export function App() {
                 harnesses={state.harnesses}
                 harnessTestKind={state.harnessTestKind}
                 harnessTestResult={state.harnessTestResult}
+                markdownViewerEnabled={markdownViewerEnabled()}
+                markdownViewerPlugin={markdownViewerPlugin()}
                 onApiKeyDraftChange={(value) => {
                   setState("apiKeyDraft", value);
                 }}
@@ -933,6 +971,9 @@ export function App() {
                 onToggleAutomation={(enabled) => {
                   void toggleAutomationPlugin(enabled);
                 }}
+                onToggleMarkdownViewer={(enabled) => {
+                  void toggleMarkdownViewerPlugin(enabled);
+                }}
                 onSwitchMode={(mode) => {
                   void clientController.switchAuthMode(mode, refreshAll);
                 }}
@@ -946,16 +987,7 @@ export function App() {
                   void clientController.unlockServer(connectAndRefresh);
                 }}
                 password={state.serverPassword}
-                plugin={
-                  state.appState?.plugins.automation ?? {
-                    configurable: true,
-                    description: "",
-                    enabled: false,
-                    id: "automation",
-                    label: "Automation",
-                    shipped: true,
-                  }
-                }
+                plugin={automationPlugin()}
                 preferredProvider={state.preferredProvider}
                 processingIssues={state.processingIssues}
                 selectedHarness={harnessController.selectedHarness()}
@@ -973,6 +1005,7 @@ export function App() {
             <Match when={state.activePage === "meeting"}>
               <MeetingPageController
                 detailError={state.detailError}
+                markdownViewerEnabled={markdownViewerEnabled()}
                 meetingDescription={meetingDescription()}
                 meetingReturnLabel={meetingReturnLabel()}
                 onBack={() => {

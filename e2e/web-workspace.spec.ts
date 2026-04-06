@@ -39,6 +39,8 @@ test.describe("toolkit web workspace", () => {
     ).toBeVisible({
       timeout: 20_000,
     });
+    await expect(page.locator(".markdown-document h1")).toContainText("Alpha Sync");
+    await expect(page.locator(".markdown-document")).toContainText("Alpha notes");
     await page.getByRole("button", { name: "Back to home" }).click();
     await expect(page.getByRole("heading", { name: "Latest meetings" })).toBeVisible();
 
@@ -100,6 +102,15 @@ test.describe("toolkit web workspace", () => {
       .locator(".primary-nav")
       .getByRole("button", { name: /Settings/i })
       .click();
+    await page.locator(".settings-shell").getByRole("button", { name: "Plugins" }).click();
+    await expect(
+      page
+        .locator(".auth-panel")
+        .getByText(
+          "Render meeting notes and markdown artefacts as readable documents in the browser while keeping the raw markdown available.",
+        ),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Disable markdown viewer" })).toBeVisible();
     await page.locator(".settings-shell").getByRole("button", { name: "Diagnostics" }).click();
     await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
     await expect(page.getByText("Transcript cache")).toBeVisible();

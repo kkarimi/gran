@@ -338,6 +338,7 @@ export function ReviewPageController(props: {
   artefactDraftSummary: string;
   artefactDraftTitle: string;
   artefactError: string;
+  markdownViewerEnabled: boolean;
   onApproveArtefact: () => void;
   onApproveRun: (runId: string) => void;
   onDraftMarkdownChange: (value: string) => void;
@@ -408,6 +409,7 @@ export function ReviewPageController(props: {
                 draftSummary={props.artefactDraftSummary}
                 draftTitle={props.artefactDraftTitle}
                 error={props.artefactError}
+                markdownViewerEnabled={props.markdownViewerEnabled}
                 onApprove={() => props.onApproveArtefact()}
                 onDraftMarkdownChange={(value) => props.onDraftMarkdownChange(value)}
                 onDraftSummaryChange={(value) => props.onDraftSummaryChange(value)}
@@ -442,6 +444,8 @@ export function SettingsPageController(props: {
   harnesses: GranolaAgentHarness[];
   harnessTestKind: GranolaAutomationArtefactKind;
   harnessTestResult: GranolaAutomationEvaluationRun | null;
+  markdownViewerEnabled: boolean;
+  markdownViewerPlugin: GranolaAppPluginState;
   onApiKeyDraftChange: (value: string) => void;
   onApproveRun: (runId: string) => void;
   onChangeHarness: (harness: GranolaAgentHarness) => void;
@@ -464,6 +468,7 @@ export function SettingsPageController(props: {
   onSaveHarnesses: () => void;
   onSelectHarness: (id: string) => void;
   onToggleAutomation: (enabled: boolean) => void;
+  onToggleMarkdownViewer: (enabled: boolean) => void;
   onSwitchMode: (mode: GranolaAppAuthMode) => void;
   onTestHarness: () => void;
   onTestKindChange: (kind: GranolaAutomationArtefactKind) => void;
@@ -535,7 +540,10 @@ export function SettingsPageController(props: {
             <Match when={props.settingsTab === "plugins"}>
               <PluginsPanel
                 automationEnabled={props.automationEnabled}
+                markdownViewerEnabled={props.markdownViewerEnabled}
+                markdownViewerPlugin={props.markdownViewerPlugin}
                 onToggleAutomation={(enabled) => props.onToggleAutomation(enabled)}
+                onToggleMarkdownViewer={(enabled) => props.onToggleMarkdownViewer(enabled)}
                 plugin={props.plugin}
               />
               <Show when={props.automationEnabled}>
@@ -614,6 +622,7 @@ export function SettingsPageController(props: {
 
 export function MeetingPageController(props: {
   detailError: string;
+  markdownViewerEnabled: boolean;
   meetingDescription: string;
   meetingReturnLabel: string;
   onBack: () => void;
@@ -638,6 +647,7 @@ export function MeetingPageController(props: {
       <Workspace
         bundle={props.selectedBundle}
         detailError={props.detailError}
+        markdownViewerEnabled={props.markdownViewerEnabled}
         onSelectTab={(tab) => props.onSelectTab(tab)}
         selectedMeeting={props.selectedMeeting}
         tab={props.workspaceTab}

@@ -283,6 +283,11 @@ export async function loadConfig(options: {
         pickBoolean(configValues["automation-plugin-enabled"]) ??
         pickBoolean(configValues.automationPluginEnabled) ??
         persistedPlugins.automationEnabled,
+      markdownViewerEnabled:
+        envFlag(env.GRANOLA_MARKDOWN_VIEWER_PLUGIN_ENABLED) ??
+        pickBoolean(configValues["markdown-viewer-plugin-enabled"]) ??
+        pickBoolean(configValues.markdownViewerPluginEnabled) ??
+        persistedPlugins.markdownViewerEnabled,
       settingsFile: pluginsFile,
     },
     supabase:

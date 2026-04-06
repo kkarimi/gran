@@ -249,6 +249,18 @@ function clonePluginState(plugin: GranolaAppPluginState): GranolaAppPluginState 
   return { ...plugin };
 }
 
+function defaultMarkdownViewerPluginState(enabled: boolean): GranolaAppPluginState {
+  return {
+    configurable: true,
+    description:
+      "Render meeting notes and markdown artefacts as readable documents in the browser while keeping the raw markdown available.",
+    enabled,
+    id: "markdown-viewer",
+    label: "Markdown Viewer",
+    shipped: true,
+  };
+}
+
 function defaultAutomationPluginState(enabled: boolean): GranolaAppPluginState {
   return {
     configurable: true,
@@ -372,6 +384,7 @@ function cloneState(state: GranolaAppState): GranolaAppState {
     index: { ...state.index },
     plugins: {
       automation: clonePluginState(state.plugins.automation),
+      markdownViewer: clonePluginState(state.plugins.markdownViewer),
       loaded: state.plugins.loaded,
     },
     sync: cloneSyncState(state.sync),
@@ -433,6 +446,9 @@ function defaultState(
     },
     plugins: {
       automation: defaultAutomationPluginState(config.plugins?.automationEnabled === true),
+      markdownViewer: defaultMarkdownViewerPluginState(
+        config.plugins?.markdownViewerEnabled !== false,
+      ),
       loaded: true,
     },
     sync: {
@@ -481,6 +497,7 @@ export class GranolaApp implements GranolaAppApi {
         ...config,
         plugins: {
           automationEnabled: automationPluginEnabled,
+          markdownViewerEnabled: config.plugins?.markdownViewerEnabled !== false,
           settingsFile: config.plugins?.settingsFile ?? "",
         },
       },
@@ -718,20 +735,33 @@ export class GranolaApp implements GranolaAppApi {
 
   async listPlugins(): Promise<GranolaAppPluginsResult> {
     return {
-      plugins: [clonePluginState(this.#state.plugins.automation)],
+      plugins: [
+        clonePluginState(this.#state.plugins.markdownViewer),
+        clonePluginState(this.#state.plugins.automation),
+      ],
     };
   }
 
   async setPluginEnabled(id: GranolaAppPluginId, enabled: boolean): Promise<GranolaAppPluginState> {
-    const nextPlugin = defaultAutomationPluginState(enabled);
+    const nextPlugin =
+      id === "automation"
+        ? defaultAutomationPluginState(enabled)
+        : defaultMarkdownViewerPluginState(enabled);
     this.#state.plugins = {
-      automation: nextPlugin,
+      ...this.#state.plugins,
+      automation:
+        id === "automation" ? nextPlugin : clonePluginState(this.#state.plugins.automation),
+      markdownViewer:
+        id === "markdown-viewer"
+          ? nextPlugin
+          : clonePluginState(this.#state.plugins.markdownViewer),
       loaded: true,
     };
     this.#state.config = {
       ...this.#state.config,
       plugins: {
-        automationEnabled: enabled,
+        automationEnabled: this.#state.plugins.automation.enabled,
+        markdownViewerEnabled: this.#state.plugins.markdownViewer.enabled,
         settingsFile:
           this.#state.config.plugins?.settingsFile ?? this.config.plugins?.settingsFile ?? "",
       },
@@ -739,7 +769,8 @@ export class GranolaApp implements GranolaAppApi {
 
     if (this.deps.pluginSettingsStore) {
       await this.deps.pluginSettingsStore.writeSettings({
-        automationEnabled: enabled,
+        automationEnabled: this.#state.plugins.automation.enabled,
+        markdownViewerEnabled: this.#state.plugins.markdownViewer.enabled,
       });
     }
 

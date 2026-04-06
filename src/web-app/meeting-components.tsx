@@ -15,10 +15,12 @@ import {
   tagSummary,
   workspaceBody,
 } from "./component-helpers.ts";
+import { MarkdownDocument } from "./markdown-viewer.tsx";
 
 interface WorkspaceProps {
   bundle: GranolaMeetingBundle | null;
   detailError?: string;
+  markdownViewerEnabled: boolean;
   onSelectTab: (tab: WorkspaceTab) => void;
   selectedMeeting: MeetingRecord | null;
   tab: WorkspaceTab;
@@ -112,7 +114,12 @@ export function Workspace(props: WorkspaceProps): JSX.Element {
                 <p>{details()?.description}</p>
               </div>
               <div class="detail-body workspace-frame__body">
-                <pre class="detail-pre">{details()?.body}</pre>
+                <Show
+                  when={parsedTab() === "notes" && props.markdownViewerEnabled}
+                  fallback={<pre class="detail-pre">{details()?.body}</pre>}
+                >
+                  <MarkdownDocument markdown={meeting().noteMarkdown} />
+                </Show>
               </div>
             </section>
           </Show>

@@ -444,7 +444,7 @@ export interface GranolaAppAutomationState {
   runsFile?: string;
 }
 
-export type GranolaAppPluginId = "automation";
+export type GranolaAppPluginId = "automation" | "markdown-viewer";
 
 export interface GranolaAppPluginState {
   configurable: boolean;
@@ -457,6 +457,7 @@ export interface GranolaAppPluginState {
 
 export interface GranolaAppPluginsState {
   automation: GranolaAppPluginState;
+  markdownViewer: GranolaAppPluginState;
   loaded: boolean;
 }
 

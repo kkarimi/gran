@@ -9,6 +9,7 @@ import type {
   GranolaProcessingIssue,
 } from "../app/index.ts";
 import type { GranolaReviewInboxItem, GranolaReviewInboxSummary } from "../review-inbox.ts";
+import { MarkdownDocument } from "./markdown-viewer.tsx";
 
 interface AutomationRunsPanelProps {
   onApprove: (id: string) => void;
@@ -42,6 +43,7 @@ interface ArtefactReviewPanelProps {
   draftSummary: string;
   draftTitle: string;
   error?: string;
+  markdownViewerEnabled: boolean;
   onApprove: () => void;
   onDraftMarkdownChange: (value: string) => void;
   onDraftSummaryChange: (value: string) => void;
@@ -431,9 +433,18 @@ export function ArtefactReviewPanel(props: ArtefactReviewPanelProps): JSX.Elemen
               <div class="review-grid">
                 <section class="detail-section">
                   <h2>Current Meeting Notes</h2>
-                  <pre class="detail-pre">
-                    {props.bundle?.meeting.noteMarkdown || "(No existing meeting notes)"}
-                  </pre>
+                  <Show
+                    when={props.markdownViewerEnabled}
+                    fallback={
+                      <pre class="detail-pre">
+                        {props.bundle?.meeting.noteMarkdown || "(No existing meeting notes)"}
+                      </pre>
+                    }
+                  >
+                    <MarkdownDocument
+                      markdown={props.bundle?.meeting.noteMarkdown || "(No existing meeting notes)"}
+                    />
+                  </Show>
                 </section>
                 <section class="detail-section">
                   <h2>Candidate</h2>
@@ -469,6 +480,12 @@ export function ArtefactReviewPanel(props: ArtefactReviewPanelProps): JSX.Elemen
                       {props.draftMarkdown}
                     </textarea>
                   </label>
+                  <Show when={props.markdownViewerEnabled}>
+                    <div class="detail-section detail-section--preview">
+                      <h3>Rendered preview</h3>
+                      <MarkdownDocument markdown={props.draftMarkdown} />
+                    </div>
+                  </Show>
                   <label class="field-row">
                     <span class="field-label">Review Note</span>
                     <textarea

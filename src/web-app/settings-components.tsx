@@ -39,7 +39,10 @@ interface ExportJobsPanelProps {
 
 interface PluginsPanelProps {
   automationEnabled: boolean;
+  markdownViewerEnabled: boolean;
+  markdownViewerPlugin: GranolaAppPluginState;
   onToggleAutomation: (enabled: boolean) => void;
+  onToggleMarkdownViewer: (enabled: boolean) => void;
   plugin: GranolaAppPluginState;
 }
 
@@ -311,6 +314,49 @@ export function AuthPanel(props: AuthPanelProps): JSX.Element {
 }
 
 export function PluginsPanel(props: PluginsPanelProps): JSX.Element {
+  const renderPluginCard = (input: {
+    detail: string;
+    enabled: boolean;
+    onToggle: (enabled: boolean) => void;
+    plugin: GranolaAppPluginState;
+  }) => (
+    <div class="auth-card">
+      <div class="status-grid">
+        <div>
+          <span class="status-label">Plugin</span>
+          <strong>{input.plugin.label}</strong>
+        </div>
+        <div>
+          <span class="status-label">Shipped</span>
+          <strong>{input.plugin.shipped ? "yes" : "no"}</strong>
+        </div>
+        <div>
+          <span class="status-label">Status</span>
+          <strong>{input.enabled ? "enabled" : "disabled"}</strong>
+        </div>
+        <div>
+          <span class="status-label">Configurable</span>
+          <strong>{input.plugin.configurable ? "yes" : "no"}</strong>
+        </div>
+      </div>
+      <div class="auth-card__meta">{input.plugin.description}</div>
+      <div class="auth-card__meta">{input.detail}</div>
+      <div class="auth-card__actions">
+        <button
+          class="button button--secondary"
+          onClick={() => {
+            input.onToggle(!input.enabled);
+          }}
+          type="button"
+        >
+          {input.enabled
+            ? `Disable ${input.plugin.label.toLowerCase()}`
+            : `Enable ${input.plugin.label.toLowerCase()}`}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <section class="auth-panel">
       <div class="auth-panel__head">
@@ -318,43 +364,22 @@ export function PluginsPanel(props: PluginsPanelProps): JSX.Element {
         <p>Optional capabilities ship with the toolkit but stay off until you turn them on.</p>
       </div>
       <div class="auth-panel__body">
-        <div class="auth-card">
-          <div class="status-grid">
-            <div>
-              <span class="status-label">Plugin</span>
-              <strong>{props.plugin.label}</strong>
-            </div>
-            <div>
-              <span class="status-label">Shipped</span>
-              <strong>{props.plugin.shipped ? "yes" : "no"}</strong>
-            </div>
-            <div>
-              <span class="status-label">Status</span>
-              <strong>{props.automationEnabled ? "enabled" : "disabled"}</strong>
-            </div>
-            <div>
-              <span class="status-label">Configurable</span>
-              <strong>{props.plugin.configurable ? "yes" : "no"}</strong>
-            </div>
-          </div>
-          <div class="auth-card__meta">{props.plugin.description}</div>
-          <div class="auth-card__meta">
-            {props.automationEnabled
-              ? "Automation is live. Configure harnesses below, then use Review to inspect generated artefacts and approvals."
-              : "Enable this to unlock harnesses, review queues, automation commands, and post-meeting processing."}
-          </div>
-          <div class="auth-card__actions">
-            <button
-              class="button button--secondary"
-              onClick={() => {
-                props.onToggleAutomation(!props.automationEnabled);
-              }}
-              type="button"
-            >
-              {props.automationEnabled ? "Disable automation" : "Enable automation"}
-            </button>
-          </div>
-        </div>
+        {renderPluginCard({
+          detail: props.markdownViewerEnabled
+            ? "Notes and markdown artefacts render as readable documents in the browser."
+            : "Disable this if you prefer raw markdown everywhere in the web workspace.",
+          enabled: props.markdownViewerEnabled,
+          onToggle: props.onToggleMarkdownViewer,
+          plugin: props.markdownViewerPlugin,
+        })}
+        {renderPluginCard({
+          detail: props.automationEnabled
+            ? "Automation is live. Configure harnesses below, then use Review to inspect generated artefacts and approvals."
+            : "Enable this to unlock harnesses, review queues, automation commands, and post-meeting processing.",
+          enabled: props.automationEnabled,
+          onToggle: props.onToggleAutomation,
+          plugin: props.plugin,
+        })}
       </div>
     </section>
   );

@@ -6,16 +6,19 @@ import { asRecord, parseJsonString } from "./utils.ts";
 
 export interface GranolaPluginSettings {
   automationEnabled: boolean;
+  markdownViewerEnabled: boolean;
 }
 
 interface GranolaPluginSettingsFile {
   automationEnabled?: boolean;
+  markdownViewerEnabled?: boolean;
 }
 
 function normalisePluginSettings(value: unknown): GranolaPluginSettings {
   const record = asRecord(value) as GranolaPluginSettingsFile | undefined;
   return {
     automationEnabled: record?.automationEnabled === true,
+    markdownViewerEnabled: record?.markdownViewerEnabled !== false,
   };
 }
 
@@ -30,6 +33,7 @@ export class MemoryPluginSettingsStore implements PluginSettingsStore {
   constructor(settings: Partial<GranolaPluginSettings> = {}) {
     this.#settings = {
       automationEnabled: settings.automationEnabled === true,
+      markdownViewerEnabled: settings.markdownViewerEnabled !== false,
     };
   }
 
@@ -40,6 +44,7 @@ export class MemoryPluginSettingsStore implements PluginSettingsStore {
   async writeSettings(settings: GranolaPluginSettings): Promise<void> {
     this.#settings = {
       automationEnabled: settings.automationEnabled === true,
+      markdownViewerEnabled: settings.markdownViewerEnabled !== false,
     };
   }
 }
@@ -54,6 +59,7 @@ export class FilePluginSettingsStore implements PluginSettingsStore {
     } catch {
       return {
         automationEnabled: false,
+        markdownViewerEnabled: true,
       };
     }
   }

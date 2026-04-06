@@ -7,25 +7,28 @@ import { describe, expect, test } from "vite-plus/test";
 import { FilePluginSettingsStore, MemoryPluginSettingsStore } from "../src/plugins.ts";
 
 describe("plugin settings stores", () => {
-  test("default to automation disabled in memory", async () => {
+  test("default to shipped plugin states in memory", async () => {
     const store = new MemoryPluginSettingsStore();
 
     await expect(store.readSettings()).resolves.toEqual({
       automationEnabled: false,
+      markdownViewerEnabled: true,
     });
   });
 
-  test("persist automation enabled state to disk", async () => {
+  test("persist plugin enabled state to disk", async () => {
     const directory = await mkdtemp(join(tmpdir(), "granola-plugin-settings-"));
     const filePath = join(directory, "plugins.json");
     const store = new FilePluginSettingsStore(filePath);
 
     await store.writeSettings({
       automationEnabled: true,
+      markdownViewerEnabled: false,
     });
 
     await expect(store.readSettings()).resolves.toEqual({
       automationEnabled: true,
+      markdownViewerEnabled: false,
     });
   });
 });

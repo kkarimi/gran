@@ -297,6 +297,7 @@ export async function startToolkitWebServer(
       },
       plugins: {
         automationEnabled: scenario !== "cold-start",
+        markdownViewerEnabled: true,
         settingsFile: join(outputRoot, "plugins.json"),
       },
       supabase: "/tmp/supabase.json",

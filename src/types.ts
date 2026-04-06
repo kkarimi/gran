@@ -162,6 +162,7 @@ export interface AppConfig {
   notes: NotesOptions;
   plugins?: {
     automationEnabled: boolean;
+    markdownViewerEnabled: boolean;
     settingsFile: string;
   };
   supabase?: string;

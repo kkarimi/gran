@@ -111,6 +111,10 @@ describe("GranolaApp", () => {
     await expect(app.listPlugins()).resolves.toEqual({
       plugins: [
         expect.objectContaining({
+          enabled: true,
+          id: "markdown-viewer",
+        }),
+        expect.objectContaining({
           enabled: false,
           id: "automation",
         }),
@@ -126,6 +130,18 @@ describe("GranolaApp", () => {
     );
     await expect(pluginSettingsStore.readSettings()).resolves.toEqual({
       automationEnabled: true,
+      markdownViewerEnabled: true,
+    });
+
+    await expect(app.setPluginEnabled("markdown-viewer", false)).resolves.toEqual(
+      expect.objectContaining({
+        enabled: false,
+        id: "markdown-viewer",
+      }),
+    );
+    await expect(pluginSettingsStore.readSettings()).resolves.toEqual({
+      automationEnabled: true,
+      markdownViewerEnabled: false,
     });
   });
 
