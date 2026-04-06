@@ -17,7 +17,10 @@ test.describe("docs site", () => {
     await page.goto(server.url);
 
     await expect(
-      page.getByRole("heading", { name: "Work with Granola meetings beyond a flat export CLI." }),
+      page.getByRole("heading", { name: /swiss army knife for granola/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/sync, search, export, review, and automate granola meetings/i),
     ).toBeVisible();
     await page.getByRole("link", { name: "Start here" }).click();
     await expect(page).toHaveURL(/\/docs\/getting-started/);
