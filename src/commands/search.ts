@@ -1,8 +1,6 @@
-import { createGranolaApp } from "../app/index.ts";
-import { loadConfig } from "../config.ts";
 import { renderMeetingList, type MeetingListOutputFormat } from "../meetings.ts";
 
-import { debug } from "./shared.ts";
+import { createCommandAppContext } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function searchHelp(): string {
@@ -69,13 +67,10 @@ export const searchCommand: CommandDefinition = {
     const format = resolveFormat(commandFlags.format);
     const limit = parseLimit(commandFlags.limit);
     const folderQuery = typeof commandFlags.folder === "string" ? commandFlags.folder : undefined;
-    const config = await loadConfig({
-      globalFlags,
-      subcommandFlags: commandFlags,
+    const { app } = await createCommandAppContext(commandFlags, globalFlags, {
+      includeSupabase: true,
+      includeTimeoutMs: true,
     });
-
-    debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-    const app = await createGranolaApp(config);
     const folder = folderQuery ? await app.findFolder(folderQuery) : undefined;
     const result = await app.listMeetings({
       folderId: folder?.id,

@@ -1,5 +1,3 @@
-import { createGranolaApp } from "../app/index.ts";
-import { loadConfig } from "../config.ts";
 import {
   renderMeetingExport,
   renderMeetingList,
@@ -13,7 +11,7 @@ import {
   type MeetingTranscriptOutputFormat,
 } from "../meetings.ts";
 
-import { debug } from "./shared.ts";
+import { createCommandAppContext } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 import { resolveGranolaWebWorkspaceOptions, runGranolaWebWorkspace } from "./web-shared.ts";
 
@@ -205,17 +203,7 @@ async function list(
   const limit = parseLimit(commandFlags.limit);
   const folderQuery = typeof commandFlags.folder === "string" ? commandFlags.folder : undefined;
   const search = typeof commandFlags.search === "string" ? commandFlags.search : undefined;
-
-  const config = await loadConfig({
-    globalFlags,
-    subcommandFlags: commandFlags,
-  });
-  debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-  debug(config.debug, "supabase", config.supabase);
-  debug(config.debug, "cacheFile", config.transcripts.cacheFile || "(none)");
-  debug(config.debug, "timeoutMs", config.notes.timeoutMs);
-  const app = await createGranolaApp(config);
-  debug(config.debug, "authMode", app.getState().auth.mode);
+  const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
   console.log("Loading meetings...");
   const folder = folderQuery ? await app.findFolder(folderQuery) : undefined;
@@ -240,16 +228,7 @@ async function view(
   globalFlags: Record<string, string | boolean | undefined>,
 ): Promise<number> {
   const format = resolveViewFormat(commandFlags.format);
-  const config = await loadConfig({
-    globalFlags,
-    subcommandFlags: commandFlags,
-  });
-  debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-  debug(config.debug, "supabase", config.supabase);
-  debug(config.debug, "cacheFile", config.transcripts.cacheFile || "(none)");
-  debug(config.debug, "timeoutMs", config.notes.timeoutMs);
-  const app = await createGranolaApp(config);
-  debug(config.debug, "authMode", app.getState().auth.mode);
+  const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
   console.log("Fetching meeting from Granola API...");
   const result = await app.getMeeting(id);
@@ -264,16 +243,7 @@ async function exportMeeting(
   globalFlags: Record<string, string | boolean | undefined>,
 ): Promise<number> {
   const format = resolveExportFormat(commandFlags.format);
-  const config = await loadConfig({
-    globalFlags,
-    subcommandFlags: commandFlags,
-  });
-  debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-  debug(config.debug, "supabase", config.supabase);
-  debug(config.debug, "cacheFile", config.transcripts.cacheFile || "(none)");
-  debug(config.debug, "timeoutMs", config.notes.timeoutMs);
-  const app = await createGranolaApp(config);
-  debug(config.debug, "authMode", app.getState().auth.mode);
+  const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
   console.log("Fetching meeting from Granola API...");
   const result = await app.getMeeting(id);
@@ -288,16 +258,7 @@ async function notes(
   globalFlags: Record<string, string | boolean | undefined>,
 ): Promise<number> {
   const format = resolveNotesFormat(commandFlags.format);
-  const config = await loadConfig({
-    globalFlags,
-    subcommandFlags: commandFlags,
-  });
-  debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-  debug(config.debug, "supabase", config.supabase);
-  debug(config.debug, "cacheFile", config.transcripts.cacheFile || "(none)");
-  debug(config.debug, "timeoutMs", config.notes.timeoutMs);
-  const app = await createGranolaApp(config);
-  debug(config.debug, "authMode", app.getState().auth.mode);
+  const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
   console.log("Fetching meeting from Granola API...");
   const result = await app.getMeeting(id);
@@ -312,16 +273,7 @@ async function transcript(
   globalFlags: Record<string, string | boolean | undefined>,
 ): Promise<number> {
   const format = resolveTranscriptFormat(commandFlags.format);
-  const config = await loadConfig({
-    globalFlags,
-    subcommandFlags: commandFlags,
-  });
-  debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-  debug(config.debug, "supabase", config.supabase);
-  debug(config.debug, "cacheFile", config.transcripts.cacheFile || "(none)");
-  debug(config.debug, "timeoutMs", config.notes.timeoutMs);
-  const app = await createGranolaApp(config);
-  debug(config.debug, "authMode", app.getState().auth.mode);
+  const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
   console.log("Fetching meeting from Granola API...");
   const result = await app.getMeeting(id);
@@ -339,19 +291,9 @@ async function openMeeting(
   commandFlags: Record<string, string | boolean | undefined>,
   globalFlags: Record<string, string | boolean | undefined>,
 ): Promise<number> {
-  const config = await loadConfig({
-    globalFlags,
-    subcommandFlags: commandFlags,
-  });
-  debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-  debug(config.debug, "supabase", config.supabase);
-  debug(config.debug, "cacheFile", config.transcripts.cacheFile || "(none)");
-  debug(config.debug, "timeoutMs", config.notes.timeoutMs);
-
-  const app = await createGranolaApp(config, {
+  const { app } = await createMeetingAppContext(commandFlags, globalFlags, {
     surface: "web",
   });
-  debug(config.debug, "authMode", app.getState().auth.mode);
 
   console.log("Resolving meeting from Granola API...");
   const result = await app.getMeeting(id);
@@ -360,5 +302,18 @@ async function openMeeting(
   return await runGranolaWebWorkspace(app, {
     ...resolveGranolaWebWorkspaceOptions(commandFlags),
     targetMeetingId: result.document.id,
+  });
+}
+
+async function createMeetingAppContext(
+  commandFlags: Record<string, string | boolean | undefined>,
+  globalFlags: Record<string, string | boolean | undefined>,
+  options: Parameters<typeof createCommandAppContext>[2] = {},
+) {
+  return await createCommandAppContext(commandFlags, globalFlags, {
+    includeCacheFile: true,
+    includeSupabase: true,
+    includeTimeoutMs: true,
+    ...options,
   });
 }

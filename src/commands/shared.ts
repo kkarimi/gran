@@ -1,9 +1,59 @@
+import { createGranolaApp, type GranolaApp, type GranolaAppSurface } from "../app/index.ts";
+import { loadConfig, type FlagValues } from "../config.ts";
+import type { AppConfig } from "../types.ts";
 import { parseDuration } from "../utils.ts";
 
 export function debug(enabled: boolean, ...values: unknown[]): void {
   if (enabled) {
     console.error("[debug]", ...values);
   }
+}
+
+export interface CommandAppContext {
+  app: GranolaApp;
+  config: AppConfig;
+}
+
+export interface CommandAppContextOptions {
+  includeCacheFile?: boolean;
+  includeSupabase?: boolean;
+  includeTimeoutMs?: boolean;
+  surface?: GranolaAppSurface;
+}
+
+function logCommandConfig(config: AppConfig, options: CommandAppContextOptions): void {
+  debug(config.debug, "using config", config.configFileUsed ?? "(none)");
+
+  if (options.includeSupabase) {
+    debug(config.debug, "supabase", config.supabase);
+  }
+
+  if (options.includeCacheFile) {
+    debug(config.debug, "cacheFile", config.transcripts.cacheFile || "(none)");
+  }
+
+  if (options.includeTimeoutMs) {
+    debug(config.debug, "timeoutMs", config.notes.timeoutMs);
+  }
+}
+
+export async function createCommandAppContext(
+  commandFlags: FlagValues,
+  globalFlags: FlagValues,
+  options: CommandAppContextOptions = {},
+): Promise<CommandAppContext> {
+  const config = await loadConfig({
+    globalFlags,
+    subcommandFlags: commandFlags,
+  });
+
+  logCommandConfig(config, options);
+  const app = await createGranolaApp(config, {
+    surface: options.surface,
+  });
+  debug(config.debug, "authMode", app.getState().auth.mode);
+
+  return { app, config };
 }
 
 export function parsePort(value: string | boolean | undefined): number | undefined {

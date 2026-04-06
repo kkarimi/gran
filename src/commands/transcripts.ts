@@ -1,9 +1,7 @@
-import { createGranolaApp } from "../app/index.ts";
 import { renderExportScopeLabel } from "../export-scope.ts";
-import { loadConfig } from "../config.ts";
 import type { TranscriptOutputFormat } from "../types.ts";
 
-import { debug } from "./shared.ts";
+import { createCommandAppContext, debug } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function transcriptsHelp(): string {
@@ -35,18 +33,13 @@ export const transcriptsCommand: CommandDefinition = {
   help: transcriptsHelp,
   name: "transcripts",
   async run({ commandFlags, globalFlags }) {
-    const config = await loadConfig({
-      globalFlags,
-      subcommandFlags: commandFlags,
+    const { app, config } = await createCommandAppContext(commandFlags, globalFlags, {
+      includeCacheFile: true,
     });
 
-    debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-    debug(config.debug, "cacheFile", config.transcripts.cacheFile);
     debug(config.debug, "output", config.transcripts.output);
     const format = resolveTranscriptFormat(commandFlags.format);
     debug(config.debug, "format", format);
-    const app = await createGranolaApp(config);
-    debug(config.debug, "authMode", app.getState().auth.mode);
     const folderQuery = typeof commandFlags.folder === "string" ? commandFlags.folder : undefined;
     const folder = folderQuery ? await app.findFolder(folderQuery) : undefined;
     debug(config.debug, "folder", folder?.id ?? "(all)");

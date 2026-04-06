@@ -1,9 +1,7 @@
-import { createGranolaApp } from "../app/index.ts";
 import { renderExportScopeLabel } from "../export-scope.ts";
-import { loadConfig } from "../config.ts";
 import type { NoteOutputFormat } from "../types.ts";
 
-import { debug } from "./shared.ts";
+import { createCommandAppContext, debug } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function notesHelp(): string {
@@ -36,19 +34,14 @@ export const notesCommand: CommandDefinition = {
   help: notesHelp,
   name: "notes",
   async run({ commandFlags, globalFlags }) {
-    const config = await loadConfig({
-      globalFlags,
-      subcommandFlags: commandFlags,
+    const { app, config } = await createCommandAppContext(commandFlags, globalFlags, {
+      includeSupabase: true,
+      includeTimeoutMs: true,
     });
 
-    debug(config.debug, "using config", config.configFileUsed ?? "(none)");
-    debug(config.debug, "supabase", config.supabase);
-    debug(config.debug, "timeoutMs", config.notes.timeoutMs);
     debug(config.debug, "output", config.notes.output);
     const format = resolveNoteFormat(commandFlags.format);
     debug(config.debug, "format", format);
-    const app = await createGranolaApp(config);
-    debug(config.debug, "authMode", app.getState().auth.mode);
     const folderQuery = typeof commandFlags.folder === "string" ? commandFlags.folder : undefined;
     const folder = folderQuery ? await app.findFolder(folderQuery) : undefined;
     debug(config.debug, "folder", folder?.id ?? "(all)");
