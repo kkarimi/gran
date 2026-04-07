@@ -42,6 +42,7 @@ export interface GranolaWebAppState {
   detailError: string;
   folderError: string;
   folders: FolderSummaryRecord[];
+  foldersLoading: boolean;
   harnessDirty: boolean;
   harnessError: string;
   harnessExplainEventKind: GranolaSyncEventKind | null;
@@ -52,8 +53,11 @@ export interface GranolaWebAppState {
   homeMeetings: MeetingSummaryRecord[];
   homeMeetingsError: string;
   listError: string;
+  homeMeetingsLoading: boolean;
+  meetingLoading: boolean;
   meetingReturnPage: MeetingReturnPage;
   meetings: MeetingSummaryRecord[];
+  meetingsLoading: boolean;
   meetingSource: MeetingSummarySource;
   preferredProvider: GranolaAgentProviderKind;
   processingIssueError: string;

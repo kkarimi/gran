@@ -12,6 +12,48 @@ import type { GranolaServerInfo } from "../transport.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
 import { exportScopeLabel, parseWorkspaceTab, type WorkspaceTab } from "../web/client-state.ts";
 
+export type WebAsyncViewState = "content" | "empty" | "error" | "loading";
+
+export function resolveAsyncViewState(options: {
+  count: number;
+  error?: string;
+  loading?: boolean;
+}): WebAsyncViewState {
+  if (options.loading && options.count === 0) {
+    return "loading";
+  }
+
+  if (options.error) {
+    return "error";
+  }
+
+  if (options.count > 0) {
+    return "content";
+  }
+
+  return "empty";
+}
+
+export function resolveMeetingWorkspaceState(options: {
+  detailError?: string;
+  hasMeeting: boolean;
+  loading?: boolean;
+}): WebAsyncViewState {
+  if (options.loading && !options.hasMeeting) {
+    return "loading";
+  }
+
+  if (options.detailError) {
+    return "error";
+  }
+
+  if (options.hasMeeting) {
+    return "content";
+  }
+
+  return "empty";
+}
+
 export function metadataLines(record: MeetingRecord, bundle?: GranolaMeetingBundle | null): string {
   const transcriptStatus = record.meeting.transcriptLoaded
     ? `${record.meeting.transcriptSegmentCount} segments`

@@ -76,8 +76,10 @@ export function App() {
     detailError: "",
     folderError: "",
     folders: [],
+    foldersLoading: false,
     homeMeetings: [],
     homeMeetingsError: "",
+    homeMeetingsLoading: false,
     harnessDirty: false,
     harnessError: "",
     harnessExplainEventKind: null,
@@ -86,8 +88,10 @@ export function App() {
     harnessTestResult: null,
     harnesses: [],
     listError: "",
+    meetingLoading: false,
     meetingSource: "live",
     meetings: [],
+    meetingsLoading: false,
     processingIssueError: "",
     processingIssues: [],
     preferredProvider: "openrouter",
@@ -559,7 +563,7 @@ export function App() {
                 state={onboardingState()}
               />
             ) : null}
-            {!state.serverLocked && state.detailError ? (
+            {!state.serverLocked && state.detailError && !state.meetingLoading ? (
               <section class="jobs-panel">
                 <div class="auth-card">
                   <div class="auth-card__meta auth-card__error">{state.detailError}</div>
@@ -598,7 +602,9 @@ export function App() {
                 appState={state.appState}
                 automationEnabled={automationEnabled()}
                 folders={state.folders}
+                foldersLoading={state.foldersLoading}
                 latestMeetings={state.homeMeetings}
+                latestMeetingsLoading={state.homeMeetingsLoading}
                 onOpenFolder={(folderId) => {
                   void browseController.openPage("folders", { folderId });
                 }}
@@ -631,9 +637,11 @@ export function App() {
               <FoldersPageController
                 folderError={state.folderError}
                 folders={state.folders}
+                foldersLoading={state.foldersLoading}
                 listError={state.listError}
                 meetingEmptyHint={browseController.meetingEmptyHint()}
                 meetings={state.meetings}
+                meetingsLoading={state.meetingsLoading}
                 onBackToFolders={() => {
                   void browseController.openPage("folders");
                 }}
@@ -702,6 +710,7 @@ export function App() {
                 listError={state.listError}
                 meetingEmptyHint={browseController.meetingEmptyHint()}
                 meetings={state.meetings}
+                meetingsLoading={state.meetingsLoading}
                 onOpenMeeting={(meetingId) => {
                   void browseController.openMeetingFromPage(meetingId, "search");
                 }}
@@ -976,6 +985,7 @@ export function App() {
             <Match when={state.activePage === "meeting"}>
               <MeetingPageController
                 detailError={state.detailError}
+                meetingLoading={state.meetingLoading}
                 markdownViewerEnabled={markdownViewerEnabled()}
                 meetingDescription={meetingDescription()}
                 meetingReturnLabel={meetingReturnLabel()}

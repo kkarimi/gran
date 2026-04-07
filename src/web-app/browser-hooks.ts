@@ -934,6 +934,7 @@ export function useMeetingBrowserController({
       return;
     }
 
+    setState("foldersLoading", true);
     try {
       setState("folderError", "");
       const result = await client.listFolders({
@@ -952,6 +953,8 @@ export function useMeetingBrowserController({
       if (state.folders.length === 0) {
         setState("selectedFolderId", null);
       }
+    } finally {
+      setState("foldersLoading", false);
     }
   };
 
@@ -961,6 +964,7 @@ export function useMeetingBrowserController({
       return;
     }
 
+    setState("homeMeetingsLoading", true);
     try {
       setState("homeMeetingsError", "");
       const result = await client.listMeetings({
@@ -972,6 +976,8 @@ export function useMeetingBrowserController({
     } catch (error) {
       setState("homeMeetingsError", error instanceof Error ? error.message : String(error));
       setState("homeMeetings", []);
+    } finally {
+      setState("homeMeetingsLoading", false);
     }
   };
 
@@ -981,7 +987,14 @@ export function useMeetingBrowserController({
       return;
     }
 
+    const previousMeetingId =
+      state.selectedMeetingBundle?.source.document.id || state.selectedMeeting?.meeting.id || null;
     setState("selectedMeetingId", meetingId);
+    setState("meetingLoading", true);
+    if (previousMeetingId !== meetingId) {
+      setState("selectedMeetingBundle", null);
+      setState("selectedMeeting", null);
+    }
     try {
       setState("detailError", "");
       const bundle = await client.getMeeting(meetingId);
@@ -1001,6 +1014,8 @@ export function useMeetingBrowserController({
       setState("detailError", error instanceof Error ? error.message : String(error));
       setState("harnessExplainEventKind", null);
       setState("harnessExplanations", []);
+    } finally {
+      setState("meetingLoading", false);
     }
   };
 
@@ -1021,6 +1036,8 @@ export function useMeetingBrowserController({
     if (!hasMeetingBrowseScope() && !options.preferredMeetingId && !state.selectedMeetingId) {
       setState("listError", "");
       setState("meetings", []);
+      setState("meetingsLoading", false);
+      setState("meetingLoading", false);
       setState("selectedMeeting", null);
       setState("selectedMeetingBundle", null);
       setState("detailError", "");
@@ -1033,6 +1050,7 @@ export function useMeetingBrowserController({
       return;
     }
 
+    setState("meetingsLoading", true);
     try {
       setState("listError", "");
       const result = await client.listMeetings({
@@ -1054,6 +1072,7 @@ export function useMeetingBrowserController({
       if (nextMeetingId) {
         await loadMeeting(nextMeetingId);
       } else {
+        setState("meetingLoading", false);
         setState("selectedMeeting", null);
         setState("selectedMeetingBundle", null);
         setState("detailError", "");
@@ -1072,6 +1091,9 @@ export function useMeetingBrowserController({
       setState("detailError", message);
       setState("harnessExplainEventKind", null);
       setState("harnessExplanations", []);
+      setState("meetingLoading", false);
+    } finally {
+      setState("meetingsLoading", false);
     }
   };
 
@@ -1096,6 +1118,7 @@ export function useMeetingBrowserController({
       setState("selectedMeetingId", null);
       setState("selectedMeeting", null);
       setState("selectedMeetingBundle", null);
+      setState("meetingLoading", false);
       setState("meetings", []);
       setState("listError", "");
       if (state.folders.length === 0) {
@@ -1113,6 +1136,7 @@ export function useMeetingBrowserController({
       setState("selectedMeetingId", null);
       setState("selectedMeeting", null);
       setState("selectedMeetingBundle", null);
+      setState("meetingLoading", false);
       setState("searchSubmitted", false);
       setState("meetings", []);
       setState("listError", "");
@@ -1182,6 +1206,7 @@ export function useMeetingBrowserController({
     setState("selectedMeetingId", null);
     setState("selectedMeeting", null);
     setState("selectedMeetingBundle", null);
+    setState("meetingLoading", false);
     setState("searchSubmitted", false);
     setState("activePage", "home");
     await loadMeetings();
@@ -1194,6 +1219,7 @@ export function useMeetingBrowserController({
     setState("selectedMeetingId", null);
     setState("selectedMeeting", null);
     setState("selectedMeetingBundle", null);
+    setState("meetingLoading", false);
     await loadMeetings();
     setStatus("Search updated", "ok");
   };
@@ -1207,6 +1233,7 @@ export function useMeetingBrowserController({
     setState("selectedMeetingId", null);
     setState("selectedMeeting", null);
     setState("selectedMeetingBundle", null);
+    setState("meetingLoading", false);
     setState("searchSubmitted", false);
     setState("meetings", []);
     setState("listError", "");

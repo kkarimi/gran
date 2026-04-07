@@ -52,7 +52,9 @@ export function HomePageController(props: {
   appState: GranolaAppState | null;
   automationEnabled: boolean;
   folders: FolderSummaryRecord[];
+  foldersLoading: boolean;
   latestMeetings: MeetingSummaryRecord[];
+  latestMeetingsLoading: boolean;
   onOpenFolder: (folderId: string) => void;
   onOpenLatestMeeting: (meeting: MeetingSummaryRecord) => void;
   onOpenMeeting: (meeting: WebWorkspaceRecentMeeting) => void;
@@ -101,7 +103,9 @@ export function HomePageController(props: {
         appState={props.appState}
         automationEnabled={props.automationEnabled}
         folders={props.folders}
+        foldersLoading={props.foldersLoading}
         latestMeetings={props.latestMeetings}
+        latestMeetingsLoading={props.latestMeetingsLoading}
         onOpenFolder={(folderId) => {
           props.onOpenFolder(folderId);
         }}
@@ -126,9 +130,11 @@ export function HomePageController(props: {
 export function FoldersPageController(props: {
   folderError: string;
   folders: FolderSummaryRecord[];
+  foldersLoading: boolean;
   listError: string;
   meetingEmptyHint: string;
   meetings: MeetingSummaryRecord[];
+  meetingsLoading: boolean;
   onBackToFolders: () => void;
   onExportNotes: () => void;
   onExportTranscripts: () => void;
@@ -192,6 +198,7 @@ export function FoldersPageController(props: {
           <FolderList
             error={props.folderError}
             folders={props.folders}
+            loading={props.foldersLoading}
             onSelect={(folderId) => {
               if (folderId) {
                 props.onSelectFolder(folderId);
@@ -238,6 +245,7 @@ export function FoldersPageController(props: {
           emptyHint={props.meetingEmptyHint}
           folders={props.folders}
           heading={`Meetings in ${props.selectedFolder?.name || "this folder"}`}
+          loading={props.meetingsLoading}
           meetings={props.meetings}
           onSelect={(meetingId) => {
             props.onOpenMeeting(meetingId);
@@ -260,6 +268,7 @@ export function SearchPageController(props: {
   listError: string;
   meetingEmptyHint: string;
   meetings: MeetingSummaryRecord[];
+  meetingsLoading: boolean;
   onAdvancedQueryChange: (value: string) => void;
   onClear: () => void;
   onOpenAdvanced: () => void;
@@ -318,6 +327,7 @@ export function SearchPageController(props: {
           emptyHint={props.meetingEmptyHint}
           folders={props.folders}
           heading="Search results"
+          loading={props.meetingsLoading}
           meetings={props.meetings}
           onSelect={(meetingId) => props.onOpenMeeting(meetingId)}
           search={props.query}
@@ -635,6 +645,7 @@ export function SettingsPageController(props: {
 
 export function MeetingPageController(props: {
   detailError: string;
+  meetingLoading: boolean;
   markdownViewerEnabled: boolean;
   meetingDescription: string;
   meetingReturnLabel: string;
@@ -662,6 +673,7 @@ export function MeetingPageController(props: {
         bundle={props.selectedBundle}
         detailError={props.detailError}
         fallbackFolderLabel={props.selectedFolderLabel}
+        loading={props.meetingLoading}
         markdownViewerEnabled={props.markdownViewerEnabled}
         onSelectTab={(tab) => props.onSelectTab(tab)}
         selectedMeeting={props.selectedMeeting}

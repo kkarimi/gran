@@ -394,6 +394,75 @@ select {
   color: var(--error);
 }
 
+.loading-block,
+.loading-card-grid,
+.workspace-loading {
+  display: grid;
+  gap: 14px;
+}
+
+.loading-block__label {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.loading-block__lines,
+.loading-card-grid__items {
+  display: grid;
+  gap: 10px;
+}
+
+.loading-card-grid__items {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.loading-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.loading-line,
+.detail-chip--skeleton,
+.workspace-tab--skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(93, 107, 119, 0.14);
+}
+
+.loading-line::after,
+.detail-chip--skeleton::after,
+.workspace-tab--skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.loading-line {
+  height: 14px;
+}
+
+.loading-line--short {
+  width: 32%;
+}
+
+.loading-line--medium {
+  width: 68%;
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .folder-card {
   width: 100%;
   display: grid;
@@ -1092,6 +1161,16 @@ select {
   font-size: 0.88rem;
 }
 
+.detail-chip--skeleton {
+  min-height: 38px;
+  min-width: 120px;
+  border: 1px solid transparent;
+}
+
+.detail-chip--wide {
+  min-width: 220px;
+}
+
 .detail-body {
   padding: 0 0 24px;
   overflow: visible;
@@ -1188,6 +1267,18 @@ select {
 
 .workspace-frame__body {
   padding: 18px 24px 24px;
+}
+
+.workspace-frame__body--loading {
+  display: grid;
+  gap: 12px;
+}
+
+.workspace-tab--skeleton {
+  width: 88px;
+  min-height: 42px;
+  border: 1px solid transparent;
+  cursor: default;
 }
 
 .home-dashboard {

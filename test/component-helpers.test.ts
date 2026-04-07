@@ -4,6 +4,8 @@ import type { GranolaMeetingBundle, MeetingRecord } from "../src/app/index.ts";
 import {
   meetingContextSummary,
   metadataLines,
+  resolveAsyncViewState,
+  resolveMeetingWorkspaceState,
   workspaceBody,
 } from "../src/web-app/component-helpers.ts";
 
@@ -83,5 +85,21 @@ describe("web meeting helpers", () => {
     expect(notesView.body).toBe("Adyen Go-Live Status\n\n- Road to production delayed");
     expect(notesView.body).not.toContain("id:");
     expect(notesView.body).not.toContain("# Payment Ops");
+  });
+
+  test("prefers loading states over empty copy for async browser panels", () => {
+    expect(resolveAsyncViewState({ count: 0, loading: true })).toBe("loading");
+    expect(resolveAsyncViewState({ count: 0, error: "boom" })).toBe("error");
+    expect(resolveAsyncViewState({ count: 2, loading: true })).toBe("content");
+    expect(resolveAsyncViewState({ count: 0 })).toBe("empty");
+  });
+
+  test("keeps the meeting workspace in loading state until the first detail fetch settles", () => {
+    expect(resolveMeetingWorkspaceState({ hasMeeting: false, loading: true })).toBe("loading");
+    expect(resolveMeetingWorkspaceState({ detailError: "missing", hasMeeting: false })).toBe(
+      "error",
+    );
+    expect(resolveMeetingWorkspaceState({ hasMeeting: true })).toBe("content");
+    expect(resolveMeetingWorkspaceState({ hasMeeting: false })).toBe("empty");
   });
 });

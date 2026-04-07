@@ -1,6 +1,6 @@
 /** @jsxImportSource solid-js */
 
-import { For, Show, type JSX } from "solid-js";
+import { For, Match, Show, Switch, type JSX } from "solid-js";
 
 import type {
   FolderSummaryRecord,
@@ -26,6 +26,7 @@ import {
   meetingsPerDay,
   meetingsWithinDays,
   relativeDateLabel,
+  resolveAsyncViewState,
   reviewSummaryLabel,
   runtimeLabel,
   syncHealthSummary,
@@ -61,6 +62,7 @@ interface ToolbarFiltersProps {
 interface FolderListProps {
   error?: string;
   folders: FolderSummaryRecord[];
+  loading?: boolean;
   onSelect: (folderId: string | null) => void;
   selectedFolderId?: string | null;
 }
@@ -89,6 +91,7 @@ interface MeetingListProps {
   emptyHint?: string;
   folders: FolderSummaryRecord[];
   heading?: string;
+  loading?: boolean;
   meetings: MeetingSummaryRecord[];
   onSelect: (meetingId: string) => void;
   search: string;
@@ -102,15 +105,49 @@ interface HomeDashboardPanelProps {
   appState?: GranolaAppState | null;
   automationEnabled: boolean;
   folders: FolderSummaryRecord[];
+  foldersLoading: boolean;
   onOpenFolder: (folderId: string) => void;
   onOpenLatestMeeting: (meeting: MeetingSummaryRecord) => void;
   onOpenMeeting: (meeting: WebWorkspaceRecentMeeting) => void;
   onOpenReview: () => void;
   latestMeetings: MeetingSummaryRecord[];
+  latestMeetingsLoading: boolean;
   processingIssues: GranolaProcessingIssue[];
   recentMeetings: WebWorkspaceRecentMeeting[];
   reviewSummary: GranolaReviewInboxSummary;
   serverInfo?: GranolaServerInfo | null;
+}
+
+function LoadingBlock(props: { label: string; lines?: number }): JSX.Element {
+  return (
+    <div aria-live="polite" class="loading-block" role="status">
+      <span class="loading-block__label">{props.label}</span>
+      <div class="loading-block__lines">
+        <For each={Array.from({ length: props.lines ?? 3 })}>
+          {() => <div class="loading-line" />}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+function LoadingCardGrid(props: { label: string; count?: number }): JSX.Element {
+  return (
+    <div aria-live="polite" class="loading-card-grid" role="status">
+      <span class="loading-block__label">{props.label}</span>
+      <div class="loading-card-grid__items">
+        <For each={Array.from({ length: props.count ?? 4 })}>
+          {() => (
+            <div class="loading-card">
+              <div class="loading-line loading-line--short" />
+              <div class="loading-line" />
+              <div class="loading-line loading-line--medium" />
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
+  );
 }
 
 export function ToolbarFilters(props: ToolbarFiltersProps): JSX.Element {
@@ -376,9 +413,13 @@ export function HomeDashboardPanel(props: HomeDashboardPanelProps): JSX.Element 
         <Show
           when={latestMeetings().length > 0}
           fallback={
-            <div class="empty empty--inline">
-              Recent meetings will appear here after your first successful sync.
-            </div>
+            props.latestMeetingsLoading ? (
+              <LoadingCardGrid count={4} label="Loading recent meetings…" />
+            ) : (
+              <div class="empty empty--inline">
+                Recent meetings will appear here after your first successful sync.
+              </div>
+            )
           }
         >
           <div class="latest-meetings-grid">
@@ -498,9 +539,13 @@ export function HomeDashboardPanel(props: HomeDashboardPanelProps): JSX.Element 
           <Show
             when={props.folders.length > 0}
             fallback={
-              <div class="empty empty--inline">
-                No folders are available yet. Run sync or finish connecting your account first.
-              </div>
+              props.foldersLoading ? (
+                <LoadingBlock label="Loading folders…" lines={4} />
+              ) : (
+                <div class="empty empty--inline">
+                  No folders are available yet. Run sync or finish connecting your account first.
+                </div>
+              )
             }
           >
             <div class="folder-list">
@@ -589,6 +634,12 @@ export function FolderList(props: FolderListProps): JSX.Element {
 
       return (right.updatedAt || "").localeCompare(left.updatedAt || "");
     });
+  const viewState = () =>
+    resolveAsyncViewState({
+      count: props.folders.length,
+      error: props.error,
+      loading: props.loading,
+    });
 
   return (
     <section class="folder-directory">
@@ -599,11 +650,20 @@ export function FolderList(props: FolderListProps): JSX.Element {
         </div>
       </div>
       <div class="folder-directory__grid">
-        <Show
-          when={!props.error}
-          fallback={<div class="folder-empty folder-empty--error">{props.error}</div>}
-        >
-          <>
+        <Switch>
+          <Match when={viewState() === "error"}>
+            <div class="folder-empty folder-empty--error">{props.error}</div>
+          </Match>
+          <Match when={viewState() === "loading"}>
+            <LoadingCardGrid count={6} label="Loading folder directory…" />
+          </Match>
+          <Match when={viewState() === "empty"}>
+            <div class="empty empty--inline">
+              No folders are available yet. Run sync once your account is connected and Granola has
+              exposed folder data for this workspace.
+            </div>
+          </Match>
+          <Match when={viewState() === "content"}>
             <For each={sortedFolders()}>
               {(folder) => (
                 <button
@@ -627,14 +687,8 @@ export function FolderList(props: FolderListProps): JSX.Element {
                 </button>
               )}
             </For>
-            <Show when={props.folders.length === 0}>
-              <div class="empty empty--inline">
-                No folders are available yet. Run sync once your account is connected and Granola
-                has exposed folder data for this workspace.
-              </div>
-            </Show>
-          </>
-        </Show>
+          </Match>
+        </Switch>
       </div>
     </section>
   );
@@ -750,6 +804,12 @@ export function MeetingList(props: MeetingListProps): JSX.Element {
       updatedFrom: props.updatedFrom,
       updatedTo: props.updatedTo,
     });
+  const viewState = () =>
+    resolveAsyncViewState({
+      count: props.meetings.length,
+      error: props.error,
+      loading: props.loading,
+    });
 
   return (
     <section class="meeting-list">
@@ -760,20 +820,21 @@ export function MeetingList(props: MeetingListProps): JSX.Element {
             (summary() ? `Browsing ${summary()}.` : "Choose a meeting from this focused list.")}
         </p>
       </div>
-      <Show
-        when={!props.error}
-        fallback={<div class="meeting-empty meeting-empty--error">{props.error}</div>}
-      >
-        <Show
-          fallback={
-            <div class="meeting-empty">
-              {summary()
-                ? `No meetings match ${summary()}.`
-                : props.emptyHint || "No meetings yet. Try Sync now."}
-            </div>
-          }
-          when={props.meetings.length > 0}
-        >
+      <Switch>
+        <Match when={viewState() === "error"}>
+          <div class="meeting-empty meeting-empty--error">{props.error}</div>
+        </Match>
+        <Match when={viewState() === "loading"}>
+          <LoadingBlock label="Loading meetings…" lines={5} />
+        </Match>
+        <Match when={viewState() === "empty"}>
+          <div class="meeting-empty">
+            {summary()
+              ? `No meetings match ${summary()}.`
+              : props.emptyHint || "No meetings yet. Try Sync now."}
+          </div>
+        </Match>
+        <Match when={viewState() === "content"}>
           <For each={props.meetings}>
             {(meeting) => (
               <button
@@ -796,8 +857,8 @@ export function MeetingList(props: MeetingListProps): JSX.Element {
               </button>
             )}
           </For>
-        </Show>
-      </Show>
+        </Match>
+      </Switch>
     </section>
   );
 }
