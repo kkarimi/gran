@@ -16,7 +16,10 @@ test.describe("toolkit web workspace", () => {
   test("uses page-based navigation instead of a giant meeting sidebar", async ({ page }) => {
     await page.goto(server.url);
 
-    await expect(page.getByRole("heading", { name: "Local meeting workspace" })).toBeVisible({
+    await expect(page.locator(".primary-nav").getByText("Granola Toolkit")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.locator(".primary-nav").getByText("Workspace")).toBeVisible({
       timeout: 20_000,
     });
     await expect(
@@ -120,9 +123,6 @@ test.describe("toolkit web workspace", () => {
       .getByRole("button", { name: /Review/i })
       .click();
     await expect(page.getByText("Review Inbox")).toBeVisible();
-    await expect(
-      page.locator(".primary-nav").getByRole("button", { name: "Sync now" }),
-    ).toBeVisible();
   });
 
   test("configures and tests automation from Settings -> Plugins while keeping the selected meeting", async ({
@@ -202,7 +202,7 @@ test.describe("toolkit web workspace", () => {
       });
       await importMeetingsButton.click();
 
-      await expect(page.getByRole("heading", { name: "Local meeting workspace" })).toBeVisible({
+      await expect(page.locator(".primary-nav").getByText("Granola Toolkit")).toBeVisible({
         timeout: 20_000,
       });
       await expect(
@@ -228,9 +228,6 @@ test.describe("toolkit web workspace", () => {
       await expect(page.getByRole("button", { name: "New Harness" })).toBeVisible();
       await expect(
         page.locator(".primary-nav").getByRole("button", { name: /Review/i }),
-      ).toBeVisible();
-      await expect(
-        page.locator(".primary-nav").getByRole("button", { name: "Sync now" }),
       ).toBeVisible();
     } finally {
       await page.close();

@@ -52,7 +52,8 @@ select {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 216px minmax(0, 1fr);
+  align-items: start;
   gap: 18px;
   min-height: 100vh;
   padding: 24px;
@@ -79,23 +80,22 @@ select {
 
 .primary-nav {
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  gap: 16px;
-  padding: 22px;
+  align-self: start;
+  position: sticky;
+  top: 24px;
+  gap: 14px;
+  padding: 18px 14px 14px;
 }
 
-.primary-nav__hero h1 {
-  margin: 6px 0 0;
-  font-family: var(--serif);
-  font-size: clamp(1.8rem, 2vw, 2.3rem);
-  font-weight: 600;
-  letter-spacing: -0.04em;
+.primary-nav__brand {
+  display: grid;
+  gap: 4px;
+  padding: 0 6px;
 }
 
-.primary-nav__hero p {
-  margin: 10px 0 0;
-  color: var(--muted);
-  line-height: 1.55;
+.primary-nav__brand-name {
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .primary-nav__eyebrow,
@@ -111,17 +111,19 @@ select {
 .primary-nav__links {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .primary-nav__link {
   width: 100%;
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
   text-align: left;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid transparent;
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.72);
   color: inherit;
   cursor: pointer;
@@ -142,29 +144,15 @@ select {
   font-weight: 700;
 }
 
-.primary-nav__link-note {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.primary-nav__status {
-  display: grid;
-  gap: 12px;
-}
-
-.primary-nav__stat {
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.primary-nav__meta {
-  display: block;
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 0.88rem;
-  line-height: 1.45;
+.primary-nav__link-badge {
+  min-width: 1.55rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .app-main {

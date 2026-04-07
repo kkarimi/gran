@@ -577,7 +577,6 @@ export function App() {
       <div class="app-shell">
         <PrimaryNav
           activePage={state.activePage}
-          folderCount={state.folders.length}
           onNavigate={(page) => {
             if (page === "home") {
               void browseController.clearFilters();
@@ -586,14 +585,8 @@ export function App() {
 
             void browseController.openPage(page);
           }}
-          onSync={() => {
-            void connectAndRefresh(true);
-          }}
           reviewEnabled={automationEnabled()}
           reviewSummary={reviewController.reviewInboxSummary()}
-          serverInfo={state.serverInfo}
-          statusLabel={state.statusLabel}
-          statusTone={state.statusTone}
         />
         <main class="pane app-main">
           <Switch>

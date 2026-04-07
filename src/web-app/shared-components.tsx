@@ -8,12 +8,7 @@ import type { GranolaReviewInboxSummary } from "../review-inbox.ts";
 import type { GranolaServerInfo } from "../transport.ts";
 import { describeAuthStatus, describeSyncStatus } from "../web/client-state.ts";
 
-import {
-  buildIdentityLabel,
-  buildStartedAtLabel,
-  reviewSummaryLabel,
-  runtimeLabel,
-} from "./component-helpers.ts";
+import { reviewSummaryLabel, runtimeLabel } from "./component-helpers.ts";
 
 export type WebStatusTone = "busy" | "error" | "idle" | "ok";
 export type WebMainPage = "folders" | "home" | "meeting" | "review" | "search" | "settings";
@@ -23,14 +18,9 @@ type WebNavigationPage = Exclude<WebMainPage, "meeting">;
 
 interface PrimaryNavProps {
   activePage: WebMainPage;
-  folderCount: number;
   onNavigate: (page: WebNavigationPage) => void;
-  onSync: () => void;
   reviewEnabled: boolean;
   reviewSummary: GranolaReviewInboxSummary;
-  serverInfo?: GranolaServerInfo | null;
-  statusLabel: string;
-  statusTone: WebStatusTone;
 }
 
 interface PageHeaderProps {
@@ -49,29 +39,32 @@ interface SecurityPanelProps {
 }
 
 export function PrimaryNav(props: PrimaryNavProps): JSX.Element {
-  const navItems = (): Array<{ id: WebNavigationPage; label: string; note: string }> => [
-    { id: "home", label: "Home", note: "Overview and next steps" },
-    { id: "folders", label: "Folders", note: "Browse meetings from folders" },
-    { id: "search", label: "Search", note: "Find one meeting on purpose" },
+  const navItems = (): Array<{
+    badge?: string;
+    id: WebNavigationPage;
+    label: string;
+  }> => [
+    { id: "home", label: "Home" },
+    { id: "folders", label: "Folders" },
+    { id: "search", label: "Search" },
     ...(props.reviewEnabled
-      ? ([{ id: "review", label: "Review", note: "Handle approvals and issues" }] as const)
+      ? ([
+          {
+            badge: props.reviewSummary.total > 0 ? String(props.reviewSummary.total) : undefined,
+            id: "review",
+            label: "Review",
+          },
+        ] as const)
       : []),
-    { id: "settings", label: "Settings", note: "Auth, plugins, exports, diagnostics" },
+    { id: "settings", label: "Settings" },
   ];
 
   return (
     <aside class="pane primary-nav">
-      <div class="primary-nav__hero">
+      <div class="primary-nav__brand">
         <p class="primary-nav__eyebrow">Granola Toolkit</p>
-        <h1>Local meeting workspace</h1>
-        <p>
-          Browse by folder, review what needs attention, and open one meeting at a time when you
-          actually need it.
-        </p>
+        <strong class="primary-nav__brand-name">Workspace</strong>
       </div>
-      <button class="button button--primary" onClick={props.onSync} type="button">
-        Sync now
-      </button>
       <nav class="primary-nav__links" aria-label="Primary">
         <For each={navItems()}>
           {(item) => (
@@ -84,31 +77,13 @@ export function PrimaryNav(props: PrimaryNavProps): JSX.Element {
               type="button"
             >
               <span class="primary-nav__link-title">{item.label}</span>
-              <span class="primary-nav__link-note">{item.note}</span>
+              <Show when={item.badge}>
+                {(badge) => <span class="primary-nav__link-badge">{badge()}</span>}
+              </Show>
             </button>
           )}
         </For>
       </nav>
-      <section class="primary-nav__status">
-        <div class="state-badge" data-tone={props.statusTone}>
-          {props.statusLabel}
-        </div>
-        <div class="primary-nav__stat">
-          <span class="status-label">Folders</span>
-          <strong>{String(props.folderCount)}</strong>
-        </div>
-        <div class="primary-nav__stat">
-          <span class="status-label">{props.reviewEnabled ? "Needs review" : "Automation"}</span>
-          <strong>
-            {props.reviewEnabled ? reviewSummaryLabel(props.reviewSummary) : "Disabled"}
-          </strong>
-        </div>
-        <div class="primary-nav__stat">
-          <span class="status-label">Attached build</span>
-          <strong>{buildIdentityLabel(props.serverInfo)}</strong>
-          <span class="primary-nav__meta">Started {buildStartedAtLabel(props.serverInfo)}</span>
-        </div>
-      </section>
     </aside>
   );
 }
