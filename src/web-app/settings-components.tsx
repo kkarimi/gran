@@ -50,7 +50,7 @@ interface PluginsPanelProps {
   plugins: GranolaAppPluginState[];
 }
 
-function CopyPathButton(props: { value?: string }): JSX.Element {
+function CopyPathButton(props: { value?: string; variant?: "icon" | "text" }): JSX.Element {
   const [copied, setCopied] = createSignal(false);
   let resetTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -79,12 +79,25 @@ function CopyPathButton(props: { value?: string }): JSX.Element {
 
   return (
     <button
-      class="mini-button"
+      aria-label={copied() ? "Copied" : "Copy path"}
+      class={props.variant === "icon" ? "copy-icon-button" : "mini-button"}
       disabled={!props.value?.trim()}
       onClick={() => void copy()}
+      title={copied() ? "Copied" : "Copy path"}
       type="button"
     >
-      {copied() ? "Copied" : "Copy path"}
+      <Show when={props.variant === "icon"} fallback={copied() ? "Copied" : "Copy path"}>
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <Show
+            when={copied()}
+            fallback={
+              <path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1Zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H10V7h9v14Z" />
+            }
+          >
+            <path d="M9.6 16.6 6 13l1.4-1.4 2.2 2.2 6-6L17 9.2l-7.4 7.4Z" />
+          </Show>
+        </svg>
+      </Show>
     </button>
   );
 }
@@ -137,14 +150,25 @@ function DiagnosticsFileCard(props: {
     <article class="diagnostic-card diagnostic-card--file">
       <div class="diagnostic-card__head">
         <span class="status-label">{props.label}</span>
-        <CopyPathButton value={path()} />
+        <CopyPathButton value={path()} variant="icon" />
       </div>
       <strong>{props.title}</strong>
       <Show when={pathLeaf()}>
         {(value) => <span class="diagnostic-card__meta">{value()}</span>}
       </Show>
       <Show when={path()}>
-        {(value) => <span class="diagnostic-card__detail">{compactPathLabel(value())}</span>}
+        {(value) => (
+          <label class="diagnostic-path-field">
+            <span class="diagnostic-path-field__label">Path</span>
+            <input
+              class="diagnostic-path-field__input"
+              readonly
+              spellcheck={false}
+              type="text"
+              value={value()}
+            />
+          </label>
+        )}
       </Show>
       <Show when={meta()}>{(value) => <span class="diagnostic-card__detail">{value()}</span>}</Show>
       <Show when={props.detail}>

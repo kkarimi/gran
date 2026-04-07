@@ -1022,6 +1022,7 @@ select {
 }
 
 .card-icon-button,
+.copy-icon-button,
 .mini-button {
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -1050,10 +1051,26 @@ select {
 }
 
 .card-icon-button:hover,
+.copy-icon-button:hover,
 .mini-button:hover {
   border-color: rgba(13, 106, 109, 0.25);
   color: var(--accent);
   background: var(--panel-strong);
+}
+
+.copy-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+.copy-icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .mini-button {
@@ -1062,6 +1079,7 @@ select {
   font-weight: 700;
 }
 
+.copy-icon-button:disabled,
 .mini-button:disabled {
   cursor: not-allowed;
   opacity: 0.56;
@@ -1250,6 +1268,35 @@ select {
 
 .diagnostic-card__detail {
   font-size: 0.88rem;
+}
+
+.diagnostic-path-field {
+  display: grid;
+  gap: 6px;
+}
+
+.diagnostic-path-field__label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.diagnostic-path-field__input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid rgba(36, 39, 44, 0.1);
+  border-radius: 14px;
+  background: rgba(245, 241, 234, 0.92);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.diagnostic-path-field__input[readonly] {
+  cursor: text;
 }
 
 .detail-meta {
