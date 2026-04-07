@@ -396,13 +396,31 @@ export function DiagnosticsPanel(props: {
 }
 
 export function AuthPanel(props: AuthPanelProps): JSX.Element {
+  const activeTone = (auth: GranolaAppAuthState) => {
+    if (auth.lastError) {
+      return "error";
+    }
+
+    return granolaAuthRecommendation(auth).status === "Recommended auth active" ? "ok" : "busy";
+  };
+  const fallbackSources = () => {
+    const available = [
+      props.auth?.storedSessionAvailable ? "Desktop session" : null,
+      props.auth?.supabaseAvailable ? "supabase.json" : null,
+    ].filter(Boolean);
+
+    return available.length > 0 ? available.join(" · ") : "No fallbacks ready yet";
+  };
+  const authAvailabilityLabel = (available: boolean, readyLabel = "Ready") =>
+    available ? readyLabel : "Unavailable";
+
   return (
     <section class="auth-panel">
       <div class="auth-panel__head">
-        <h3>Auth Session</h3>
+        <h3>Auth</h3>
         <p>
-          Prefer a Granola Personal API key, then keep stored session and <code>supabase.json</code>{" "}
-          as fallbacks.
+          Prefer a Granola Personal API key, then keep a desktop session and{" "}
+          <code>supabase.json</code> as fallbacks when needed.
         </p>
       </div>
       <div class="auth-panel__body">
@@ -415,126 +433,197 @@ export function AuthPanel(props: AuthPanelProps): JSX.Element {
           when={props.auth}
         >
           {(auth) => (
-            <div class="auth-card">
-              <div class="status-grid">
-                <div>
-                  <span class="status-label">Active</span>
-                  <strong>{granolaAuthModeLabel(auth().mode)}</strong>
+            <>
+              <div class="auth-card auth-card--hero">
+                <div class="auth-card__hero">
+                  <div>
+                    <span class="status-label">Connected with</span>
+                    <div class="auth-card__title-row">
+                      <strong class="auth-card__title">{granolaAuthModeLabel(auth().mode)}</strong>
+                      <span class="state-badge" data-tone={activeTone(auth())}>
+                        {granolaAuthRecommendation(auth()).status}
+                      </span>
+                    </div>
+                    <p class="auth-card__lead">{granolaAuthRecommendation(auth()).detail}</p>
+                  </div>
+                  <Show when={auth().lastError}>
+                    <div class="auth-card__meta auth-card__error">{auth().lastError}</div>
+                  </Show>
                 </div>
-                <div>
-                  <span class="status-label">API key</span>
-                  <strong>{auth().apiKeyAvailable ? "available" : "missing"}</strong>
+                <div class="diagnostic-card-grid diagnostic-card-grid--metrics">
+                  <DiagnosticsMetricCard
+                    detail="Recommended for web, background sync, and automation."
+                    label="Personal API key"
+                    meta={auth().apiKeyAvailable ? "Saved in toolkit auth state" : undefined}
+                    title={authAvailabilityLabel(Boolean(auth().apiKeyAvailable))}
+                  />
+                  <DiagnosticsMetricCard
+                    detail={fallbackSources()}
+                    label="Fallback sources"
+                    meta={
+                      auth().storedSessionAvailable || auth().supabaseAvailable
+                        ? "Available if the API key is missing or rate-limited"
+                        : undefined
+                    }
+                    title={
+                      auth().storedSessionAvailable || auth().supabaseAvailable
+                        ? "Fallbacks ready"
+                        : "No fallbacks ready"
+                    }
+                  />
+                  <DiagnosticsMetricCard
+                    detail={providerSetupHint(props.preferredProvider)}
+                    label="Preferred agent provider"
+                    meta="Runtime environment"
+                    title={granolaAgentProviderLabel(props.preferredProvider)}
+                  />
                 </div>
-                <div>
-                  <span class="status-label">Stored</span>
-                  <strong>{auth().storedSessionAvailable ? "available" : "missing"}</strong>
+                <div class="auth-detail-list">
+                  <div class="auth-detail-row">
+                    <span class="auth-detail-row__label">Desktop session</span>
+                    <span class="auth-detail-row__value">
+                      {authAvailabilityLabel(auth().storedSessionAvailable)}
+                    </span>
+                  </div>
+                  <div class="auth-detail-row">
+                    <span class="auth-detail-row__label">Refresh</span>
+                    <span class="auth-detail-row__value">
+                      {authAvailabilityLabel(
+                        auth().storedSessionAvailable && auth().refreshAvailable,
+                      )}
+                    </span>
+                  </div>
+                  <Show when={auth().signInMethod}>
+                    <div class="auth-detail-row">
+                      <span class="auth-detail-row__label">Sign-in method</span>
+                      <span class="auth-detail-row__value">{auth().signInMethod}</span>
+                    </div>
+                  </Show>
+                  <Show when={auth().clientId}>
+                    <div class="auth-detail-row">
+                      <span class="auth-detail-row__label">Client ID</span>
+                      <span class="auth-detail-row__value">{auth().clientId}</span>
+                    </div>
+                  </Show>
+                  <Show when={auth().supabasePath}>
+                    <div class="auth-detail-row auth-detail-row--path">
+                      <div>
+                        <span class="auth-detail-row__label">supabase.json</span>
+                        <span class="auth-detail-row__value">
+                          {compactPathLabel(auth().supabasePath)}
+                        </span>
+                      </div>
+                      <CopyPathButton value={auth().supabasePath} />
+                    </div>
+                  </Show>
                 </div>
-                <div>
-                  <span class="status-label">supabase.json</span>
-                  <strong>{auth().supabaseAvailable ? "available" : "missing"}</strong>
+                <Show when={granolaAuthRecommendation(auth()).nextAction}>
+                  {(nextAction) => <div class="auth-card__meta">Next step: {nextAction()}</div>}
+                </Show>
+              </div>
+
+              <div class="auth-card">
+                <div class="auth-section-head">
+                  <div>
+                    <span class="status-label">Personal API key</span>
+                    <h4>Save or rotate your key</h4>
+                  </div>
+                  <p>
+                    Keep a Personal API key here for the default connection path. You can also use{" "}
+                    <code>granola auth login --api-key &lt;token&gt;</code>.
+                  </p>
                 </div>
-                <div>
-                  <span class="status-label">Refresh</span>
-                  <strong>{auth().refreshAvailable ? "available" : "missing"}</strong>
+                <div class="auth-inline">
+                  <input
+                    class="input"
+                    onInput={(event) => {
+                      props.onApiKeyDraftChange(event.currentTarget.value);
+                    }}
+                    placeholder="grn_..."
+                    type="password"
+                    value={props.apiKeyDraft}
+                  />
+                  <button
+                    class="button button--secondary"
+                    onClick={props.onSaveApiKey}
+                    type="button"
+                  >
+                    Save API key
+                  </button>
+                </div>
+                <div class="auth-card__actions">
+                  <button
+                    class="button button--secondary"
+                    disabled={!auth().apiKeyAvailable || auth().mode === "api-key"}
+                    onClick={() => {
+                      props.onSwitchMode("api-key");
+                    }}
+                    type="button"
+                  >
+                    Use API key
+                  </button>
                 </div>
               </div>
-              <div class="auth-card__meta">
-                <strong>{granolaAuthRecommendation(auth()).status}.</strong>{" "}
-                {granolaAuthRecommendation(auth()).detail}
+
+              <div class="auth-card">
+                <div class="auth-section-head">
+                  <div>
+                    <span class="status-label">Fallbacks</span>
+                    <h4>Switch or refresh another source</h4>
+                  </div>
+                  <p>
+                    Desktop session import and <code>supabase.json</code> stay available when the
+                    default API-key path needs help.
+                  </p>
+                </div>
+                <div class="auth-card__actions">
+                  <button
+                    class="button button--secondary"
+                    disabled={!auth().supabaseAvailable}
+                    onClick={props.onImportDesktopSession}
+                    type="button"
+                  >
+                    Import desktop session fallback
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    disabled={!auth().storedSessionAvailable || !auth().refreshAvailable}
+                    onClick={props.onRefresh}
+                    type="button"
+                  >
+                    Refresh stored session
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    disabled={!auth().storedSessionAvailable || auth().mode === "stored-session"}
+                    onClick={() => {
+                      props.onSwitchMode("stored-session");
+                    }}
+                    type="button"
+                  >
+                    Use stored session
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    disabled={!auth().supabaseAvailable || auth().mode === "supabase-file"}
+                    onClick={() => {
+                      props.onSwitchMode("supabase-file");
+                    }}
+                    type="button"
+                  >
+                    Use supabase.json
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    disabled={!auth().apiKeyAvailable && !auth().storedSessionAvailable}
+                    onClick={props.onLogout}
+                    type="button"
+                  >
+                    Sign out
+                  </button>
+                </div>
               </div>
-              <Show when={granolaAuthRecommendation(auth()).nextAction}>
-                {(nextAction) => <div class="auth-card__meta">Next step: {nextAction()}</div>}
-              </Show>
-              <Show when={auth().clientId}>
-                <div class="auth-card__meta">Client ID: {auth().clientId}</div>
-              </Show>
-              <Show when={auth().signInMethod}>
-                <div class="auth-card__meta">Sign-in method: {auth().signInMethod}</div>
-              </Show>
-              <Show when={auth().supabasePath}>
-                <div class="auth-card__meta">supabase path: {auth().supabasePath}</div>
-              </Show>
-              <Show when={auth().lastError}>
-                <div class="auth-card__meta auth-card__error">{auth().lastError}</div>
-              </Show>
-              <div class="auth-card__meta">
-                Save a Personal API key here or use{" "}
-                <code>granola auth login --api-key &lt;token&gt;</code>. Desktop-session import
-                remains the fallback path.
-              </div>
-              <div class="auth-card__meta">
-                <strong>{granolaAgentProviderLabel(props.preferredProvider)} setup:</strong>{" "}
-                {providerSetupHint(props.preferredProvider)}
-              </div>
-              <div class="auth-card__actions">
-                <input
-                  class="input"
-                  onInput={(event) => {
-                    props.onApiKeyDraftChange(event.currentTarget.value);
-                  }}
-                  placeholder="grn_..."
-                  type="password"
-                  value={props.apiKeyDraft}
-                />
-                <button class="button button--secondary" onClick={props.onSaveApiKey} type="button">
-                  Save API key
-                </button>
-                <button
-                  class="button button--secondary"
-                  disabled={!auth().apiKeyAvailable || auth().mode === "api-key"}
-                  onClick={() => {
-                    props.onSwitchMode("api-key");
-                  }}
-                  type="button"
-                >
-                  Use API key
-                </button>
-                <button
-                  class="button button--secondary"
-                  disabled={!auth().supabaseAvailable}
-                  onClick={props.onImportDesktopSession}
-                  type="button"
-                >
-                  Import desktop session fallback
-                </button>
-                <button
-                  class="button button--secondary"
-                  disabled={!auth().storedSessionAvailable || !auth().refreshAvailable}
-                  onClick={props.onRefresh}
-                  type="button"
-                >
-                  Refresh stored session
-                </button>
-                <button
-                  class="button button--secondary"
-                  disabled={!auth().storedSessionAvailable || auth().mode === "stored-session"}
-                  onClick={() => {
-                    props.onSwitchMode("stored-session");
-                  }}
-                  type="button"
-                >
-                  Use stored session
-                </button>
-                <button
-                  class="button button--secondary"
-                  disabled={!auth().supabaseAvailable || auth().mode === "supabase-file"}
-                  onClick={() => {
-                    props.onSwitchMode("supabase-file");
-                  }}
-                  type="button"
-                >
-                  Use supabase.json
-                </button>
-                <button
-                  class="button button--secondary"
-                  disabled={!auth().apiKeyAvailable && !auth().storedSessionAvailable}
-                  onClick={props.onLogout}
-                  type="button"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
+            </>
           )}
         </Show>
       </div>

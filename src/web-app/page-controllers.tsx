@@ -434,9 +434,9 @@ export function SettingsPageController(props: {
   return (
     <>
       <PageHeader
-        description="Settings holds auth, optional plugins, export history, and diagnostics so the rest of the app can stay focused on browsing and reading."
+        description="Choose how the toolkit connects to Granola, enable plugins, review exports, and inspect local state."
         eyebrow="Settings"
-        title="Service settings"
+        title="Settings"
       />
       <section class="settings-shell">
         <nav class="settings-shell__tabs">
