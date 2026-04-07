@@ -1270,6 +1270,45 @@ select {
   font-size: 0.88rem;
 }
 
+.diagnostic-file-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid rgba(36, 39, 44, 0.08);
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.diagnostic-file-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(280px, 1.5fr) minmax(220px, 1.1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px 18px;
+  border-top: 1px solid rgba(36, 39, 44, 0.08);
+}
+
+.diagnostic-file-row:first-child {
+  border-top: 0;
+}
+
+.diagnostic-file-row__identity,
+.diagnostic-file-row__details {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.diagnostic-file-row__path,
+.diagnostic-file-row__actions {
+  min-width: 0;
+}
+
+.diagnostic-file-row__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .diagnostic-path-field {
   display: grid;
   gap: 6px;
@@ -1297,6 +1336,16 @@ select {
 
 .diagnostic-path-field__input[readonly] {
   cursor: text;
+}
+
+@media (max-width: 1100px) {
+  .diagnostic-file-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .diagnostic-file-row__actions {
+    justify-content: start;
+  }
 }
 
 .detail-meta {

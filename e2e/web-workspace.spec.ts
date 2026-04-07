@@ -120,7 +120,10 @@ test.describe("toolkit web workspace", () => {
     await expect(page.getByRole("heading", { name: "Sync and local files" })).toBeVisible();
     await expect(page.getByText("Desktop transcript cache")).toBeVisible();
     await expect(
-      page.locator(".diagnostic-card").getByText("No custom config file").first(),
+      page
+        .locator(".diagnostic-file-row")
+        .getByText("No custom config file", { exact: true })
+        .first(),
     ).toBeVisible();
     await page
       .locator(".primary-nav")

@@ -120,7 +120,7 @@ function DiagnosticsMetricCard(props: {
   );
 }
 
-function DiagnosticsFileCard(props: {
+function DiagnosticsFileRow(props: {
   detail?: string;
   file?: GranolaLocalPathInfo;
   fallbackPath?: string;
@@ -147,33 +147,37 @@ function DiagnosticsFileCard(props: {
   };
 
   return (
-    <article class="diagnostic-card diagnostic-card--file">
-      <div class="diagnostic-card__head">
+    <article class="diagnostic-file-row">
+      <div class="diagnostic-file-row__identity">
         <span class="status-label">{props.label}</span>
+        <strong>{props.title}</strong>
+        <Show when={pathLeaf()}>
+          {(value) => <span class="diagnostic-card__meta">{value()}</span>}
+        </Show>
+      </div>
+      <div class="diagnostic-file-row__path">
+        <label class="diagnostic-path-field">
+          <span class="diagnostic-path-field__label">Path</span>
+          <input
+            class="diagnostic-path-field__input"
+            readonly
+            spellcheck={false}
+            type="text"
+            value={path() || "Not configured"}
+          />
+        </label>
+      </div>
+      <div class="diagnostic-file-row__details">
+        <Show when={meta()}>
+          {(value) => <span class="diagnostic-card__detail">{value()}</span>}
+        </Show>
+        <Show when={props.detail}>
+          {(detail) => <span class="diagnostic-card__detail">{detail()}</span>}
+        </Show>
+      </div>
+      <div class="diagnostic-file-row__actions">
         <CopyPathButton value={path()} variant="icon" />
       </div>
-      <strong>{props.title}</strong>
-      <Show when={pathLeaf()}>
-        {(value) => <span class="diagnostic-card__meta">{value()}</span>}
-      </Show>
-      <Show when={path()}>
-        {(value) => (
-          <label class="diagnostic-path-field">
-            <span class="diagnostic-path-field__label">Path</span>
-            <input
-              class="diagnostic-path-field__input"
-              readonly
-              spellcheck={false}
-              type="text"
-              value={value()}
-            />
-          </label>
-        )}
-      </Show>
-      <Show when={meta()}>{(value) => <span class="diagnostic-card__detail">{value()}</span>}</Show>
-      <Show when={props.detail}>
-        {(detail) => <span class="diagnostic-card__detail">{detail()}</span>}
-      </Show>
     </article>
   );
 }
@@ -352,10 +356,10 @@ export function DiagnosticsPanel(props: {
         </section>
         <section class="detail-section">
           <h2>Local files</h2>
-          <div class="diagnostic-card-grid">
+          <div class="diagnostic-file-list">
             <For each={localFiles()}>
               {(entry) => (
-                <DiagnosticsFileCard
+                <DiagnosticsFileRow
                   detail={entry.detail}
                   fallbackPath={entry.fallbackPath}
                   file={entry.file}
