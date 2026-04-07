@@ -1,17 +1,34 @@
 # granola-toolkit
 
+[![npm version](https://img.shields.io/npm/v/granola-toolkit?label=npm)](https://www.npmjs.com/package/granola-toolkit)
+[![CI](https://img.shields.io/github/actions/workflow/status/kkarimi/granola-toolkit/ci.yml?branch=main&label=ci)](https://github.com/kkarimi/granola-toolkit/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-live-0f766e)](https://kkarimi.github.io/granola-toolkit/)
+[![License](https://img.shields.io/github/license/kkarimi/granola-toolkit)](https://github.com/kkarimi/granola-toolkit/blob/main/LICENSE)
+
 The unofficial open-source Swiss army knife for Granola.
 
 Sync your meeting archive locally, browse it in the browser or terminal, export anything you need,
 and run your own agents against transcripts and notes.
 
-What it is good at:
+> `granola-toolkit` is for people who want more than a flat export command:
+> a local-first Granola archive, a real browser and terminal workspace, and automation you control.
 
-- keeping a local copy of your Granola archive instead of depending on one app surface
-- browsing meetings from the CLI, browser, and TUI on one shared runtime
-- exporting notes and transcripts into files you actually own
-- running BYOA pipelines and review loops on top of meeting transcripts
-- extending the workflow with local prompts, rules, skills, and scripts
+## Why Use It
+
+- Local-first control instead of being trapped in one app surface
+- CLI, browser, and TUI on one shared runtime and one local index
+- Bring your own agent workflows on top of transcripts and notes
+- Export notes and transcripts into files you actually own
+- Open-source and scriptable, with local prompts, rules, skills, and plugins
+
+## What You Get
+
+- `granola sync` for local indexing and refresh
+- `granola web` for a browser workspace
+- `granola tui` / `granola attach` for keyboard-first terminal use
+- `granola notes` and `granola transcripts` for file exports
+- `granola automation` plus harnesses/rules for BYOA review workflows
+- local diagnostics, sync history, and inspectable runtime state
 
 ## Install
 
@@ -57,6 +74,44 @@ opening a browser first.
 
 If you prefer to reuse the desktop app session instead, `granola auth login` still imports it from
 `supabase.json`.
+
+## Set Default Configuration
+
+`granola init` writes a project-local `.granola.toml` for you. If you want to edit it directly,
+the file can look like this:
+
+```toml
+agent-provider = "openrouter"
+agent-model = "openai/gpt-5-mini"
+agent-harnesses-file = "./.granola/agent-harnesses.json"
+automation-rules-file = "./.granola/automation-rules.json"
+pkm-targets-file = "./.granola/pkm-targets.json"
+output = "./exports/notes"
+transcript-output = "./exports/transcripts"
+debug = false
+```
+
+The CLI reads configuration in this order:
+
+1. command-line flags
+2. environment variables
+3. `.granola.toml`
+4. platform defaults
+
+Relative paths in `.granola.toml` resolve from the directory that contains the config file.
+
+## Debug Logging
+
+Yes, the toolkit supports a real debug mode.
+
+```bash
+granola sync --debug
+granola web --debug --foreground
+DEBUG_MODE=1 granola service start
+```
+
+Useful when you want to see config resolution, auth mode selection, sync behaviour, and runtime
+paths while diagnosing local-state issues.
 
 ## Documentation
 
