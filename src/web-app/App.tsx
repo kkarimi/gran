@@ -988,10 +988,6 @@ export function App() {
                 onSelectTab={(tab) => {
                   setState("workspaceTab", tab);
                 }}
-                selectedFolderLabel={
-                  state.folders.find((folder) => folder.id === state.selectedFolderId)?.name ||
-                  state.selectedFolderId
-                }
                 selectedBundle={state.selectedMeetingBundle}
                 selectedMeeting={state.selectedMeeting}
                 selectedMeetingId={state.selectedMeetingId}

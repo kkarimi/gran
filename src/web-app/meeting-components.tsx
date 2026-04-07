@@ -5,19 +5,12 @@ import { For, Match, Show, Switch, type JSX } from "solid-js";
 import type { GranolaMeetingBundle, MeetingRecord } from "../app/index.ts";
 import { parseWorkspaceTab, type WorkspaceTab } from "../web/client-state.ts";
 
-import {
-  formatDateLabel,
-  meetingFolderSummary,
-  resolveMeetingWorkspaceState,
-  tagSummary,
-  workspaceBody,
-} from "./component-helpers.ts";
+import { resolveMeetingWorkspaceState, workspaceBody } from "./component-helpers.ts";
 import { MarkdownDocument } from "./markdown-viewer.tsx";
 
 interface WorkspaceProps {
   bundle: GranolaMeetingBundle | null;
   detailError?: string;
-  fallbackFolderLabel?: string | null;
   loading?: boolean;
   markdownViewerEnabled: boolean;
   onSelectTab: (tab: WorkspaceTab) => void;
@@ -29,11 +22,6 @@ function WorkspaceLoadingState(): JSX.Element {
   return (
     <section aria-live="polite" class="workspace-loading" role="status">
       <span class="loading-block__label">Loading meeting…</span>
-      <div class="detail-meta">
-        <div class="detail-chip detail-chip--skeleton" />
-        <div class="detail-chip detail-chip--skeleton detail-chip--wide" />
-        <div class="detail-chip detail-chip--skeleton" />
-      </div>
       <div class="workspace-tabs">
         <div class="workspace-tab workspace-tab--skeleton" />
         <div class="workspace-tab workspace-tab--skeleton" />
@@ -82,22 +70,6 @@ export function Workspace(props: WorkspaceProps): JSX.Element {
       <Match when={props.selectedMeeting}>
         {(meeting) => (
           <>
-            <section class="meeting-context">
-              <div class="detail-meta">
-                <div class="detail-chip">{formatDateLabel(meeting().meeting.createdAt)}</div>
-                <div class="detail-chip">
-                  {`Folders: ${meetingFolderSummary(meeting(), props.bundle, props.fallbackFolderLabel)}`}
-                </div>
-                <Show when={meeting().meeting.tags.length > 0}>
-                  <div class="detail-chip">{`Tags: ${tagSummary(meeting().meeting.tags)}`}</div>
-                </Show>
-                <div class="detail-chip">
-                  {meeting().meeting.transcriptLoaded
-                    ? `${meeting().meeting.transcriptSegmentCount} transcript segments`
-                    : "Transcript on demand"}
-                </div>
-              </div>
-            </section>
             <nav class="workspace-tabs">
               <For each={["notes", "transcript", "metadata", "raw"] as const}>
                 {(tab) => (

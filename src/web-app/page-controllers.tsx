@@ -576,7 +576,6 @@ export function MeetingPageController(props: {
   onBack: () => void;
   onSelectTab: (tab: WorkspaceTab) => void;
   selectedBundle: GranolaMeetingBundle | null;
-  selectedFolderLabel?: string | null;
   selectedMeeting: MeetingRecord | null;
   selectedMeetingId: string | null;
   workspaceTab: WorkspaceTab;
@@ -596,7 +595,6 @@ export function MeetingPageController(props: {
       <Workspace
         bundle={props.selectedBundle}
         detailError={props.detailError}
-        fallbackFolderLabel={props.selectedFolderLabel}
         loading={props.meetingLoading}
         markdownViewerEnabled={props.markdownViewerEnabled}
         onSelectTab={(tab) => props.onSelectTab(tab)}
