@@ -1342,7 +1342,7 @@ describe("command execution", () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining("Alpha Sync"));
   });
 
-  test("tui command reuses the background sync loop and stops it on exit", async () => {
+  test("tui command runs a standalone workspace when foreground mode is requested", async () => {
     const app = {
       getState: () => ({
         auth: {
@@ -1371,6 +1371,7 @@ describe("command execution", () => {
     const exitCode = await tuiCommand.run(
       makeContext({
         commandFlags: {
+          foreground: true,
           meeting: "doc-alpha-1111",
         },
       }),
@@ -1385,6 +1386,87 @@ describe("command execution", () => {
       initialMeetingId: "doc-alpha-1111",
       onClose: expect.any(Function),
     });
+  });
+
+  test("tui command attaches to an existing background service when no runtime overrides are passed", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {} as never;
+    vi.spyOn(serviceModule, "discoverGranolaService").mockResolvedValue(makeServiceRecord());
+    vi.spyOn(serverClientModule, "createGranolaServerClient").mockResolvedValue(app);
+    const createGranolaApp = vi.spyOn(appModule, "createGranolaApp");
+    const loadConfig = vi.spyOn(configModule, "loadConfig");
+    const runGranolaTui = vi.spyOn(tuiWorkspaceModule, "runGranolaTui").mockResolvedValue(0);
+
+    const exitCode = await tuiCommand.run(
+      makeContext({
+        commandFlags: {
+          meeting: "doc-alpha-1111",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(loadConfig).not.toHaveBeenCalled();
+    expect(createGranolaApp).not.toHaveBeenCalled();
+    expect(serverClientModule.createGranolaServerClient).toHaveBeenCalledWith(
+      "http://127.0.0.1:4123/",
+      {
+        password: undefined,
+      },
+    );
+    expect(runGranolaTui).toHaveBeenCalledWith(app, {
+      initialMeetingId: "doc-alpha-1111",
+    });
+    expect(log).toHaveBeenCalledWith(
+      "Attaching to Granola Toolkit background service at http://127.0.0.1:4123/",
+    );
+  });
+
+  test("tui command starts the background service when safe and none is running", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {} as never;
+    const loadConfig = vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    const createGranolaApp = vi.spyOn(appModule, "createGranolaApp");
+    vi.spyOn(serviceModule, "discoverGranolaService").mockResolvedValue(undefined);
+    vi.spyOn(serviceModule, "spawnGranolaServiceProcess").mockResolvedValue(2222);
+    vi.spyOn(serviceModule, "waitForGranolaService").mockResolvedValue({
+      info: makeServerInfo(),
+      kind: "running",
+      record: makeServiceRecord({ pid: 2222 }),
+    });
+    vi.spyOn(serverClientModule, "createGranolaServerClient").mockResolvedValue(app);
+    const runGranolaTui = vi.spyOn(tuiWorkspaceModule, "runGranolaTui").mockResolvedValue(0);
+
+    const exitCode = await tuiCommand.run(
+      makeContext({
+        commandFlags: {
+          meeting: "doc-alpha-1111",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(loadConfig).toHaveBeenCalled();
+    expect(createGranolaApp).not.toHaveBeenCalled();
+    expect(serviceModule.spawnGranolaServiceProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commandArgs: [],
+        env: expect.any(Object),
+        logFile: expect.any(String),
+      }),
+    );
+    expect(serverClientModule.createGranolaServerClient).toHaveBeenCalledWith(
+      "http://127.0.0.1:4123/",
+      {
+        password: undefined,
+      },
+    );
+    expect(runGranolaTui).toHaveBeenCalledWith(app, {
+      initialMeetingId: "doc-alpha-1111",
+    });
+    expect(log).toHaveBeenCalledWith(
+      "Granola Toolkit background service started on http://127.0.0.1:4123/",
+    );
   });
 
   test("attach command discovers the background service when no URL is provided", async () => {
