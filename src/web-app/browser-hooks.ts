@@ -949,8 +949,9 @@ export function useMeetingBrowserController({
       }
     } catch (error) {
       setState("folderError", error instanceof Error ? error.message : String(error));
-      setState("folders", []);
-      setState("selectedFolderId", null);
+      if (state.folders.length === 0) {
+        setState("selectedFolderId", null);
+      }
     }
   };
 

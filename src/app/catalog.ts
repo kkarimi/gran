@@ -267,19 +267,9 @@ export class GranolaCatalogService {
 
     const client = await this.getGranolaClient();
     if (!client.listFolders) {
-      const documents = await this.listDocuments({
-        forceRefresh: options.forceRefresh,
-      });
-      const folders = this.deriveFoldersFromDocuments(documents);
+      const folders = await this.deriveAndStoreFoldersFromDocuments();
       if (folders) {
-        this.#folders = folders.map(cloneGranolaFolder);
-        this.deps.onFoldersState({
-          count: folders.length,
-          loaded: true,
-          loadedAt: this.deps.nowIso(),
-        });
-        await this.persistSnapshot();
-        return this.#folders.map(cloneGranolaFolder);
+        return folders;
       }
 
       if (options.required) {
@@ -301,6 +291,13 @@ export class GranolaCatalogService {
       await this.persistSnapshot();
       return this.#folders.map(cloneGranolaFolder);
     } catch (error) {
+      const fallbackFolders = await this.deriveAndStoreFoldersFromDocuments().catch(
+        () => undefined,
+      );
+      if (fallbackFolders) {
+        return fallbackFolders;
+      }
+
       if (options.required) {
         throw error;
       }
@@ -473,6 +470,23 @@ export class GranolaCatalogService {
     }
 
     return [...byFolderId.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  private async deriveAndStoreFoldersFromDocuments(): Promise<GranolaFolder[] | undefined> {
+    const documents = await this.listDocuments();
+    const folders = this.deriveFoldersFromDocuments(documents);
+    if (!folders) {
+      return undefined;
+    }
+
+    this.#folders = folders.map(cloneGranolaFolder);
+    this.deps.onFoldersState({
+      count: this.#folders.length,
+      loaded: true,
+      loadedAt: this.deps.nowIso(),
+    });
+    await this.persistSnapshot();
+    return this.#folders.map(cloneGranolaFolder);
   }
 
   private missingCacheError(): Error {

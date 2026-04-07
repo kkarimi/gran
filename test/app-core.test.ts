@@ -2676,6 +2676,71 @@ describe("GranolaApp", () => {
     expect(transcript.meeting.transcriptText).toContain("Transcript loaded from the Granola API");
   });
 
+  test("falls back to document-derived folders when live folder listing fails", async () => {
+    const listFolders = vi.fn(async () => {
+      throw new Error("folder listing not available for the active Granola client");
+    });
+    const listDocuments = vi.fn(async () => [
+      {
+        ...documents[0]!,
+        folderMemberships: [
+          {
+            id: "fol_12345678901234",
+            name: "Product",
+          },
+        ],
+      },
+    ]);
+
+    const app = new GranolaApp(
+      {
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          apiKeyAvailable: true,
+          mode: "api-key",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: false,
+        },
+        cacheLoader: async () => undefined,
+        granolaClient: {
+          listDocuments,
+          listFolders,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+      },
+      { surface: "web" },
+    );
+
+    const result = await app.listFolders({ limit: 10 });
+
+    expect(result.folders).toEqual([
+      expect.objectContaining({
+        documentCount: 1,
+        id: "fol_12345678901234",
+        name: "Product",
+      }),
+    ]);
+    expect(listFolders).toHaveBeenCalledTimes(1);
+    expect(listDocuments).toHaveBeenCalledTimes(1);
+    expect(app.getState().folders).toEqual(
+      expect.objectContaining({
+        count: 1,
+        loaded: true,
+      }),
+    );
+  });
+
   test("uses the local meeting index as a fast path for web surfaces", async () => {
     const listDocuments = vi.fn(async () => documents);
     const meetingIndexStore = new MemoryMeetingIndexStore();
