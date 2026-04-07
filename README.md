@@ -142,6 +142,11 @@ Key docs entry points:
 Release history is also tracked in
 [`CHANGELOG.md`](https://github.com/kkarimi/granola-toolkit/blob/main/CHANGELOG.md).
 
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](/Users/nima/dev/personal/granola-cli/CONTRIBUTING.md) for
+local setup, QA expectations, and contribution workflow.
+
 ## Local Development
 
 ```bash

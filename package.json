@@ -18,6 +18,7 @@
   "bugs": {
     "url": "https://github.com/kkarimi/granola-toolkit/issues"
   },
+  "license": "MIT",
   "author": "Nima Karimi",
   "repository": {
     "type": "git",
