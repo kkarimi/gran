@@ -353,6 +353,133 @@ describe("createDefaultGranolaRuntime", () => {
     );
   });
 
+  test("uses desktop auth fallback for folder listing when the public API client does not support it", async () => {
+    vi.spyOn(authModule, "createDefaultApiKeyStore").mockReturnValue({
+      async clearApiKey() {},
+      async readApiKey() {
+        return "grn_test_123";
+      },
+      async writeApiKey() {},
+    });
+
+    const store = new MemorySessionStore();
+    await store.writeSession({
+      accessToken: "stored-token",
+      clientId: "client_GranolaMac",
+      refreshToken: "stored-refresh",
+    });
+    vi.spyOn(authModule, "createDefaultSessionStore").mockReturnValue(store);
+
+    const fetchMock = vi.fn<
+      (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async (url, init) => {
+      const requestUrl =
+        typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url;
+      const authorization = new Headers(init?.headers).get("authorization");
+
+      expect(requestUrl).toBe("https://api.granola.ai/v2/get-document-lists");
+      expect(authorization).toBe("Bearer stored-token");
+
+      return new Response(
+        JSON.stringify([
+          {
+            created_at: "2024-01-01T00:00:00Z",
+            document_ids: ["not_1d3tmYTlCICgjy"],
+            id: "fol_12345678901234",
+            is_favorite: false,
+            name: "Product",
+            updated_at: "2024-01-02T00:00:00Z",
+          },
+        ]),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const runtime = await createDefaultGranolaRuntime(createConfig(undefined, "grn_test_123"), {
+      warn: vi.fn(),
+    });
+
+    expect(typeof runtime.client.listFolders).toBe("function");
+
+    const folders = await runtime.client.listFolders!({
+      timeoutMs: 5_000,
+    });
+
+    expect(folders).toEqual([
+      expect.objectContaining({
+        documentIds: ["not_1d3tmYTlCICgjy"],
+        id: "fol_12345678901234",
+        name: "Product",
+      }),
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("uses desktop auth fallback for transcript loading when the public API client does not support it", async () => {
+    vi.spyOn(authModule, "createDefaultApiKeyStore").mockReturnValue({
+      async clearApiKey() {},
+      async readApiKey() {
+        return "grn_test_123";
+      },
+      async writeApiKey() {},
+    });
+
+    const store = new MemorySessionStore();
+    await store.writeSession({
+      accessToken: "stored-token",
+      clientId: "client_GranolaMac",
+      refreshToken: "stored-refresh",
+    });
+    vi.spyOn(authModule, "createDefaultSessionStore").mockReturnValue(store);
+
+    const fetchMock = vi.fn<
+      (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async (url, init) => {
+      const requestUrl =
+        typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url;
+      const authorization = new Headers(init?.headers).get("authorization");
+
+      expect(requestUrl).toBe("https://api.granola.ai/v1/get-document-transcript");
+      expect(authorization).toBe("Bearer stored-token");
+
+      return new Response(
+        JSON.stringify({
+          transcript: [
+            {
+              end_timestamp: "2024-01-01T00:01:00Z",
+              id: "segment-1",
+              is_final: true,
+              source: "microphone",
+              start_timestamp: "2024-01-01T00:00:00Z",
+              text: "Hello from desktop auth fallback",
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const runtime = await createDefaultGranolaRuntime(createConfig(undefined, "grn_test_123"), {
+      warn: vi.fn(),
+    });
+
+    expect(typeof runtime.client.getDocumentTranscript).toBe("function");
+
+    const transcript = await runtime.client.getDocumentTranscript!("not_1d3tmYTlCICgjy", {
+      timeoutMs: 5_000,
+    });
+
+    expect(transcript).toEqual([
+      expect.objectContaining({
+        documentId: "not_1d3tmYTlCICgjy",
+        text: "Hello from desktop auth fallback",
+      }),
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   test("throws a helpful error when neither a stored session nor supabase.json is available", async () => {
     stubNoApiKeyStore();
     vi.spyOn(authModule, "createDefaultSessionStore").mockReturnValue(new MemorySessionStore());

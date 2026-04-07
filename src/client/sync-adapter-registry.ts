@@ -109,6 +109,30 @@ function createRateLimitedFallbackClient(options: {
     }
   };
 
+  const callWithCapabilityFallback = async <T>(
+    action: string,
+    capability: "listFolders" | "getDocumentTranscript",
+    unavailableMessage: string,
+    fn: (client: DefaultGranolaClient) => Promise<T>,
+  ): Promise<T> => {
+    if (typeof options.primary[capability] !== "function") {
+      const fallback = await fallbackClient();
+      if (typeof fallback[capability] !== "function") {
+        throw new Error(unavailableMessage);
+      }
+
+      return await fn(fallback);
+    }
+
+    return await retryWithFallback(action, async (client) => {
+      if (typeof client[capability] !== "function") {
+        throw new Error(unavailableMessage);
+      }
+
+      return await fn(client);
+    });
+  };
+
   return {
     async listDocuments(requestOptions) {
       return await retryWithFallback("document sync", async (client) => {
@@ -116,22 +140,24 @@ function createRateLimitedFallbackClient(options: {
       });
     },
     async listFolders(requestOptions) {
-      return await retryWithFallback("folder sync", async (client) => {
-        if (typeof client.listFolders !== "function") {
-          throw new Error("folder listing not available for the active Granola client");
-        }
-
-        return await client.listFolders(requestOptions);
-      });
+      return await callWithCapabilityFallback(
+        "folder sync",
+        "listFolders",
+        "folder listing not available for the active Granola client",
+        async (client) => {
+          return await client.listFolders!(requestOptions);
+        },
+      );
     },
     async getDocumentTranscript(documentId, requestOptions) {
-      return await retryWithFallback("transcript fetch", async (client) => {
-        if (typeof client.getDocumentTranscript !== "function") {
-          throw new Error("transcript loading not available for the active Granola client");
-        }
-
-        return await client.getDocumentTranscript(documentId, requestOptions);
-      });
+      return await callWithCapabilityFallback(
+        "transcript fetch",
+        "getDocumentTranscript",
+        "transcript loading not available for the active Granola client",
+        async (client) => {
+          return await client.getDocumentTranscript!(documentId, requestOptions);
+        },
+      );
     },
   };
 }
