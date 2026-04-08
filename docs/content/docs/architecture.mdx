@@ -66,8 +66,8 @@ the app or the index service, not compute their own meeting indexes ad hoc.
 
 ## Canonical Read Models
 
-The toolkit used to derive meeting state in several places. That caused drift around transcript
-availability, summary presence, and search metadata.
+The toolkit derives meeting state in one place so transcript availability, summary presence, and
+search metadata stay consistent.
 
 The canonical read-model layer now lives in:
 
@@ -110,7 +110,7 @@ app core.
 
 ## Extension Seams
 
-The toolkit now prefers registries over hard-coded switch statements when a capability is likely to
+The toolkit prefers registries over hard-coded switch statements when a capability is likely to
 grow.
 
 Current registries:
@@ -131,15 +131,15 @@ The shipped plugin layer now follows the same rule: declare once, project everyw
 
 Key modules:
 
-- `src/plugin-registry.ts`: shipped plugin definitions, ids, defaults, capability lists, status copy, and compatibility metadata
-- `src/plugins.ts`: persisted plugin enablement using a generic `enabled` map plus legacy-settings normalisation
+- `src/plugin-registry.ts`: shipped plugin definitions, ids, defaults, capability lists, and status copy
+- `src/plugins.ts`: persisted plugin enablement using a generic `enabled` map
 - `src/app/plugin-state.ts`: projection helpers, capability checks, and active settings contributions
 - `src/server/routes/plugins.ts`: generic plugin list and toggle routes
 - `src/web-app/plugin-settings-contributions.tsx`: web-side contribution renderers keyed by registry metadata
 
 The important boundary is this:
 
-1. The registry knows concrete plugin ids, legacy compatibility keys, and runtime defaults.
+1. The registry knows concrete plugin ids and runtime defaults.
 2. Persistence stores generic enablement by id.
 3. App/web/TUI code consume plugin lists, status metadata, capabilities, and declared settings contributions.
 
@@ -155,16 +155,12 @@ It should not usually ask:
 That distinction keeps future plugin work sane. One plugin can expose one or more capabilities, and
 feature surfaces can stay decoupled from the current built-in plugin set.
 
-Compatibility still matters. The registry now carries the old enablement keys and status copy for
-the shipped plugins, and the config/runtime layers project that metadata forward:
+The config/runtime layers project that metadata forward:
 
 - config and env resolution produce a generic `plugins.enabled` map plus a per-plugin source map
-- the runtime can only override plugins whose current state still came from a default source
+- the runtime can only override plugins whose current state came from a default source
 - settings pages render detail text from plugin state instead of a browser-owned lookup table
 - follow-up settings sections are declared in registry metadata and rendered from contribution ids
-
-That keeps old keys like `automation-plugin-enabled` and `markdown-viewer-plugin-enabled` working
-without leaving those names scattered through the rest of the app.
 
 ## Where New Code Should Go
 

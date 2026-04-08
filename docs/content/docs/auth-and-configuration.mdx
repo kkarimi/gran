@@ -34,9 +34,9 @@ gran auth logout
 - `logout` to delete stored credentials
 
 The same auth actions are also available from the browser workspace.
-The first-run web onboarding flow now prefers API keys and uses the same local auth store, so a
+The first-run web onboarding flow prefers API keys and uses the same local auth store, so a
 key saved in the browser is immediately available to the CLI, web workspace, and TUI surfaces.
-The TUI auth overlay now uses the same API-key-first language and points back to the CLI command
+The TUI auth overlay uses the same API-key-first language and points back to the CLI command
 when you still need to store the key itself.
 
 ## Configuration Precedence
@@ -71,17 +71,17 @@ from whatever shell directory happened to launch the command.
 ## Environment Variables
 
 - `DEBUG_MODE`
-- `GRAN_API_KEY` (`GRANOLA_API_KEY` still works as a legacy alias)
-- `GRAN_OPENAI_API_KEY` (`GRANOLA_OPENAI_API_KEY` still works as a legacy alias)
-- `GRAN_OPENROUTER_API_KEY` (`GRANOLA_OPENROUTER_API_KEY` still works as a legacy alias)
-- `GRAN_AUTOMATION_RULES_FILE` (`GRANOLA_AUTOMATION_RULES_FILE` still works)
-- `GRAN_AGENT_HARNESSES_FILE` (`GRANOLA_AGENT_HARNESSES_FILE` still works)
+- `GRAN_API_KEY`
+- `GRAN_OPENAI_API_KEY`
+- `GRAN_OPENROUTER_API_KEY`
+- `GRAN_AUTOMATION_RULES_FILE`
+- `GRAN_AGENT_HARNESSES_FILE`
 - `SUPABASE_FILE`
 - `OUTPUT`
 - `TIMEOUT`
 - `CACHE_FILE`
 - `TRANSCRIPT_OUTPUT`
-- `GRAN_CLIENT_VERSION` (`GRANOLA_CLIENT_VERSION` still works)
+- `GRAN_CLIENT_VERSION`
 
 ## Notes on Auth Sources
 

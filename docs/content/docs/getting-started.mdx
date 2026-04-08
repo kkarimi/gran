@@ -60,7 +60,7 @@ export OPENROUTER_API_KEY=...
 export OPENAI_API_KEY=...
 ```
 
-If you prefer to reuse the desktop app session, `gran auth login` still imports it from
+If you prefer to reuse the desktop app session, `gran auth login` imports it from
 `supabase.json`.
 
 Then verify that folders and meetings resolve cleanly:
@@ -85,7 +85,7 @@ The first-run flow in the web workspace will guide you through the same setup in
 Granola API key, run the first meeting import, choose an agent provider, and create a starter
 reviewable notes pipeline before it drops you into the full workspace.
 
-`gran web` now prefers the reusable background-service path, so for many users the command above
+`gran web` prefers the reusable background-service path, so for many users the command above
 is enough to both launch the browser and warm the local sync runtime.
 
 If you want to warm the service before opening the browser, or keep it running headlessly, use:

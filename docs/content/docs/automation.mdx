@@ -273,12 +273,12 @@ Fields are combined with `AND`, while multiple values inside one field are treat
 For HTTP providers, set credentials in the environment used by `gran sync`, `gran serve`, or
 whatever process runs your automation:
 
-- `OPENROUTER_API_KEY` or `GRAN_OPENROUTER_API_KEY` (`GRANOLA_OPENROUTER_API_KEY` still works)
-- `OPENAI_API_KEY` or `GRAN_OPENAI_API_KEY` (`GRANOLA_OPENAI_API_KEY` still works)
+- `OPENROUTER_API_KEY` or `GRAN_OPENROUTER_API_KEY`
+- `OPENAI_API_KEY` or `GRAN_OPENAI_API_KEY`
 
 For local Codex runs, the toolkit shells out to `codex exec`, so it uses whatever local Codex login
-state you already have. You can override the command path with `GRAN_CODEX_COMMAND` (`GRANOLA_CODEX_COMMAND`
-still works) or `"codex-command": "..."` in `.gran.json`.
+state you already have. You can override the command path with `GRAN_CODEX_COMMAND` or
+`"codex-command": "..."` in `.gran.json`.
 
 For approval-phase delivery actions, provide any external endpoints in the same runtime
 environment, for example:
@@ -331,7 +331,7 @@ directory. You can also point them at a project-local file:
 ```
 
 PKM targets live in `pkm-targets.json` under the shared toolkit data directory by default. Override
-that with `GRAN_PKM_TARGETS_FILE` (`GRANOLA_PKM_TARGETS_FILE` still works) or `"pkm-targets-file": "..."` in `.gran.json`.
+that with `GRAN_PKM_TARGETS_FILE` or `"pkm-targets-file": "..."` in `.gran.json`.
 
 Example PKM targets:
 

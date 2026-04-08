@@ -5,7 +5,7 @@
 [![Docs](https://img.shields.io/badge/docs-live-0f766e)](https://kkarimi.github.io/gran/)
 [![License](https://img.shields.io/github/license/kkarimi/gran)](https://github.com/kkarimi/gran/blob/main/LICENSE)
 
-The unofficial open-source Swiss army knife for Granola, now under the shorter Gran brand.
+The unofficial open-source Swiss army knife for Granola.
 
 Sync your meeting archive locally, browse it in the browser or terminal, export anything you need,
 and run your own agents against transcripts and notes.
@@ -70,18 +70,18 @@ gran web
 prompt files under `./.gran/` so the first-run setup is not just “read docs and assemble JSON by
 hand”.
 
-If you start with `gran web`, the browser now walks you through the same first-run path:
+If you start with `gran web`, the browser walks you through the same first-run path:
 enter a Granola API key, import your meetings, choose an agent provider, and land in a workspace
 with a starter reviewable notes pipeline already configured.
 
-`gran web` now prefers the long-running background-service path by default: it will reuse the
+`gran web` prefers the long-running background-service path by default: it will reuse the
 existing service when one is already running, or start it for you when you have not asked for a
 foreground/debug session.
 
-`gran service start` is still available when you want to warm the local sync loop without
+`gran service start` is available when you want to warm the local sync loop without
 opening a browser first.
 
-If you prefer to reuse the desktop app session instead, `gran auth login` still imports it from
+If you prefer to reuse the desktop app session instead, `gran auth login` imports it from
 `supabase.json`.
 
 ## Set Default Configuration
@@ -126,7 +126,7 @@ paths while diagnosing local-state issues.
 
 ## Documentation
 
-The detailed documentation now lives at
+The detailed documentation lives at
 [`kkarimi.github.io/gran`](https://kkarimi.github.io/gran/).
 
 Local docs development:
