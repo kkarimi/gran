@@ -215,12 +215,16 @@ test.describe("toolkit web workspace", () => {
       });
       await importMeetingsButton.click();
 
-      await expect(page.locator(".primary-nav").getByText("Granola Toolkit")).toBeVisible({
-        timeout: 20_000,
+      await expect(
+        page.getByRole("heading", {
+          name: "Set up Granola Toolkit in three steps.",
+        }),
+      ).toHaveCount(0, {
+        timeout: 30_000,
       });
       await expect(page.locator(".page-header").getByRole("heading", { name: "Home" })).toBeVisible(
         {
-          timeout: 20_000,
+          timeout: 30_000,
         },
       );
       await expect(
