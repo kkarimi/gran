@@ -119,7 +119,7 @@ describe("renderReleaseEntry", () => {
     expect(markdown).toContain("### Highlights");
     expect(markdown).toContain("### Features");
     expect(markdown).toContain("### Fixes");
-    expect(markdown).toContain("SDK: [gran-sdk@0.67.0]");
+    expect(markdown).toContain("SDK: [@kkarimi/gran-sdk@0.67.0]");
     expect(markdown).toContain("https://github.com/kkarimi/gran/compare/v0.61.0...v0.62.0");
   });
 });
@@ -146,8 +146,8 @@ describe("upsertReleaseArtefacts", () => {
       version: "0.67.0",
     });
 
-    expect(next).toContain("SDK: [gran-sdk@0.67.0]");
-    expect(next).toContain("SDK install: `npm install gran-sdk@0.67.0`");
+    expect(next).toContain("SDK: [@kkarimi/gran-sdk@0.67.0]");
+    expect(next).toContain("SDK install: `npm install @kkarimi/gran-sdk@0.67.0`");
     expect(next).toContain("https://github.com/kkarimi/gran/compare/v0.66.0...v0.67.0");
   });
 });

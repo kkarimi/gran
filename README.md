@@ -30,7 +30,7 @@ and run your own agents against transcripts and notes.
 - `gran targets` for named vaults, folders, and export profiles
 - `gran intelligence` for built-in presets like decisions and action items
 - `gran automation` plus harnesses/rules for BYOA review workflows
-- `gran-sdk` for Node and TypeScript integrations on the same local-first core
+- `@kkarimi/gran-sdk` for Node and TypeScript integrations on the same local-first core
 - local diagnostics, sync history, and inspectable runtime state
 
 ## Install
@@ -49,7 +49,7 @@ npx @kkarimi/gran --help
 If you want the SDK instead of the CLI:
 
 ```bash
-npm install gran-sdk
+npm install @kkarimi/gran-sdk
 ```
 
 If you do not want to install via npm, each GitHub release also publishes standalone archives for

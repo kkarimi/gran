@@ -79,7 +79,7 @@ jobs:
           const sdkPkg = JSON.parse(fs.readFileSync('packages/sdk/package.json', 'utf8'));
           const packages = [
             { name: rootPkg.name, version: rootPkg.version, workspace: '.', publishName: rootPkg.name },
-            { name: sdkPkg.name, version: sdkPkg.version, workspace: 'gran-sdk', publishName: sdkPkg.name },
+            { name: sdkPkg.name, version: sdkPkg.version, workspace: sdkPkg.name, publishName: sdkPkg.name },
           ];
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `package_name=${rootPkg.name}\n`);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `package_version=${rootPkg.version}\n`);

@@ -16,6 +16,9 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
   },
+  fmt: {
+    ignorePatterns: ["dist/**"],
+  },
   lint: {
     ignorePatterns: ["dist/**"],
     options: {

@@ -1,5 +1,5 @@
 {
-  "name": "gran-sdk",
+  "name": "@kkarimi/gran-sdk",
   "version": "0.67.0",
   "description": "Node and TypeScript SDK for Gran 👵🏻",
   "license": "MIT",

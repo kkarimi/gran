@@ -3,20 +3,20 @@ title: SDK
 description: Use Gran's Node and TypeScript SDK to load config, create the local app core, connect to a running service, and export archives from code.
 ---
 
-`gran-sdk` is the Node-first package for people who want Gran's local-first core without shelling
+`@kkarimi/gran-sdk` is the Node-first package for people who want Gran's local-first core without shelling
 out to CLI commands.
 
 Install it alongside `@kkarimi/gran` when you want to embed Gran in scripts, local apps, or agent
 workflows:
 
 ```bash
-npm install gran-sdk
+npm install @kkarimi/gran-sdk
 ```
 
 ## Create The App Core
 
 ```ts
-import { createGranSdk } from "gran-sdk";
+import { createGranSdk } from "@kkarimi/gran-sdk";
 
 const { app, config } = await createGranSdk({
   apiKey: process.env.GRAN_API_KEY,
@@ -29,7 +29,7 @@ const meetings = await app.listMeetings({ limit: 10 });
 If you want config loading separated from app creation:
 
 ```ts
-import { createGranApp, loadGranConfig } from "gran-sdk";
+import { createGranApp, loadGranConfig } from "@kkarimi/gran-sdk";
 
 const config = await loadGranConfig({ config: ".gran.json" });
 const app = await createGranApp(config, { surface: "server" });
@@ -41,7 +41,7 @@ If `gran service start` or `gran web` already has the shared runtime running, yo
 over the existing local transport:
 
 ```ts
-import { connectGranService } from "gran-sdk";
+import { connectGranService } from "@kkarimi/gran-sdk";
 
 const client = await connectGranService("http://127.0.0.1:5051");
 
@@ -58,7 +58,7 @@ that should reuse the existing Gran runtime instead of spinning up another app i
 The SDK exposes the same bundled export shape as the CLI:
 
 ```ts
-import { createGranSdk, exportGranArchive } from "gran-sdk";
+import { createGranSdk, exportGranArchive } from "@kkarimi/gran-sdk";
 
 const { app } = await createGranSdk({
   apiKey: process.env.GRAN_API_KEY,
@@ -80,7 +80,7 @@ You can also use `includeNotes: false` or `includeTranscripts: false` when you o
 ## Save Named Export Targets
 
 ```ts
-import { createGranExportTarget, createGranSdk, saveGranExportTarget } from "gran-sdk";
+import { createGranExportTarget, createGranSdk, saveGranExportTarget } from "@kkarimi/gran-sdk";
 
 const { app } = await createGranSdk({
   apiKey: process.env.GRAN_API_KEY,

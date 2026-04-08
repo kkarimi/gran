@@ -1,4 +1,4 @@
-# gran-sdk
+# @kkarimi/gran-sdk
 
 Node and TypeScript SDK for Gran 👵🏻.
 
@@ -7,13 +7,13 @@ Use it when you want Gran's local-first core without shelling out to the CLI.
 ## Install
 
 ```bash
-npm install gran-sdk
+npm install @kkarimi/gran-sdk
 ```
 
 ## Use
 
 ```ts
-import { createGranSdk } from "gran-sdk";
+import { createGranSdk } from "@kkarimi/gran-sdk";
 
 const { app } = await createGranSdk({
   apiKey: process.env.GRAN_API_KEY,
@@ -26,7 +26,7 @@ console.log(meetings.meetings.map((meeting) => meeting.meeting.title));
 You can also load config first:
 
 ```ts
-import { createGranApp, loadGranConfig } from "gran-sdk";
+import { createGranApp, loadGranConfig } from "@kkarimi/gran-sdk";
 
 const config = await loadGranConfig({ config: ".gran.json" });
 const app = await createGranApp(config, { surface: "server" });
@@ -35,7 +35,7 @@ const app = await createGranApp(config, { surface: "server" });
 ## Export An Archive
 
 ```ts
-import { createGranSdk, exportGranArchive } from "gran-sdk";
+import { createGranSdk, exportGranArchive } from "@kkarimi/gran-sdk";
 
 const { app } = await createGranSdk({
   apiKey: process.env.GRAN_API_KEY,
@@ -55,7 +55,7 @@ That writes:
 ## Connect To A Running Local Service
 
 ```ts
-import { connectGranService } from "gran-sdk";
+import { connectGranService } from "@kkarimi/gran-sdk";
 
 const client = await connectGranService("http://127.0.0.1:5051");
 const state = client.getState();
@@ -67,7 +67,7 @@ await client.close();
 ## Create Named Export Targets
 
 ```ts
-import { createGranExportTarget, createGranSdk, saveGranExportTarget } from "gran-sdk";
+import { createGranExportTarget, createGranSdk, saveGranExportTarget } from "@kkarimi/gran-sdk";
 
 const { app } = await createGranSdk({
   apiKey: process.env.GRAN_API_KEY,
