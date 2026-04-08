@@ -13,6 +13,7 @@ export interface GranolaToolkitPersistenceLayout {
   catalogSnapshotFile: string;
   dataDirectory: string;
   exportJobsFile: string;
+  exportTargetsFile: string;
   meetingIndexFile: string;
   pluginsFile: string;
   pkmTargetsFile: string;
@@ -56,6 +57,7 @@ export function defaultGranolaToolkitPersistenceLayout(
     catalogSnapshotFile: join(dataDirectory, "catalog-snapshot.json"),
     dataDirectory,
     exportJobsFile: join(dataDirectory, "export-jobs.json"),
+    exportTargetsFile: join(dataDirectory, "export-targets.json"),
     meetingIndexFile: join(dataDirectory, "meeting-index.json"),
     pluginsFile: join(dataDirectory, "plugins.json"),
     pkmTargetsFile: join(dataDirectory, "pkm-targets.json"),

@@ -118,6 +118,7 @@ export async function startGranolaServer(
     catalogSnapshot: await describeLocalPath(persistenceLayout.catalogSnapshotFile, "file"),
     config: await describeLocalPath(app.config.configFileUsed || undefined, "file"),
     dataDirectory: await describeLocalPath(persistenceLayout.dataDirectory, "directory"),
+    exportTargets: await describeLocalPath(app.config.exports?.targetsFile || undefined, "file"),
     meetingIndex: await describeLocalPath(persistenceLayout.meetingIndexFile, "file"),
     pluginSettings: await describeLocalPath(
       app.config.plugins?.settingsFile || persistenceLayout.pluginsFile,
@@ -134,6 +135,7 @@ export async function startGranolaServer(
     config: {
       automationRulesFile: app.config.automation?.rulesFile || undefined,
       configFile: app.config.configFileUsed || undefined,
+      exportTargetsFile: app.config.exports?.targetsFile || undefined,
       notesOutputDir: app.config.notes.output || undefined,
       pluginsFile: app.config.plugins?.settingsFile || undefined,
       supabaseFile: app.config.supabase || undefined,
@@ -159,6 +161,7 @@ export async function startGranolaServer(
       dataDirectory: persistenceLayout.dataDirectory,
       exportJobs: true,
       exportJobsFile: persistenceLayout.exportJobsFile,
+      exportTargetsFile: persistenceLayout.exportTargetsFile,
       meetingIndex: true,
       meetingIndexFile: persistenceLayout.meetingIndexFile,
       searchIndexFile: persistenceLayout.searchIndexFile,

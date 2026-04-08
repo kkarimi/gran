@@ -26,7 +26,9 @@ and run your own agents against transcripts and notes.
 - `granola sync` for local indexing and refresh
 - `granola web` for a browser workspace
 - `granola tui` / `granola attach` for keyboard-first terminal use
-- `granola notes` and `granola transcripts` for file exports
+- `granola export` for bundled note + transcript exports
+- `granola targets` for named vaults, folders, and export profiles
+- `granola intelligence` for built-in presets like decisions and action items
 - `granola automation` plus harnesses/rules for BYOA review workflows
 - local diagnostics, sync history, and inspectable runtime state
 
@@ -54,6 +56,7 @@ macOS arm64, Linux x64, and Windows x64. Extract the archive and run `granola` (
 ```bash
 granola init --provider openrouter
 granola auth login --api-key grn_...
+granola targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work
 granola web
 ```
 

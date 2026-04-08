@@ -161,6 +161,9 @@ export interface AppConfig {
   apiKey?: string;
   configFileUsed?: string;
   debug: boolean;
+  exports?: {
+    targetsFile: string;
+  };
   notes: NotesOptions;
   plugins?: {
     enabled: Record<string, boolean>;

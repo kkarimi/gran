@@ -525,6 +525,16 @@ export function DiagnosticsPanel(props: {
         title: "Plugin settings",
       },
       {
+        detail: "Named export profiles for local archives, vaults, and future integrations.",
+        fallbackPath:
+          props.appState?.config.exports?.targetsFile || props.serverInfo?.config.exportTargetsFile,
+        file: props.serverInfo?.files?.exportTargets,
+        label: "Export targets",
+        missingDetail:
+          "This file will be created when you first save a named export target/profile.",
+        title: "Export target profiles",
+      },
+      {
         detail: "Loaded when automation rules are enabled.",
         fallbackPath:
           props.appState?.config.automation?.rulesFile ||

@@ -26,6 +26,8 @@ import type {
   GranolaExportJobsListOptions,
   GranolaExportJobsResult,
   GranolaExportRunOptions,
+  GranolaExportTarget,
+  GranolaExportTargetsResult,
   GranolaFolderListOptions,
   GranolaFolderListResult,
   GranolaMeetingBundle,
@@ -60,6 +62,7 @@ import {
   granolaProcessingIssueRecoverPath,
   granolaProcessingIssuesPath,
   granolaTransportPaths,
+  granolaExportTargetsPath,
   GRANOLA_TRANSPORT_PROTOCOL_VERSION,
   type GranolaServerInfo,
 } from "../transport.ts";
@@ -504,6 +507,20 @@ export class GranolaServerClient implements GranolaAppApi {
     return await this.requestJson(granolaExportJobsPath(options));
   }
 
+  async listExportTargets(): Promise<GranolaExportTargetsResult> {
+    return await this.requestJson(granolaExportTargetsPath());
+  }
+
+  async saveExportTargets(targets: GranolaExportTarget[]): Promise<GranolaExportTargetsResult> {
+    return await this.requestJson(granolaExportTargetsPath(), {
+      body: JSON.stringify({ targets }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "PUT",
+    });
+  }
+
   async exportNotes(
     format: NoteOutputFormat = "markdown",
     options: GranolaExportRunOptions = {},
@@ -512,6 +529,7 @@ export class GranolaServerClient implements GranolaAppApi {
       body: JSON.stringify({
         folderId: options.folderId,
         format,
+        targetId: options.targetId,
       }),
       headers: {
         "content-type": "application/json",
@@ -528,6 +546,7 @@ export class GranolaServerClient implements GranolaAppApi {
       body: JSON.stringify({
         folderId: options.folderId,
         format,
+        targetId: options.targetId,
       }),
       headers: {
         "content-type": "application/json",

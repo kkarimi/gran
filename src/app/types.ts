@@ -68,6 +68,7 @@ export type GranolaAutomationActionRunStatus = "completed" | "failed" | "pending
 export type GranolaAutomationWebhookPayloadFormat = "json" | "markdown" | "text";
 export type GranolaAutomationWriteFileFormat = "json" | "markdown" | "text";
 export type GranolaPkmTargetKind = "docs-folder" | "obsidian";
+export type GranolaExportTargetKind = "bundle-folder" | "obsidian-vault";
 export type GranolaExportScope =
   | {
       mode: "all";
@@ -317,6 +318,17 @@ export interface GranolaPkmTarget {
   outputDir: string;
 }
 
+export interface GranolaExportTarget {
+  id: string;
+  kind: GranolaExportTargetKind;
+  name?: string;
+  notesFormat?: NoteOutputFormat;
+  notesSubdir?: string;
+  outputDir: string;
+  transcriptsFormat?: TranscriptOutputFormat;
+  transcriptsSubdir?: string;
+}
+
 export type GranolaAutomationAction =
   | GranolaAutomationAgentAction
   | GranolaAutomationAskUserAction
@@ -492,6 +504,10 @@ export interface GranolaAppPluginsResult {
   plugins: GranolaAppPluginState[];
 }
 
+export interface GranolaExportTargetsResult {
+  targets: GranolaExportTarget[];
+}
+
 export interface GranolaAppExportRunState {
   format: string;
   itemCount: number;
@@ -592,6 +608,7 @@ export interface GranolaExportRunOptions {
   folderId?: string;
   outputDir?: string;
   scopedOutput?: boolean;
+  targetId?: string;
 }
 
 export interface GranolaMeetingListResult {
@@ -787,6 +804,8 @@ export interface GranolaAppApi {
   getMeeting(id: string, options?: { requireCache?: boolean }): Promise<GranolaMeetingBundle>;
   findMeeting(query: string, options?: { requireCache?: boolean }): Promise<GranolaMeetingBundle>;
   listExportJobs(options?: GranolaExportJobsListOptions): Promise<GranolaExportJobsResult>;
+  listExportTargets(): Promise<GranolaExportTargetsResult>;
+  saveExportTargets(targets: GranolaExportTarget[]): Promise<GranolaExportTargetsResult>;
   exportNotes(
     format?: NoteOutputFormat,
     options?: GranolaExportRunOptions,

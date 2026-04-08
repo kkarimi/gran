@@ -33,6 +33,7 @@ import {
   collectPipelineRecoveryContexts,
   parseProcessingIssueId,
 } from "../processing-health.ts";
+import type { GranolaIntelligencePreset } from "../intelligence-presets.ts";
 import { parsePipelineOutput } from "../processing.ts";
 import type { AppConfig } from "../types.ts";
 
@@ -679,6 +680,73 @@ export class GranolaAutomationService {
       generatedAt,
       kind,
       results,
+    };
+  }
+
+  async runIntelligencePreset(options: {
+    approvalMode?: GranolaAutomationApprovalMode;
+    bundles: GranolaMeetingBundle[];
+    model?: GranolaAutomationAgentAction["model"];
+    preset: GranolaIntelligencePreset;
+    provider?: GranolaAutomationAgentAction["provider"];
+  }): Promise<{
+    artefacts: GranolaAutomationArtefact[];
+    runs: GranolaAutomationActionRun[];
+  }> {
+    const generatedAt = this.deps.nowIso();
+    const action: GranolaAutomationAgentAction = {
+      approvalMode: options.approvalMode ?? "manual",
+      id: `intelligence:${options.preset.id}`,
+      kind: "agent",
+      model: options.model,
+      pipeline: { kind: "enrichment" },
+      prompt: options.preset.prompt,
+      provider: options.provider,
+    };
+    const rule: GranolaAutomationRule = {
+      id: `intelligence:${options.preset.id}`,
+      name: `Intelligence: ${options.preset.label}`,
+      when: {},
+    };
+    const runs: GranolaAutomationActionRun[] = [];
+
+    for (const bundle of options.bundles) {
+      const meeting = bundle.meeting.meeting;
+      const matchId = `intelligence:${options.preset.id}:${bundle.source.document.id}:${generatedAt}`;
+      const match: GranolaAutomationMatch = {
+        eventId: matchId,
+        eventKind: defaultHarnessEventKind(bundle),
+        folders: meeting.folders.map((folder) => ({ ...folder })),
+        id: matchId,
+        matchedAt: generatedAt,
+        meetingId: bundle.source.document.id,
+        ruleId: rule.id,
+        ruleName: rule.name,
+        tags: [...meeting.tags],
+        title: meeting.title || bundle.source.document.title || bundle.source.document.id,
+        transcriptLoaded: meeting.transcriptLoaded,
+      };
+
+      runs.push(
+        await executeAutomationAction(match, rule, action, this.automationActionHandlers(), {
+          registry: this.deps.automationActionRegistry,
+          runId: matchId,
+        }),
+      );
+    }
+
+    await this.appendAutomationRuns(runs);
+    this.deps.emitStateUpdate();
+
+    const artefacts = runs
+      .flatMap((run) => run.artefactIds ?? [])
+      .map((id) => this.#automationArtefacts.find((artefact) => artefact.id === id))
+      .filter((artefact): artefact is GranolaAutomationArtefact => Boolean(artefact))
+      .map((artefact) => this.cloneAutomationArtefact(artefact));
+
+    return {
+      artefacts,
+      runs: runs.map((run) => this.cloneAutomationRun(run)),
     };
   }
 

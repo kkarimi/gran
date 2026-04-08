@@ -7,6 +7,7 @@ import { GranolaApp } from "../src/app/core.ts";
 import { MemoryAutomationMatchStore } from "../src/automation-matches.ts";
 import { MemoryAutomationRunStore } from "../src/automation-runs.ts";
 import { MemoryAutomationRuleStore } from "../src/automation-rules.ts";
+import { MemoryExportTargetStore } from "../src/export-targets.ts";
 import type { GranolaAppStateEvent } from "../src/app/index.ts";
 import { MemorySyncEventStore } from "../src/sync-events.ts";
 import { createGranolaServerClient } from "../src/server/client.ts";
@@ -190,6 +191,13 @@ function createTestApp(options: { withCacheFile?: boolean } = {}): {
             updatedAt: "2024-03-01T12:00:00.000Z",
           },
         ],
+        exportTargetStore: new MemoryExportTargetStore([
+          {
+            id: "archive",
+            kind: "bundle-folder",
+            outputDir: "/tmp/archive",
+          },
+        ]),
         cacheLoader: async () => cacheData,
         granolaClient: {
           listDocuments: async () => currentDocuments,
@@ -483,6 +491,32 @@ describe("GranolaServerClient", () => {
         expect.objectContaining({
           id: "team-harness",
           name: "Team harness",
+        }),
+      ],
+    });
+
+    await expect(client.listExportTargets()).resolves.toEqual({
+      targets: [
+        expect.objectContaining({
+          id: "archive",
+          kind: "bundle-folder",
+        }),
+      ],
+    });
+
+    await expect(
+      client.saveExportTargets([
+        {
+          id: "work-vault",
+          kind: "obsidian-vault",
+          outputDir: "/tmp/vault",
+        },
+      ]),
+    ).resolves.toEqual({
+      targets: [
+        expect.objectContaining({
+          id: "work-vault",
+          kind: "obsidian-vault",
         }),
       ],
     });

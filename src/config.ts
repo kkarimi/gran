@@ -305,6 +305,16 @@ export async function loadConfig(options: {
       envFlag(env.DEBUG_MODE) ??
       pickBoolean(configValues.debug) ??
       false,
+    exports: {
+      targetsFile:
+        pickString(env.GRANOLA_EXPORT_TARGETS_FILE) ??
+        resolveConfigPath(
+          configPath,
+          pickString(configValues["export-targets-file"]) ??
+            pickString(configValues.exportTargetsFile),
+        ) ??
+        defaultGranolaToolkitPersistenceLayout().exportTargetsFile,
+    },
     notes: {
       output:
         pickString(options.subcommandFlags.output) ??

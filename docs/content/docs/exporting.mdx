@@ -1,60 +1,80 @@
 ---
 title: Exporting
-description: Keep Granola notes and transcripts in durable local files you control, with stable incremental export state.
+description: Keep Granola notes and transcripts in durable local files you control, with bundled exports, named targets, and stable incremental state.
 ---
 
-Exports are still a core part of the toolkit, but the point is no longer “dump markdown once”.
-The point is to keep a local copy of your notes and transcripts in formats you can search, version,
-review, and feed into other tools.
+`granola export` is the default archive workflow.
 
-## Notes
+Instead of treating notes and transcripts as two unrelated commands, the toolkit now exports them
+together by default and keeps persistent job history so the CLI, web app, and future integrations
+all point at the same export runtime.
 
-`granola notes` exports Granola's generated meeting notes, not the raw transcript.
+## Bundled Export
 
-The flow is:
+By default, `granola export` writes:
 
-1. Resolve credentials, preferring a stored API key, then stored session, then `supabase.json`.
-2. Call the appropriate Granola notes API for the active auth mode.
-3. Normalise each document into a structured note export.
-4. Choose the best available note content.
-5. Render Markdown, JSON, YAML, or raw JSON.
-6. Write one file per document into the output directory.
-
-Content is chosen in this order:
-
-1. `notes`
-2. `last_viewed_panel.content`
-3. `last_viewed_panel.original_content`
-4. raw `content`
+- notes to `<output>/notes`
+- transcripts to `<output>/transcripts`
 
 Examples:
 
 ```bash
-granola notes
-granola notes --folder Team
-granola notes --format json --output ./notes-json
+granola export
+granola export --folder Team
+granola export --output ./exports
+granola export --notes-only
+granola export --transcripts-only
 ```
 
-## Transcripts
+You can still use `granola notes` or `granola transcripts` when you explicitly want a narrower
+one-off export, but the bundled command should be the normal path.
 
-`granola transcripts` exports transcript data from Granola's desktop transcript file when it is
-available locally.
+## Named Export Targets
 
-The flow is:
+Named targets let you save a reusable destination profile instead of retyping output paths.
 
-1. Read Granola's local desktop transcript file from disk.
-2. Parse the transcript data payload.
-3. Normalise transcript data into a structured export per document.
-4. Match segments to documents by document id.
-5. Render text, JSON, YAML, or raw JSON.
-6. Write one file per document into the output directory.
+Current built-in target kinds:
+
+- `bundle-folder`
+- `obsidian-vault`
 
 Examples:
 
 ```bash
-granola transcripts
-granola transcripts --folder Team
-granola transcripts --format yaml --output ./transcripts-yaml
+granola targets list
+granola targets add --id work-archive --output ./exports
+granola targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work
+granola export --target work-vault
+granola targets remove work-archive
+```
+
+For Obsidian vault targets, the toolkit defaults to:
+
+- notes in `Meetings`
+- transcripts in `Meeting Transcripts`
+
+## Notes And Transcript Formats
+
+Notes support:
+
+- `markdown`
+- `json`
+- `yaml`
+- `raw`
+
+Transcripts support:
+
+- `text`
+- `json`
+- `yaml`
+- `raw`
+
+Examples:
+
+```bash
+granola export --notes-format json
+granola export --transcripts-format yaml
+granola export --target work-vault --notes-format markdown
 ```
 
 ## Folder-Scoped Exports
@@ -65,15 +85,15 @@ into a stable per-folder subdirectory under the output root.
 Examples:
 
 ```bash
-granola notes --folder Team
-granola transcripts --folder Team
+granola export --folder Team
+granola export --folder Team --target work-vault
 ```
 
 ## Export Jobs
 
 Exports are tracked as jobs with persistent history, scope metadata, status, progress counters, and
-rerun support, so the browser and future automation flows can treat exports as part of the shared
-local runtime instead of a fire-and-forget shell command.
+rerun support, so the browser and automation flows can treat exports as part of the shared local
+runtime instead of a fire-and-forget shell command.
 
 ```bash
 granola exports list

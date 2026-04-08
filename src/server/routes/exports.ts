@@ -16,6 +16,7 @@ export async function handleExportRoute(context: GranolaServerRouteContext): Pro
     const body = await readJsonBody(request);
     const result = await app.exportNotes(noteFormatFromBody(body.format), {
       folderId: folderIdFromBody(body.folderId),
+      targetId: typeof body.targetId === "string" ? body.targetId : undefined,
     });
     sendJson(response, result, { headers: originHeaders, status: 202 });
     return true;
@@ -24,6 +25,19 @@ export async function handleExportRoute(context: GranolaServerRouteContext): Pro
   if (method === "GET" && path === granolaTransportPaths.exportJobs) {
     const limit = parseInteger(url.searchParams.get("limit"));
     const result = await app.listExportJobs({ limit });
+    sendJson(response, result, { headers: originHeaders });
+    return true;
+  }
+
+  if (method === "GET" && path === granolaTransportPaths.exportTargets) {
+    const result = await app.listExportTargets();
+    sendJson(response, result, { headers: originHeaders });
+    return true;
+  }
+
+  if (method === "PUT" && path === granolaTransportPaths.exportTargets) {
+    const body = await readJsonBody(request);
+    const result = await app.saveExportTargets(Array.isArray(body.targets) ? body.targets : []);
     sendJson(response, result, { headers: originHeaders });
     return true;
   }
@@ -49,6 +63,7 @@ export async function handleExportRoute(context: GranolaServerRouteContext): Pro
     const body = await readJsonBody(request);
     const result = await app.exportTranscripts(transcriptFormatFromBody(body.format), {
       folderId: folderIdFromBody(body.folderId),
+      targetId: typeof body.targetId === "string" ? body.targetId : undefined,
     });
     sendJson(response, result, { headers: originHeaders, status: 202 });
     return true;

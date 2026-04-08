@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import type { GranolaExportTarget } from "../app/index.ts";
 import { renderExportScopeLabel } from "../export-scope.ts";
 import type { NoteOutputFormat, TranscriptOutputFormat } from "../types.ts";
 
@@ -18,6 +19,7 @@ By default this exports notes and transcripts together.
 
 Options:
   --folder <query>             Export only meetings inside one folder id or name
+  --target <id>                Named export target/profile to use
   --output <path>              Shared output root; writes notes to <path>/notes and transcripts to <path>/transcripts
   --notes-output <path>        Output directory for note files
   --transcripts-output <path>  Output directory for transcript files
@@ -85,6 +87,34 @@ function resolveSharedOutputRoot(value: string | boolean | undefined): string | 
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function resolveTargetById(
+  targets: GranolaExportTarget[],
+  targetId?: string,
+): GranolaExportTarget | undefined {
+  if (!targetId?.trim()) {
+    return undefined;
+  }
+
+  return targets.find((candidate) => candidate.id === targetId.trim());
+}
+
+function assertCompatibleTargetFlags(options: {
+  notesOutput?: string;
+  outputRoot?: string;
+  targetId?: string;
+  transcriptsOutput?: string;
+}): void {
+  if (!options.targetId) {
+    return;
+  }
+
+  if (options.outputRoot || options.notesOutput || options.transcriptsOutput) {
+    throw new Error(
+      "cannot combine --target with --output, --notes-output, or --transcripts-output",
+    );
+  }
+}
+
 export const exportCommand: CommandDefinition = {
   description: "Export notes and transcripts together",
   flags: {
@@ -95,6 +125,7 @@ export const exportCommand: CommandDefinition = {
     "notes-only": { type: "boolean" },
     "notes-output": { type: "string" },
     output: { type: "string" },
+    target: { type: "string" },
     timeout: { type: "string" },
     "transcripts-format": { type: "string" },
     "transcripts-only": { type: "boolean" },
@@ -125,6 +156,13 @@ export const exportCommand: CommandDefinition = {
         : { mode: "all" },
     );
     const outputRoot = resolveSharedOutputRoot(commandFlags.output);
+    const targetId =
+      typeof commandFlags.target === "string" ? commandFlags.target.trim() : undefined;
+    const configuredTargets = targetId ? (await app.listExportTargets()).targets : [];
+    const target = resolveTargetById(configuredTargets, targetId);
+    if (targetId && !target) {
+      throw new Error(`export target not found: ${targetId}`);
+    }
     const noteFormat = resolveNoteFormat(commandFlags["notes-format"]);
     const transcriptFormat = resolveTranscriptFormat(commandFlags["transcripts-format"]);
     const notesOutput =
@@ -139,33 +177,49 @@ export const exportCommand: CommandDefinition = {
         : outputRoot
           ? join(outputRoot, "transcripts")
           : undefined;
+    assertCompatibleTargetFlags({
+      notesOutput,
+      outputRoot,
+      targetId,
+      transcriptsOutput,
+    });
+    const resolvedNoteFormat =
+      commandFlags["notes-format"] === undefined ? (target?.notesFormat ?? noteFormat) : noteFormat;
+    const resolvedTranscriptFormat =
+      commandFlags["transcripts-format"] === undefined
+        ? (target?.transcriptsFormat ?? transcriptFormat)
+        : transcriptFormat;
 
     debug(config.debug, "mode", mode);
     debug(config.debug, "folder", folder?.id ?? "(all)");
-    debug(config.debug, "notesFormat", noteFormat);
-    debug(config.debug, "transcriptsFormat", transcriptFormat);
+    debug(config.debug, "target", target?.id ?? "(none)");
+    debug(config.debug, "notesFormat", resolvedNoteFormat);
+    debug(config.debug, "transcriptsFormat", resolvedTranscriptFormat);
     debug(config.debug, "notesOutput", notesOutput ?? config.notes.output);
     debug(config.debug, "transcriptsOutput", transcriptsOutput ?? config.transcripts.output);
 
     const notesResult = exportNotes
-      ? await app.exportNotes(noteFormat, {
+      ? await app.exportNotes(resolvedNoteFormat, {
           folderId: folder?.id,
           outputDir: notesOutput,
           scopedOutput: notesOutput === undefined,
+          targetId: target?.id,
         })
       : undefined;
     const transcriptsResult = exportTranscripts
-      ? await app.exportTranscripts(transcriptFormat, {
+      ? await app.exportTranscripts(resolvedTranscriptFormat, {
           folderId: folder?.id,
           outputDir: transcriptsOutput,
           scopedOutput: transcriptsOutput === undefined,
+          targetId: target?.id,
         })
       : undefined;
+    const targetLabel = target ? ` via ${target.name ?? target.id}` : "";
 
     if (notesResult && transcriptsResult) {
       console.log(
         [
-          `✓ Exported notes and transcripts from ${scopeLabel}`,
+          `✓ Exported notes and transcripts from ${scopeLabel}${targetLabel}`,
           `  notes: ${notesResult.documentCount} -> ${notesResult.outputDir} (job ${notesResult.job.id})`,
           `  transcripts: ${transcriptsResult.transcriptCount} -> ${transcriptsResult.outputDir} (job ${transcriptsResult.job.id})`,
         ].join("\n"),
@@ -175,14 +229,14 @@ export const exportCommand: CommandDefinition = {
 
     if (notesResult) {
       console.log(
-        `✓ Exported ${notesResult.documentCount} notes from ${scopeLabel} to ${notesResult.outputDir} (job ${notesResult.job.id})`,
+        `✓ Exported ${notesResult.documentCount} notes from ${scopeLabel}${targetLabel} to ${notesResult.outputDir} (job ${notesResult.job.id})`,
       );
       return 0;
     }
 
     if (transcriptsResult) {
       console.log(
-        `✓ Exported ${transcriptsResult.transcriptCount} transcripts from ${scopeLabel} to ${transcriptsResult.outputDir} (job ${transcriptsResult.job.id})`,
+        `✓ Exported ${transcriptsResult.transcriptCount} transcripts from ${scopeLabel}${targetLabel} to ${transcriptsResult.outputDir} (job ${transcriptsResult.job.id})`,
       );
       return 0;
     }

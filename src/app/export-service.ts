@@ -4,6 +4,7 @@ import {
   folderExportScope,
   resolveExportOutputDir,
 } from "../export-scope.ts";
+import { resolveExportTargetOutputDir, type ExportTargetStore } from "../export-targets.ts";
 import type { ExportJobStore } from "../export-jobs.ts";
 import { writeNotes } from "../notes.ts";
 import { buildFolderSummary, resolveFolder } from "../folders.ts";
@@ -25,6 +26,8 @@ import type {
   GranolaExportJobsResult,
   GranolaExportRunOptions,
   GranolaExportScope,
+  GranolaExportTarget,
+  GranolaExportTargetsResult,
   GranolaNotesExportResult,
   GranolaTranscriptsExportResult,
 } from "./types.ts";
@@ -62,6 +65,7 @@ interface GranolaExportServiceDependencies {
   createExportJobId: (kind: GranolaExportJobKind) => string;
   emitStateUpdate: () => void;
   exportJobStore?: ExportJobStore;
+  exportTargetStore?: ExportTargetStore;
   exporterRegistry?: GranolaExporterRegistry;
   loadCache: (options?: { required?: boolean }) => Promise<CacheData | undefined>;
   loadFolders: (options?: {
@@ -93,6 +97,24 @@ export class GranolaExportService {
     };
   }
 
+  async listTargets(): Promise<GranolaExportTargetsResult> {
+    const targets = this.deps.exportTargetStore
+      ? await this.deps.exportTargetStore.readTargets()
+      : [];
+    return {
+      targets: targets.map((target) => ({ ...target })),
+    };
+  }
+
+  async saveTargets(targets: GranolaExportTarget[]): Promise<GranolaExportTargetsResult> {
+    if (!this.deps.exportTargetStore) {
+      throw new Error("export target store is not configured");
+    }
+
+    await this.deps.exportTargetStore.writeTargets(targets.map((target) => ({ ...target })));
+    return await this.listTargets();
+  }
+
   async exportNotes(
     format: NoteOutputFormat = "markdown",
     options: GranolaExportRunOptions = {},
@@ -120,13 +142,7 @@ export class GranolaExportService {
     return {
       documents: filteredDocuments,
       format,
-      outputDir: resolveExportOutputDir(
-        options.outputDir ?? this.deps.config.notes.output,
-        exportContext.scope,
-        {
-          scopedDirectory: options.scopedOutput,
-        },
-      ),
+      outputDir: await this.resolveNotesOutputDir(exportContext.scope, options),
       scope: exportContext.scope,
     };
   }
@@ -173,13 +189,7 @@ export class GranolaExportService {
     return {
       cacheData: scopedCacheData,
       format,
-      outputDir: resolveExportOutputDir(
-        options.outputDir ?? this.deps.config.transcripts.output,
-        exportContext.scope,
-        {
-          scopedDirectory: options.scopedOutput,
-        },
-      ),
+      outputDir: await this.resolveTranscriptsOutputDir(exportContext.scope, options),
       scope: exportContext.scope,
     };
   }
@@ -422,5 +432,58 @@ export class GranolaExportService {
       documentIds: new Set(rawFolder.documentIds),
       scope: folderExportScope(summary),
     };
+  }
+
+  private async readExportTarget(
+    targetId: string | undefined,
+  ): Promise<GranolaExportTarget | undefined> {
+    if (!targetId) {
+      return undefined;
+    }
+
+    if (!this.deps.exportTargetStore) {
+      throw new Error("export target store is not configured");
+    }
+
+    const target = (await this.deps.exportTargetStore.readTargets()).find(
+      (candidate) => candidate.id === targetId,
+    );
+    if (!target) {
+      throw new Error(`export target not found: ${targetId}`);
+    }
+
+    return { ...target };
+  }
+
+  private async resolveNotesOutputDir(
+    scope: GranolaExportScope,
+    options: GranolaExportRunOptions,
+  ): Promise<string> {
+    const target = await this.readExportTarget(options.targetId);
+    if (target) {
+      return resolveExportTargetOutputDir(target, "notes", scope, {
+        scopedDirectory: options.scopedOutput,
+      });
+    }
+
+    return resolveExportOutputDir(options.outputDir ?? this.deps.config.notes.output, scope, {
+      scopedDirectory: options.scopedOutput,
+    });
+  }
+
+  private async resolveTranscriptsOutputDir(
+    scope: GranolaExportScope,
+    options: GranolaExportRunOptions,
+  ): Promise<string> {
+    const target = await this.readExportTarget(options.targetId);
+    if (target) {
+      return resolveExportTargetOutputDir(target, "transcripts", scope, {
+        scopedDirectory: options.scopedOutput,
+      });
+    }
+
+    return resolveExportOutputDir(options.outputDir ?? this.deps.config.transcripts.output, scope, {
+      scopedDirectory: options.scopedOutput,
+    });
   }
 }

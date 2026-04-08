@@ -47,7 +47,9 @@ Global options:
 Examples:
   granola attach http://127.0.0.1:4123
   granola export --folder Team
+  granola targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work
   granola folder list
+  granola intelligence run decisions --last 5
   granola init --provider openrouter
   granola service start
   granola sync

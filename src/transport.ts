@@ -32,6 +32,7 @@ export interface GranolaServerInfo {
   config: {
     automationRulesFile?: string;
     configFile?: string;
+    exportTargetsFile?: string;
     notesOutputDir?: string;
     pluginsFile?: string;
     supabaseFile?: string;
@@ -57,6 +58,7 @@ export interface GranolaServerInfo {
     config?: GranolaLocalPathInfo;
     dataDirectory?: GranolaLocalPathInfo;
     meetingIndex?: GranolaLocalPathInfo;
+    exportTargets?: GranolaLocalPathInfo;
     pluginSettings?: GranolaLocalPathInfo;
     serviceLog?: GranolaLocalPathInfo;
     session?: GranolaLocalPathInfo;
@@ -69,6 +71,7 @@ export interface GranolaServerInfo {
     dataDirectory?: string;
     exportJobs: boolean;
     exportJobsFile?: string;
+    exportTargetsFile?: string;
     meetingIndex: boolean;
     meetingIndexFile?: string;
     searchIndexFile?: string;
@@ -111,6 +114,7 @@ export const granolaTransportPaths = {
   events: "/events",
   exportJobs: "/exports/jobs",
   exportNotes: "/exports/notes",
+  exportTargets: "/exports/targets",
   exportTranscripts: "/exports/transcripts",
   folderResolve: "/folders/resolve",
   folders: "/folders",
@@ -193,6 +197,10 @@ export function granolaExportJobsPath(options: GranolaExportJobsListOptions = {}
   return appendSearchParams(granolaTransportPaths.exportJobs, {
     limit: options.limit,
   });
+}
+
+export function granolaExportTargetsPath(): string {
+  return granolaTransportPaths.exportTargets;
 }
 
 export function granolaAutomationRunsPath(

@@ -121,6 +121,17 @@ describe("runCli", () => {
     expect(error).not.toHaveBeenCalled();
   });
 
+  test("shows intelligence help from the command module", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const exitCode = await runCli(["intelligence", "--help"]);
+
+    expect(exitCode).toBe(0);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola intelligence"));
+    expect(error).not.toHaveBeenCalled();
+  });
+
   test("shows serve help from the command module", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -173,6 +184,17 @@ describe("runCli", () => {
 
     expect(exitCode).toBe(0);
     expect(log).toHaveBeenCalledWith(expect.stringContaining("--meeting <id>"));
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  test("shows targets help from the command module", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const exitCode = await runCli(["targets", "--help"]);
+
+    expect(exitCode).toBe(0);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola targets"));
     expect(error).not.toHaveBeenCalled();
   });
 

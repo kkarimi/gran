@@ -61,6 +61,7 @@ import {
   createExportJobId,
   type ExportJobStore,
 } from "../export-jobs.ts";
+import { createDefaultExportTargetStore, type ExportTargetStore } from "../export-targets.ts";
 import { meetingExportScope, resolveExportOutputDir } from "../export-scope.ts";
 import { filterMeetingSummaries, listMeetings } from "../meetings.ts";
 import {
@@ -77,6 +78,10 @@ import {
   type MeetingIndexStore,
 } from "../meeting-index.ts";
 import { createDefaultPkmTargetStore, type PkmTargetStore } from "../pkm-targets.ts";
+import {
+  resolveGranolaIntelligencePreset,
+  type GranolaIntelligencePreset,
+} from "../intelligence-presets.ts";
 import { createDefaultPluginSettingsStore, type PluginSettingsStore } from "../plugins.ts";
 import {
   applyPluginRuntimeDefaults,
@@ -146,6 +151,8 @@ import type {
   GranolaAppSyncRun,
   GranolaAppSyncResult,
   GranolaAppSyncState,
+  GranolaExportTarget,
+  GranolaExportTargetsResult,
   GranolaExportRunOptions,
   GranolaExportScope,
   GranolaExportJobsListOptions,
@@ -212,6 +219,7 @@ interface GranolaAppDependencies {
     client: GranolaCatalogClient;
   }>;
   exportJobStore?: ExportJobStore;
+  exportTargetStore?: ExportTargetStore;
   exporterRegistry?: GranolaExporterRegistry;
   exportJobs?: GranolaAppExportJobState[];
   granolaClient?: GranolaCatalogClient;
@@ -422,7 +430,9 @@ function cloneState(state: GranolaAppState): GranolaAppState {
       ...state.config,
       automation: state.config.automation ? { ...state.config.automation } : undefined,
       agents: state.config.agents ? { ...state.config.agents } : undefined,
+      exports: state.config.exports ? { ...state.config.exports } : undefined,
       notes: { ...state.config.notes },
+      plugins: state.config.plugins ? { ...state.config.plugins } : undefined,
       transcripts: { ...state.config.transcripts },
     },
     documents: { ...state.documents },
@@ -478,6 +488,7 @@ function defaultState(
       ...config,
       automation: config.automation ? { ...config.automation } : undefined,
       agents: config.agents ? { ...config.agents } : undefined,
+      exports: config.exports ? { ...config.exports } : undefined,
       notes: { ...config.notes },
       plugins: config.plugins ? { ...config.plugins } : undefined,
       transcripts: { ...config.transcripts },
@@ -626,6 +637,7 @@ export class GranolaApp implements GranolaAppApi {
       },
       exporterRegistry: deps.exporterRegistry,
       exportJobStore: deps.exportJobStore,
+      exportTargetStore: deps.exportTargetStore,
       loadCache: async (options = {}) => await this.loadCache(options),
       loadFolders: async (options = {}) => await this.loadFolders(options),
       listDocuments: async () => await this.listDocuments(),
@@ -1847,10 +1859,72 @@ export class GranolaApp implements GranolaAppApi {
     return bundle;
   }
 
+  async runIntelligencePreset(
+    presetId: string,
+    options: {
+      approvalMode?: "auto" | "manual";
+      folderId?: string;
+      limit?: number;
+      model?: string;
+      provider?: "codex" | "openai" | "openrouter";
+      updatedFrom?: string;
+    } = {},
+  ): Promise<{
+    artefacts: GranolaAutomationArtefact[];
+    meetings: MeetingSummaryRecord[];
+    preset: GranolaIntelligencePreset;
+    runs: GranolaAutomationActionRun[];
+  }> {
+    const preset = resolveGranolaIntelligencePreset(presetId);
+    if (!preset) {
+      throw new Error(`intelligence preset not found: ${presetId}`);
+    }
+
+    const meetingResult = await this.listMeetings({
+      folderId: options.folderId,
+      limit: options.limit,
+      preferIndex: true,
+      sort: "updated-desc",
+      updatedFrom: options.updatedFrom,
+    });
+    const meetings = meetingResult.meetings;
+    const bundles: GranolaMeetingBundle[] = [];
+
+    for (const meeting of meetings) {
+      const bundle = await this.getMeeting(meeting.id, {
+        requireCache: true,
+      }).catch(async () => await this.getMeeting(meeting.id));
+      bundles.push(bundle);
+    }
+
+    const result = await this.#automation.runIntelligencePreset({
+      approvalMode: options.approvalMode,
+      bundles,
+      model: options.model,
+      preset,
+      provider: options.provider,
+    });
+
+    return {
+      artefacts: result.artefacts,
+      meetings,
+      preset,
+      runs: result.runs,
+    };
+  }
+
   async listExportJobs(
     options: GranolaExportJobsListOptions = {},
   ): Promise<GranolaExportJobsResult> {
     return await this.#exports.listJobs(options);
+  }
+
+  async listExportTargets(): Promise<GranolaExportTargetsResult> {
+    return await this.#exports.listTargets();
+  }
+
+  async saveExportTargets(targets: GranolaExportTarget[]): Promise<GranolaExportTargetsResult> {
+    return await this.#exports.saveTargets(targets);
   }
 
   async exportNotes(
@@ -1901,6 +1975,7 @@ export async function createGranolaApp(
   const authController = createDefaultGranolaAuthController(config);
   const exportJobStore = createDefaultExportJobStore();
   const exportJobs = await exportJobStore.readJobs();
+  const exportTargetStore = createDefaultExportTargetStore(config.exports?.targetsFile);
   const meetingIndexStore = createDefaultMeetingIndexStore();
   const meetingIndex = await meetingIndexStore.readIndex();
   const pkmTargetStore = createDefaultPkmTargetStore(config.automation?.pkmTargetsFile);
@@ -1939,6 +2014,7 @@ export async function createGranolaApp(
         }),
       exportJobs,
       exportJobStore,
+      exportTargetStore,
       meetingIndex,
       meetingIndexStore,
       now: options.now,

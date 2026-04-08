@@ -11,6 +11,7 @@ import { MemoryAutomationMatchStore } from "../src/automation-matches.ts";
 import { MemoryAutomationRunStore } from "../src/automation-runs.ts";
 import { MemoryAutomationRuleStore } from "../src/automation-rules.ts";
 import { MemoryExportJobStore } from "../src/export-jobs.ts";
+import { MemoryExportTargetStore } from "../src/export-targets.ts";
 import { MemoryMeetingIndexStore } from "../src/meeting-index.ts";
 import { MemoryPkmTargetStore } from "../src/pkm-targets.ts";
 import { MemoryPluginSettingsStore } from "../src/plugins.ts";
@@ -1548,6 +1549,124 @@ describe("GranolaApp", () => {
     expect(runAgent).toHaveBeenCalledTimes(4);
   });
 
+  test("runs intelligence presets into reviewable enrichment artefacts", async () => {
+    const cacheFile = join(
+      await mkdtemp(join(tmpdir(), "granola-intelligence-cache-")),
+      "cache.json",
+    );
+    await writeFile(cacheFile, "{}\n", "utf8");
+    const meetingIndexStore = new MemoryMeetingIndexStore();
+    const artefactStore = new MemoryAutomationArtefactStore();
+    const searchIndexStore = new MemorySearchIndexStore();
+
+    await meetingIndexStore.writeIndex([
+      {
+        createdAt: "2024-01-01T09:00:00Z",
+        folders: folders.map((folder) => ({
+          createdAt: folder.createdAt,
+          documentCount: folder.documentIds.length,
+          id: folder.id,
+          isFavourite: folder.isFavourite,
+          name: folder.name,
+          updatedAt: folder.updatedAt,
+        })),
+        id: "doc-alpha-1111",
+        noteContentSource: "notes",
+        tags: ["team", "alpha"],
+        title: "Alpha Sync",
+        transcriptLoaded: true,
+        transcriptSegmentCount: 1,
+        updatedAt: "2024-01-03T10:00:00Z",
+      },
+    ]);
+
+    const app = new GranolaApp(
+      enableAutomation({
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile,
+          output: "/tmp/transcripts",
+        },
+      }),
+      {
+        agentRunner: {
+          run: vi.fn(
+            async (): Promise<GranolaAutomationAgentResult> => ({
+              dryRun: false,
+              model: "gpt-5-mini",
+              output: JSON.stringify({
+                actionItems: [],
+                decisions: ["Ship the rollout"],
+                followUps: ["Confirm launch date"],
+                highlights: ["Payment ops risk is under control."],
+                markdown: "# Insights\n\n- Payment ops risk is under control.",
+                metadata: { preset: "insights" },
+                sections: [
+                  {
+                    body: "Payment ops risk is under control.",
+                    title: "Key insight",
+                  },
+                ],
+                summary: "One useful insight captured.",
+                title: "Alpha Sync Insights",
+              }),
+              prompt: "Prompt",
+              provider: "openrouter",
+            }),
+          ),
+        },
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        automationArtefactStore: artefactStore,
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          getDocumentTranscript: async () => cacheData.transcripts["doc-alpha-1111"] ?? [],
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        meetingIndex: await meetingIndexStore.readIndex(),
+        meetingIndexStore,
+        now: () => new Date("2024-03-01T12:00:00Z"),
+        searchIndexStore,
+      },
+      { surface: "server" },
+    );
+
+    const result = await app.runIntelligencePreset("insights", {
+      approvalMode: "manual",
+      limit: 5,
+      provider: "openrouter",
+    });
+
+    expect(result.meetings).toHaveLength(1);
+    expect(result.runs).toHaveLength(1);
+    expect(result.artefacts).toHaveLength(1);
+    expect(result.artefacts[0]).toEqual(
+      expect.objectContaining({
+        kind: "enrichment",
+        provider: "openrouter",
+        ruleName: "Intelligence: Insights",
+        status: "generated",
+        structured: expect.objectContaining({
+          title: "Alpha Sync Insights",
+        }),
+      }),
+    );
+    expect(
+      (await app.listAutomationArtefacts({ kind: "enrichment", limit: 10 })).artefacts,
+    ).toHaveLength(1);
+  });
+
   test("runs downstream approval actions after approving an artefact", async () => {
     const outputDir = await mkdtemp(join(tmpdir(), "granola-approval-actions-"));
     const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-cache-")), "cache.json");
@@ -2420,6 +2539,133 @@ describe("GranolaApp", () => {
     expect(rerun.job.id).not.toBe(first.job.id);
     expect(rerun.job.kind).toBe("notes");
     expect((await jobStore.readJobs()).map((job) => job.id)).toEqual([rerun.job.id, first.job.id]);
+  });
+
+  test("lists and saves export targets", async () => {
+    const targetStore = new MemoryExportTargetStore([
+      {
+        id: "archive",
+        kind: "bundle-folder",
+        outputDir: "/tmp/archive",
+      },
+    ]);
+    const app = new GranolaApp(
+      {
+        debug: false,
+        exports: {
+          targetsFile: "/tmp/export-targets.json",
+        },
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        cacheLoader: async () => undefined,
+        exportTargetStore: targetStore,
+        granolaClient: {
+          listDocuments: async () => documents,
+        },
+      },
+    );
+
+    expect((await app.listExportTargets()).targets).toEqual([
+      expect.objectContaining({
+        id: "archive",
+      }),
+    ]);
+
+    const result = await app.saveExportTargets([
+      {
+        id: "work-vault",
+        kind: "obsidian-vault",
+        notesSubdir: "Meetings",
+        outputDir: "/tmp/vault",
+        transcriptsSubdir: "Meeting Transcripts",
+      },
+    ]);
+
+    expect(result.targets).toEqual([
+      {
+        id: "work-vault",
+        kind: "obsidian-vault",
+        notesSubdir: "Meetings",
+        outputDir: "/tmp/vault",
+        transcriptsSubdir: "Meeting Transcripts",
+      },
+    ]);
+  });
+
+  test("resolves note and transcript exports through a named target", async () => {
+    const outputDir = await mkdtemp(join(tmpdir(), "granola-app-target-"));
+    const cacheFile = join(outputDir, "cache.json");
+    await writeFile(cacheFile, "{}\n", "utf8");
+    const targetStore = new MemoryExportTargetStore([
+      {
+        id: "work-vault",
+        kind: "obsidian-vault",
+        outputDir,
+      },
+    ]);
+    const app = new GranolaApp(
+      {
+        debug: false,
+        exports: {
+          targetsFile: "/tmp/export-targets.json",
+        },
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile,
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        cacheLoader: async () => cacheData,
+        exportTargetStore: targetStore,
+        granolaClient: {
+          listDocuments: async () => documents,
+        },
+      },
+    );
+
+    const notesResult = await app.exportNotes("markdown", {
+      targetId: "work-vault",
+    });
+    const transcriptsResult = await app.exportTranscripts("text", {
+      targetId: "work-vault",
+    });
+
+    expect(notesResult.outputDir).toBe(join(outputDir, "Meetings"));
+    expect(transcriptsResult.outputDir).toBe(join(outputDir, "Meeting Transcripts"));
+    expect(await readFile(join(outputDir, "Meetings", "Alpha Sync.md"), "utf8")).toContain(
+      "Alpha Sync",
+    );
+    expect(
+      await readFile(join(outputDir, "Meeting Transcripts", "Alpha Sync.txt"), "utf8"),
+    ).toContain("Hello team");
   });
 
   test("tracks list filters and quick-open state", async () => {

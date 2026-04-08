@@ -669,6 +669,7 @@ function createWorkspaceHarness(
     inspectAuth: vi.fn(async () => state.auth),
     inspectSync: vi.fn(async () => state.sync),
     listAgentHarnesses: vi.fn(async () => ({ harnesses: [] })),
+    listExportTargets: vi.fn(async () => ({ targets: [] })),
     getAutomationArtefact: vi.fn(async (id: string) => ({
       actionId: "pipeline-notes",
       actionName: "Pipeline notes",
@@ -777,6 +778,7 @@ function createWorkspaceHarness(
     rerunExportJob: vi.fn(),
     saveAgentHarnesses: vi.fn(async () => ({ harnesses: [] })),
     saveAutomationRules: vi.fn(async (rules) => ({ rules })),
+    saveExportTargets: vi.fn(async () => ({ targets: [] })),
     sync: vi.fn(async () => ({
       changes: [],
       state: state.sync,

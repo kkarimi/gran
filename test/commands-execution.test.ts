@@ -8,12 +8,14 @@ import type { CommandContext } from "../src/commands/types.ts";
 import { authCommand } from "../src/commands/auth.ts";
 import { exportCommand } from "../src/commands/export.ts";
 import { exportsCommand } from "../src/commands/exports.ts";
+import { intelligenceCommand } from "../src/commands/intelligence.ts";
 import { meetingCommand } from "../src/commands/meeting.ts";
 import { notesCommand } from "../src/commands/notes.ts";
 import { searchCommand } from "../src/commands/search.ts";
 import { serviceCommand } from "../src/commands/service.ts";
 import { serveCommand } from "../src/commands/serve.ts";
 import { syncCommand } from "../src/commands/sync.ts";
+import { targetsCommand } from "../src/commands/targets.ts";
 import { tuiCommand } from "../src/commands/tui.ts";
 import { transcriptsCommand } from "../src/commands/transcripts.ts";
 import { webCommand } from "../src/commands/web.ts";
@@ -380,6 +382,318 @@ describe("command execution", () => {
         "  transcripts: 2 -> /tmp/archive/transcripts (job transcripts-job-1)",
       ].join("\n"),
     );
+  });
+
+  test("export command uses a named target profile when provided", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      exportNotes: vi.fn(async () => ({
+        documentCount: 2,
+        documents: [],
+        format: "markdown",
+        job: {
+          completedCount: 2,
+          format: "markdown",
+          id: "notes-job-1",
+          itemCount: 2,
+          kind: "notes",
+          outputDir: "/tmp/vault/Meetings",
+          scope: { mode: "all" },
+          startedAt: "2024-03-01T12:00:00Z",
+          status: "completed",
+          written: 2,
+        },
+        outputDir: "/tmp/vault/Meetings",
+        scope: { mode: "all" },
+        written: 2,
+      })),
+      exportTranscripts: vi.fn(async () => ({
+        cacheData: {
+          documents: {},
+          transcripts: {},
+        },
+        format: "text",
+        job: {
+          completedCount: 2,
+          format: "text",
+          id: "transcripts-job-1",
+          itemCount: 2,
+          kind: "transcripts",
+          outputDir: "/tmp/vault/Meeting Transcripts",
+          scope: { mode: "all" },
+          startedAt: "2024-03-01T12:00:00Z",
+          status: "completed",
+          written: 2,
+        },
+        outputDir: "/tmp/vault/Meeting Transcripts",
+        scope: { mode: "all" },
+        transcriptCount: 2,
+        written: 2,
+      })),
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      listExportTargets: vi.fn(async () => ({
+        targets: [
+          {
+            id: "work-vault",
+            kind: "obsidian-vault" as const,
+            name: "Work vault",
+            notesFormat: "markdown" as const,
+            outputDir: "/tmp/vault",
+            transcriptsFormat: "text" as const,
+          },
+        ],
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await exportCommand.run(
+      makeContext({
+        commandFlags: {
+          target: "work-vault",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.listExportTargets).toHaveBeenCalled();
+    expect(app.exportNotes).toHaveBeenCalledWith("markdown", {
+      outputDir: undefined,
+      scopedOutput: true,
+      targetId: "work-vault",
+    });
+    expect(app.exportTranscripts).toHaveBeenCalledWith("text", {
+      outputDir: undefined,
+      scopedOutput: true,
+      targetId: "work-vault",
+    });
+    expect(log).toHaveBeenCalledWith(
+      [
+        "✓ Exported notes and transcripts from all meetings via Work vault",
+        "  notes: 2 -> /tmp/vault/Meetings (job notes-job-1)",
+        "  transcripts: 2 -> /tmp/vault/Meeting Transcripts (job transcripts-job-1)",
+      ].join("\n"),
+    );
+  });
+
+  test("targets add saves a named export target", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      listExportTargets: vi.fn(async () => ({
+        targets: [],
+      })),
+      saveExportTargets: vi.fn(async (targets) => ({
+        targets,
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await targetsCommand.run(
+      makeContext({
+        commandArgs: ["add"],
+        commandFlags: {
+          id: "work-vault",
+          kind: "obsidian-vault",
+          "notes-subdir": "Meetings",
+          output: "/tmp/vault",
+          "transcripts-subdir": "Meeting Transcripts",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.saveExportTargets).toHaveBeenCalledWith([
+      {
+        id: "work-vault",
+        kind: "obsidian-vault",
+        name: undefined,
+        notesFormat: undefined,
+        notesSubdir: "Meetings",
+        outputDir: "/tmp/vault",
+        transcriptsFormat: undefined,
+        transcriptsSubdir: "Meeting Transcripts",
+      },
+    ]);
+    expect(log).toHaveBeenCalledWith("Saved export target work-vault -> /tmp/vault (1 total)");
+  });
+
+  test("targets remove deletes one export target", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      listExportTargets: vi.fn(async () => ({
+        targets: [
+          {
+            id: "keep",
+            kind: "bundle-folder" as const,
+            outputDir: "/tmp/archive",
+          },
+          {
+            id: "remove-me",
+            kind: "obsidian-vault" as const,
+            outputDir: "/tmp/vault",
+          },
+        ],
+      })),
+      saveExportTargets: vi.fn(async (targets) => ({
+        targets,
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await targetsCommand.run(
+      makeContext({
+        commandArgs: ["remove", "remove-me"],
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.saveExportTargets).toHaveBeenCalledWith([
+      {
+        id: "keep",
+        kind: "bundle-folder",
+        outputDir: "/tmp/archive",
+      },
+    ]);
+    expect(log).toHaveBeenCalledWith("Removed export target remove-me");
+  });
+
+  test("intelligence run executes a built-in preset over recent meetings", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      findFolder: vi.fn(async () => ({
+        id: "folder-team-1111",
+        name: "Team",
+      })),
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      runIntelligencePreset: vi.fn(async () => ({
+        artefacts: [
+          {
+            actionId: "intelligence:decisions",
+            actionName: "intelligence:decisions",
+            attempts: [],
+            createdAt: "2024-03-01T12:00:00.000Z",
+            eventId: "intelligence:decisions:doc-alpha-1111:20240301",
+            history: [{ action: "generated" as const, at: "2024-03-01T12:00:00.000Z" }],
+            id: "enrichment:intelligence:decisions:doc-alpha-1111:20240301",
+            kind: "enrichment" as const,
+            matchId: "intelligence:decisions:doc-alpha-1111:20240301",
+            meetingId: "doc-alpha-1111",
+            model: "gpt-5-mini",
+            parseMode: "json" as const,
+            prompt: "Prompt",
+            provider: "openrouter" as const,
+            rawOutput: "{}",
+            ruleId: "intelligence:decisions",
+            ruleName: "Intelligence: Decisions",
+            runId: "intelligence:decisions:doc-alpha-1111:20240301",
+            status: "generated" as const,
+            structured: {
+              actionItems: [],
+              decisions: ["Ship the rollout"],
+              followUps: [],
+              highlights: [],
+              markdown: "# Decisions\n\n- Ship the rollout",
+              sections: [],
+              summary: "One major decision captured.",
+              title: "Alpha Sync Decisions",
+            },
+            updatedAt: "2024-03-01T12:00:00.000Z",
+          },
+        ],
+        meetings: [
+          {
+            createdAt: "2024-01-01T09:00:00Z",
+            folders: [],
+            id: "doc-alpha-1111",
+            noteContentSource: "notes" as const,
+            tags: ["team"],
+            title: "Alpha Sync",
+            transcriptLoaded: true,
+            transcriptSegmentCount: 2,
+            updatedAt: "2024-01-03T10:00:00Z",
+          },
+        ],
+        preset: {
+          description: "Decision tracking",
+          id: "decisions",
+          label: "Decisions",
+          prompt: "Prompt",
+        },
+        runs: [
+          {
+            actionId: "intelligence:decisions",
+            actionKind: "agent" as const,
+            actionName: "intelligence:decisions",
+            eventId: "intelligence:decisions:doc-alpha-1111:20240301",
+            eventKind: "transcript.ready" as const,
+            folders: [],
+            id: "intelligence:decisions:doc-alpha-1111:20240301",
+            matchId: "intelligence:decisions:doc-alpha-1111:20240301",
+            matchedAt: "2024-03-01T12:00:00.000Z",
+            meetingId: "doc-alpha-1111",
+            ruleId: "intelligence:decisions",
+            ruleName: "Intelligence: Decisions",
+            startedAt: "2024-03-01T12:00:00.000Z",
+            status: "completed" as const,
+            tags: ["team"],
+            title: "Alpha Sync",
+            transcriptLoaded: true,
+          },
+        ],
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await intelligenceCommand.run(
+      makeContext({
+        commandArgs: ["run", "decisions"],
+        commandFlags: {
+          approve: true,
+          folder: "Team",
+          last: "5",
+          model: "gpt-5-mini",
+          provider: "openrouter",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.findFolder).toHaveBeenCalledWith("Team");
+    expect(app.runIntelligencePreset).toHaveBeenCalledWith("decisions", {
+      approvalMode: "auto",
+      folderId: "folder-team-1111",
+      limit: 5,
+      model: "gpt-5-mini",
+      provider: "openrouter",
+      updatedFrom: undefined,
+    });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Preset: Decisions"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Alpha Sync Decisions"));
   });
 
   test("exports command prints scope-aware job history and rerun output", async () => {
