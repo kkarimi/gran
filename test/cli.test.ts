@@ -16,7 +16,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola Toolkit"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran 👵🏻"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -49,7 +49,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["auth", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola auth"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran auth"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -60,7 +60,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["attach", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola attach"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran attach"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -82,7 +82,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["exports", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola exports"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran exports"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -106,7 +106,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["folder", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola folder"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran folder"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -117,7 +117,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["init", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola init"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran init"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -128,7 +128,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["intelligence", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola intelligence"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran intelligence"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -139,7 +139,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["serve", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola serve"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran serve"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -150,7 +150,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["sync", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola sync"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran sync"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -161,7 +161,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["service", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola service"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran service"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -172,7 +172,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["tui", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola tui"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran tui"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -194,7 +194,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["targets", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Granola targets"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran targets"));
     expect(error).not.toHaveBeenCalled();
   });
 

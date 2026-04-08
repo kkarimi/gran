@@ -1,5 +1,6 @@
 export type WorkspaceTab = "metadata" | "notes" | "raw" | "transcript";
-export const granolaWebWorkspaceStorageKey = "granola-toolkit.web-workspace";
+export const granWebWorkspaceStorageKey = "gran.web-workspace";
+export const legacyGranolaWebWorkspaceStorageKey = "granola-toolkit.web-workspace";
 const maxRecentMeetings = 6;
 const maxSavedFilters = 6;
 
@@ -120,6 +121,13 @@ export function parseWorkspacePreferences(raw: string | null | undefined): WebWo
   } catch {
     return defaultWorkspacePreferences();
   }
+}
+
+export function readWorkspacePreferencesStorage(storage: Pick<Storage, "getItem">): string | null {
+  return (
+    storage.getItem(granWebWorkspaceStorageKey) ??
+    storage.getItem(legacyGranolaWebWorkspaceStorageKey)
+  );
 }
 
 export function serialiseWorkspacePreferences(preferences: WebWorkspacePreferences): string {

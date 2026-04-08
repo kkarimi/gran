@@ -14,10 +14,10 @@ import type { CommandDefinition } from "./types.ts";
 type ExportMode = "both" | "notes" | "transcripts";
 
 function exportHelp(): string {
-  return `Granola export
+  return `Gran export
 
 Usage:
-  granola export [options]
+  gran export [options]
 
 By default this exports notes and transcripts together.
 
@@ -35,7 +35,7 @@ Options:
   --timeout <value>            Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>            Path to supabase.json
   --debug                      Enable debug logging
-  --config <path>              Path to .granola.toml
+  --config <path>              Path to .gran.json
   -h, --help                   Show help
 `;
 }

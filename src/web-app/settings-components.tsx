@@ -447,12 +447,12 @@ export function DiagnosticsPanel(props: {
       {
         detail: props.appState?.config.configFileUsed
           ? "Custom config file currently in use."
-          : "No custom config file found. Change values from the Auth, Plugins, and Exports tabs, or add a .granola.toml later.",
+          : "No custom config file found. Change values from the Auth, Plugins, and Exports tabs, or add a .gran.json later.",
         fallbackPath: props.appState?.config.configFileUsed || undefined,
         file: props.serverInfo?.files?.config,
         label: "Config file",
         title: props.appState?.config.configFileUsed
-          ? "Custom .granola.toml"
+          ? "Custom .gran.json"
           : "No custom config file",
       },
       {
@@ -491,7 +491,7 @@ export function DiagnosticsPanel(props: {
         file: props.serverInfo?.files?.transcriptCache,
         label: "Desktop transcript data",
         missingDetail:
-          "This configured desktop transcript file is not present yet. Granola Toolkit will fetch transcripts on demand until it appears.",
+          "This configured desktop transcript file is not present yet. Gran 👵🏻 will fetch transcripts on demand until it appears.",
         missingStateLabel: "Not found on disk",
         title: props.appState?.cache.filePath ? "Desktop transcript file" : "Transcripts on demand",
       },
@@ -840,7 +840,7 @@ export function AuthPanel(props: AuthPanelProps): JSX.Element {
                       fallback={
                         <>
                           Save a Personal API key here for the default connection path. You can also
-                          use <code>granola auth login --api-key &lt;token&gt;</code>.
+                          use <code>gran auth login --api-key &lt;token&gt;</code>.
                         </>
                       }
                     >

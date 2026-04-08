@@ -5,10 +5,10 @@ import { createCommandAppContext, debug } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function notesHelp(): string {
-  return `Granola notes
+  return `Gran notes
 
 Usage:
-  granola notes [options]
+  gran notes [options]
 
 Options:
   --folder <query>    Export only meetings inside one folder id or name
@@ -17,7 +17,7 @@ Options:
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   -h, --help          Show help
 `;
 }

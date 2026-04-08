@@ -67,7 +67,7 @@ import {
   type GranolaServerInfo,
 } from "../transport.ts";
 
-interface GranolaServerClientOptions {
+export interface GranolaServerClientOptions {
   fetchImpl?: typeof fetch;
   password?: string;
   reconnectDelayMs?: number;

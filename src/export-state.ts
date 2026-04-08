@@ -34,6 +34,10 @@ interface ManagedExportPlan {
 }
 
 function exportStatePath(outputDir: string, kind: ExportStateKind): string {
+  return join(outputDir, `.gran-${kind}-state.json`);
+}
+
+function legacyExportStatePath(outputDir: string, kind: ExportStateKind): string {
   return join(outputDir, `.granola-toolkit-${kind}-state.json`);
 }
 
@@ -87,15 +91,20 @@ function normaliseExportState(parsed: unknown, kind: ExportStateKind): ExportSta
 }
 
 async function loadExportState(outputDir: string, kind: ExportStateKind): Promise<ExportStateFile> {
-  const statePath = exportStatePath(outputDir, kind);
-
-  try {
-    const raw = await readUtf8(statePath);
-    const parsed = parseJsonString<unknown>(raw);
-    return normaliseExportState(parsed, kind);
-  } catch {
-    return emptyExportState(kind);
+  for (const statePath of [
+    exportStatePath(outputDir, kind),
+    legacyExportStatePath(outputDir, kind),
+  ]) {
+    try {
+      const raw = await readUtf8(statePath);
+      const parsed = parseJsonString<unknown>(raw);
+      return normaliseExportState(parsed, kind);
+    } catch {
+      continue;
+    }
   }
+
+  return emptyExportState(kind);
 }
 
 function hashContent(content: string): string {

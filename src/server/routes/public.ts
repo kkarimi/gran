@@ -42,7 +42,7 @@ export async function handlePublicRoute(context: GranolaServerRouteContext): Pro
       response,
       {
         ok: true,
-        service: "granola-toolkit",
+        service: "gran",
         version: context.app.config ? undefined : undefined,
       },
       { headers: originHeaders },

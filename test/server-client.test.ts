@@ -262,7 +262,7 @@ describe("GranolaServerClient", () => {
           folders: true,
           webClient: false,
         }),
-        product: "granola-toolkit",
+        product: "gran",
         protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
       }),
     );

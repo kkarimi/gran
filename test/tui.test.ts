@@ -460,7 +460,7 @@ describe("renderGranolaTuiAuthState", () => {
 
     expect(rendered).toContain("Active source: supabase.json fallback");
     expect(rendered).toContain("Recommended: No stored API key yet");
-    expect(rendered).toContain("Next step: granola auth login --api-key grn_...");
+    expect(rendered).toContain("Next step: gran auth login --api-key grn_...");
     expect(rendered).toContain("Last error: refresh failed");
   });
 });

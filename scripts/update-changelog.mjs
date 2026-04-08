@@ -16,7 +16,7 @@ import {
 const pkg = readPackageMetadata();
 const repository = process.env.GITHUB_REPOSITORY
   ? `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${process.env.GITHUB_REPOSITORY}`
-  : "https://github.com/kkarimi/granola-toolkit";
+  : "https://github.com/kkarimi/gran";
 const version = pkg.version;
 const date = new Date().toISOString().slice(0, 10);
 const baseTag = previousTag();

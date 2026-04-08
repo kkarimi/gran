@@ -120,7 +120,7 @@ export async function runGranolaWebWorkspace(
     ? buildGranolaMeetingUrl(server.url, options.targetMeetingId)
     : new URL(server.url);
 
-  console.log(`Granola Toolkit web workspace listening on ${server.url.href}`);
+  console.log(`Gran 👵🏻 web workspace listening on ${server.url.href}`);
   if (targetUrl.href !== server.url.href) {
     console.log(`Focused meeting URL: ${targetUrl.href}`);
   }
@@ -139,7 +139,7 @@ export async function runGranolaWebWorkspace(
       : "Background sync: disabled",
   );
   printWebRoutes();
-  console.log(`Attach: granola attach ${server.url.href}`);
+  console.log(`Attach: gran attach ${server.url.href}`);
   if (options.password) {
     console.log("Attach password: add --password <value>");
   }

@@ -8,13 +8,13 @@ import {
 describe("defaultGranolaToolkitDataDirectory", () => {
   test("uses Application Support on macOS", () => {
     expect(defaultGranolaToolkitDataDirectory("darwin", "/Users/nima")).toBe(
-      "/Users/nima/Library/Application Support/granola-toolkit",
+      "/Users/nima/Library/Application Support/gran",
     );
   });
 
   test("uses ~/.config on Linux", () => {
     expect(defaultGranolaToolkitDataDirectory("linux", "/home/nima")).toBe(
-      "/home/nima/.config/granola-toolkit",
+      "/home/nima/.config/gran",
     );
   });
 });
@@ -27,26 +27,26 @@ describe("defaultGranolaToolkitPersistenceLayout", () => {
         platform: "linux",
       }),
     ).toEqual({
-      agentHarnessesFile: "/home/nima/.config/granola-toolkit/agent-harnesses.json",
-      apiKeyFile: "/home/nima/.config/granola-toolkit/api-key.txt",
-      automationArtefactsFile: "/home/nima/.config/granola-toolkit/automation-artefacts.json",
-      automationMatchesFile: "/home/nima/.config/granola-toolkit/automation-matches.jsonl",
-      automationRulesFile: "/home/nima/.config/granola-toolkit/automation-rules.json",
-      automationRunsFile: "/home/nima/.config/granola-toolkit/automation-runs.jsonl",
-      catalogSnapshotFile: "/home/nima/.config/granola-toolkit/catalog-snapshot.json",
-      dataDirectory: "/home/nima/.config/granola-toolkit",
-      exportJobsFile: "/home/nima/.config/granola-toolkit/export-jobs.json",
-      exportTargetsFile: "/home/nima/.config/granola-toolkit/export-targets.json",
-      meetingIndexFile: "/home/nima/.config/granola-toolkit/meeting-index.json",
-      pkmTargetsFile: "/home/nima/.config/granola-toolkit/pkm-targets.json",
-      pluginsFile: "/home/nima/.config/granola-toolkit/plugins.json",
-      searchIndexFile: "/home/nima/.config/granola-toolkit/search-index.json",
-      serviceLogFile: "/home/nima/.config/granola-toolkit/service.log",
-      serviceStateFile: "/home/nima/.config/granola-toolkit/service.json",
-      sessionFile: "/home/nima/.config/granola-toolkit/session.json",
+      agentHarnessesFile: "/home/nima/.config/gran/agent-harnesses.json",
+      apiKeyFile: "/home/nima/.config/gran/api-key.txt",
+      automationArtefactsFile: "/home/nima/.config/gran/automation-artefacts.json",
+      automationMatchesFile: "/home/nima/.config/gran/automation-matches.jsonl",
+      automationRulesFile: "/home/nima/.config/gran/automation-rules.json",
+      automationRunsFile: "/home/nima/.config/gran/automation-runs.jsonl",
+      catalogSnapshotFile: "/home/nima/.config/gran/catalog-snapshot.json",
+      dataDirectory: "/home/nima/.config/gran",
+      exportJobsFile: "/home/nima/.config/gran/export-jobs.json",
+      exportTargetsFile: "/home/nima/.config/gran/export-targets.json",
+      meetingIndexFile: "/home/nima/.config/gran/meeting-index.json",
+      pkmTargetsFile: "/home/nima/.config/gran/pkm-targets.json",
+      pluginsFile: "/home/nima/.config/gran/plugins.json",
+      searchIndexFile: "/home/nima/.config/gran/search-index.json",
+      serviceLogFile: "/home/nima/.config/gran/service.log",
+      serviceStateFile: "/home/nima/.config/gran/service.json",
+      sessionFile: "/home/nima/.config/gran/session.json",
       sessionStoreKind: "file",
-      syncEventsFile: "/home/nima/.config/granola-toolkit/sync-events.jsonl",
-      syncStateFile: "/home/nima/.config/granola-toolkit/sync-state.json",
+      syncEventsFile: "/home/nima/.config/gran/sync-events.jsonl",
+      syncStateFile: "/home/nima/.config/gran/sync-state.json",
     });
   });
 

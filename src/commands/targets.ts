@@ -14,10 +14,10 @@ function targetsHelp(): string {
   const kinds = listGranolaExportTargetDefinitions()
     .map((definition) => definition.kind)
     .join(" or ");
-  return `Granola targets
+  return `Gran targets
 
 Usage:
-  granola targets [list|add|remove] [options]
+  gran targets [list|add|remove] [options]
 
 Subcommands:
   list                Show configured export targets
@@ -37,7 +37,7 @@ Options:
   --transcripts-format <value>
                             text, markdown, json, yaml, raw
   --daily-notes-dir <path>   Optional daily note directory for obsidian-vault targets
-  --config <path>            Path to .granola.toml
+  --config <path>            Path to .gran.json
   --debug                    Enable debug logging
   -h, --help                 Show help
 `;

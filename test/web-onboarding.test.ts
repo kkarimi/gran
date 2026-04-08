@@ -15,13 +15,13 @@ describe("web onboarding", () => {
       build: {
         gitCommit: "1234567890abcdef1234567890abcdef12345678",
         gitCommitShort: "1234567",
-        packageName: "granola-toolkit",
-        repositoryUrl: "git+https://github.com/kkarimi/granola-toolkit.git",
+        packageName: "@kkarimi/gran",
+        repositoryUrl: "git+https://github.com/kkarimi/gran.git",
         version: "0.66.0",
       },
       config: {
         automationRulesFile: "/tmp/automation-rules.json",
-        configFile: "/tmp/.granola.toml",
+        configFile: "/tmp/.gran.json",
         notesOutputDir: "/tmp/notes",
         pluginsFile: "/tmp/plugins.json",
         supabaseFile: "/tmp/supabase.json",
@@ -43,7 +43,7 @@ describe("web onboarding", () => {
       },
       persistence: {
         catalogSnapshotFile: "/tmp/catalog-snapshot.json",
-        dataDirectory: "/tmp/granola-toolkit",
+        dataDirectory: "/tmp/gran",
         exportJobs: true,
         exportJobsFile: "/tmp/export-jobs.json",
         meetingIndex: true,
@@ -58,8 +58,8 @@ describe("web onboarding", () => {
         syncState: true,
         syncStateFile: "/tmp/sync-state.json",
       },
-      product: "granola-toolkit",
-      protocolVersion: 3,
+      product: "gran",
+      protocolVersion: 4,
       runtime: {
         mode: "background-service",
         startedAt: "2026-04-05T10:00:00.000Z",

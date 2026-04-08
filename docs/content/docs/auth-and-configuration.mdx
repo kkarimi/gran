@@ -8,23 +8,23 @@ description: Prefer API keys, keep desktop auth as fallback, and configure the t
 Prefer a Granola Personal API key:
 
 ```bash
-granola auth login --api-key grn_...
-granola auth status
-granola auth use api-key
+gran auth login --api-key grn_...
+gran auth status
+gran auth use api-key
 ```
 
 Desktop-session import remains available as a fallback:
 
 ```bash
-granola auth login
-granola auth status
-granola auth refresh
-granola auth use stored
-granola auth use supabase
-granola auth logout
+gran auth login
+gran auth status
+gran auth refresh
+gran auth use stored
+gran auth use supabase
+gran auth logout
 ```
 
-`granola auth` supports:
+`gran auth` supports:
 
 - `login --api-key <token>` to store a Granola Personal API key in the toolkit store
 - `login` to import the desktop app session into the toolkit store
@@ -45,41 +45,43 @@ The CLI reads configuration in this order:
 
 1. command-line flags
 2. environment variables
-3. `.granola.toml`
+3. `.gran.json`
 4. platform defaults
 
 ## Config File
 
-`granola init` generates a good starting point automatically. If you prefer to write the config by
+`gran init` generates a good starting point automatically. If you prefer to write the config by
 hand, a project-local file can look like this:
 
-```toml
-agent-provider = "openrouter"
-agent-model = "openai/gpt-5-mini"
-agent-harnesses-file = "./.granola/agent-harnesses.json"
-automation-rules-file = "./.granola/automation-rules.json"
-pkm-targets-file = "./.granola/pkm-targets.json"
-output = "./exports/notes"
-transcript-output = "./exports/transcripts"
+```json
+{
+  "agent-provider": "openrouter",
+  "agent-model": "openai/gpt-5-mini",
+  "agent-harnesses-file": "./.gran/agent-harnesses.json",
+  "automation-rules-file": "./.gran/automation-rules.json",
+  "pkm-targets-file": "./.gran/pkm-targets.json",
+  "output": "./exports/notes",
+  "transcript-output": "./exports/transcripts"
+}
 ```
 
-Relative paths in `.granola.toml` resolve from the directory that contains the config file, not
+Relative paths in `.gran.json` resolve from the directory that contains the config file, not
 from whatever shell directory happened to launch the command.
 
 ## Environment Variables
 
 - `DEBUG_MODE`
-- `GRANOLA_API_KEY`
-- `GRANOLA_OPENAI_API_KEY`
-- `GRANOLA_OPENROUTER_API_KEY`
-- `GRANOLA_AUTOMATION_RULES_FILE`
-- `GRANOLA_AGENT_HARNESSES_FILE`
+- `GRAN_API_KEY` (`GRANOLA_API_KEY` still works as a legacy alias)
+- `GRAN_OPENAI_API_KEY` (`GRANOLA_OPENAI_API_KEY` still works as a legacy alias)
+- `GRAN_OPENROUTER_API_KEY` (`GRANOLA_OPENROUTER_API_KEY` still works as a legacy alias)
+- `GRAN_AUTOMATION_RULES_FILE` (`GRANOLA_AUTOMATION_RULES_FILE` still works)
+- `GRAN_AGENT_HARNESSES_FILE` (`GRANOLA_AGENT_HARNESSES_FILE` still works)
 - `SUPABASE_FILE`
 - `OUTPUT`
 - `TIMEOUT`
 - `CACHE_FILE`
 - `TRANSCRIPT_OUTPUT`
-- `GRANOLA_CLIENT_VERSION`
+- `GRAN_CLIENT_VERSION` (`GRANOLA_CLIENT_VERSION` still works)
 
 ## Notes on Auth Sources
 
@@ -96,25 +98,25 @@ For OpenRouter-backed harnesses:
 
 ```bash
 export OPENROUTER_API_KEY=...
-granola init --provider openrouter
-granola auth login --api-key grn_...
-granola sync --config ./.granola.toml
+gran init --provider openrouter
+gran auth login --api-key grn_...
+gran sync --config ./.gran.json
 ```
 
 For OpenAI-backed harnesses:
 
 ```bash
 export OPENAI_API_KEY=...
-granola init --provider openai
-granola auth login --api-key grn_...
-granola sync --config ./.granola.toml
+gran init --provider openai
+gran auth login --api-key grn_...
+gran sync --config ./.gran.json
 ```
 
 For local Codex-backed harnesses:
 
 ```bash
-granola init --provider codex
-granola auth login --api-key grn_...
+gran init --provider codex
+gran auth login --api-key grn_...
 codex exec --help
-granola sync --config ./.granola.toml
+gran sync --config ./.gran.json
 ```

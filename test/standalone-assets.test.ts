@@ -6,6 +6,7 @@ import {
   standaloneArchiveName,
   standaloneAssetBaseName,
   standaloneExecutableName,
+  standalonePackageLabel,
   supportedStandaloneTargets,
 } from "../scripts/standalone-assets.mjs";
 
@@ -28,13 +29,14 @@ describe("standalone assets", () => {
     const darwinTarget = parseStandaloneTarget("darwin-arm64");
     const windowsTarget = parseStandaloneTarget("win32-x64");
 
-    expect(standaloneExecutableName("granola", darwinTarget)).toBe("granola");
-    expect(standaloneExecutableName("granola", windowsTarget)).toBe("granola.exe");
-    expect(standaloneAssetBaseName("granola-toolkit", "0.44.0", darwinTarget)).toBe(
-      "granola-toolkit-v0.44.0-darwin-arm64",
+    expect(standaloneExecutableName("gran", darwinTarget)).toBe("gran");
+    expect(standaloneExecutableName("gran", windowsTarget)).toBe("gran.exe");
+    expect(standalonePackageLabel("@kkarimi/gran")).toBe("gran");
+    expect(standaloneAssetBaseName("@kkarimi/gran", "0.44.0", darwinTarget)).toBe(
+      "gran-v0.44.0-darwin-arm64",
     );
-    expect(standaloneArchiveName("granola-toolkit", "0.44.0", windowsTarget)).toBe(
-      "granola-toolkit-v0.44.0-win32-x64.zip",
+    expect(standaloneArchiveName("@kkarimi/gran", "0.44.0", windowsTarget)).toBe(
+      "gran-v0.44.0-win32-x64.zip",
     );
   });
 

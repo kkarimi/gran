@@ -18,8 +18,8 @@ function createServerInfo() {
     build: {
       gitCommit: "1234567890abcdef1234567890abcdef12345678",
       gitCommitShort: "1234567",
-      packageName: "granola-toolkit",
-      repositoryUrl: "git+https://github.com/kkarimi/granola-toolkit.git",
+      packageName: "@kkarimi/gran",
+      repositoryUrl: "git+https://github.com/kkarimi/gran.git",
       version: "0.66.0",
     },
     capabilities: {
@@ -41,7 +41,7 @@ function createServerInfo() {
       syncEvents: true,
       syncState: true,
     },
-    product: "granola-toolkit" as const,
+    product: "gran" as const,
     protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
     runtime: {
       mode: "background-service" as const,

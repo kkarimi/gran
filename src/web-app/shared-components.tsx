@@ -62,7 +62,7 @@ export function PrimaryNav(props: PrimaryNavProps): JSX.Element {
   return (
     <aside class="pane primary-nav">
       <div class="primary-nav__brand">
-        <p class="primary-nav__eyebrow">Granola Toolkit</p>
+        <p class="primary-nav__eyebrow">Gran 👵🏻</p>
         <strong class="primary-nav__brand-name">Workspace</strong>
       </div>
       <nav class="primary-nav__links" aria-label="Primary">
@@ -128,8 +128,8 @@ export function AppStatePanel(props: {
       <div>
         <h2>{props.heading}</h2>
         <p class="detail-head__copy">
-          The browser is attached to your local Granola service, so sync, review, and exports stay
-          in step with the CLI and TUI.
+          The browser is attached to your local Gran service, so sync, review, and exports stay in
+          step with the CLI and TUI.
         </p>
         <Show fallback={<p>Waiting for server state…</p>} when={props.appState}>
           {(appState) => (

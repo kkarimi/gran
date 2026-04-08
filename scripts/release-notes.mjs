@@ -9,12 +9,13 @@ import {
   readPackageMetadata,
   releaseChanges,
   renderReleaseEntry,
+  upsertReleaseArtefacts,
 } from "./release-data.mjs";
 
 const pkg = readPackageMetadata();
 const repository = process.env.GITHUB_REPOSITORY
   ? `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${process.env.GITHUB_REPOSITORY}`
-  : "https://github.com/kkarimi/granola-toolkit";
+  : "https://github.com/kkarimi/gran";
 const version = process.env.PACKAGE_VERSION ?? pkg.version;
 const packageName = process.env.PACKAGE_NAME ?? pkg.name;
 
@@ -36,8 +37,14 @@ function fallbackNotes() {
 
 function releaseNotes() {
   const entry = extractChangelogEntry(readChangelog(), version);
-  const notes = entry || fallbackNotes();
   const baseTag = previousTagBefore(`v${version}`) || previousTag();
+  const notes = upsertReleaseArtefacts(entry || fallbackNotes(), {
+    baseTag,
+    homepage: pkg.homepage,
+    packageName,
+    repository,
+    version,
+  });
   const fullChangelog = compareUrl({ repository, baseTag, version });
 
   return [notes, "", `**Full Changelog**: ${fullChangelog}`].join("\n");

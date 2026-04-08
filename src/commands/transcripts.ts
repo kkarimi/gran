@@ -5,10 +5,10 @@ import { createCommandAppContext, debug } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function transcriptsHelp(): string {
-  return `Granola transcripts
+  return `Gran transcripts
 
 Usage:
-  granola transcripts [options]
+  gran transcripts [options]
 
 Options:
   --cache <path>      Path to Granola desktop transcript file
@@ -16,7 +16,7 @@ Options:
   --format <value>    Output format: text, json, yaml, raw (default: text)
   --output <path>     Output directory for transcript files (default: ./transcripts)
   --debug             Enable debug logging
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   -h, --help          Show help
 `;
 }

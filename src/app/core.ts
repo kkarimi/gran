@@ -1797,7 +1797,7 @@ export class GranolaApp implements GranolaAppApi {
       forceRefresh: options.forceRefresh,
     });
     if (options.folderId && !snapshot.folders) {
-      throw new Error("Granola folder API is not configured");
+      throw new Error("Gran folder API is not configured");
     }
 
     const meetings = listMeetings(snapshot.documents, {

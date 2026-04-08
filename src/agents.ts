@@ -64,11 +64,19 @@ function resolveProvider(
     return config.agents.defaultProvider;
   }
 
-  if (trimString(env.OPENROUTER_API_KEY) || trimString(env.GRANOLA_OPENROUTER_API_KEY)) {
+  if (
+    trimString(env.OPENROUTER_API_KEY) ||
+    trimString(env.GRAN_OPENROUTER_API_KEY) ||
+    trimString(env.GRANOLA_OPENROUTER_API_KEY)
+  ) {
     return "openrouter";
   }
 
-  if (trimString(env.OPENAI_API_KEY) || trimString(env.GRANOLA_OPENAI_API_KEY)) {
+  if (
+    trimString(env.OPENAI_API_KEY) ||
+    trimString(env.GRAN_OPENAI_API_KEY) ||
+    trimString(env.GRANOLA_OPENAI_API_KEY)
+  ) {
     return "openai";
   }
 

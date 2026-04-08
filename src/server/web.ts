@@ -6,11 +6,11 @@ export function renderGranolaWebPage(options: { serverPasswordRequired?: boolean
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Granola Toolkit</title>
+    <title>Gran 👵🏻</title>
     <link rel="stylesheet" href="${granolaWebAssetPaths.stylesheet}" />
   </head>
   <body>
-    <div id="granola-web-root"></div>
+    <div id="gran-web-root"></div>
     <script>
 window.__GRANOLA_SERVER__ = ${JSON.stringify({
     passwordRequired: options.serverPasswordRequired ?? false,

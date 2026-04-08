@@ -8,10 +8,10 @@ import type { CommandDefinition } from "./types.ts";
 type IntelligenceFormat = "json" | "text" | "yaml";
 
 function intelligenceHelp(): string {
-  return `Granola intelligence
+  return `Gran intelligence
 
 Usage:
-  granola intelligence <list|run> [preset] [options]
+  gran intelligence <list|run> [preset] [options]
 
 Subcommands:
   list                       Show built-in intelligence presets
@@ -35,7 +35,7 @@ Options:
   --cache <path>             Path to Granola desktop transcript file
   --supabase <path>          Path to supabase.json
   --debug                    Enable debug logging
-  --config <path>            Path to .granola.toml
+  --config <path>            Path to .gran.json
   -h, --help                 Show help
 `;
 }

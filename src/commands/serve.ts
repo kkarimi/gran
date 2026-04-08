@@ -18,10 +18,10 @@ import {
 import type { CommandDefinition } from "./types.ts";
 
 function serveHelp(): string {
-  return `Granola serve
+  return `Gran serve
 
 Usage:
-  granola serve [options]
+  gran serve [options]
 
 Options:
   --network <mode>        Network mode: local or lan (default: local)
@@ -35,13 +35,13 @@ Options:
   --timeout <value>       Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>       Path to supabase.json
   --debug                 Enable debug logging
-  --config <path>         Path to .granola.toml
+  --config <path>         Path to .gran.json
   -h, --help              Show help
 `;
 }
 
 export const serveCommand: CommandDefinition = {
-  description: "Start a local Granola API server",
+  description: "Start a local Gran service",
   flags: {
     cache: { type: "string" },
     help: { type: "boolean" },
@@ -107,7 +107,7 @@ export const serveCommand: CommandDefinition = {
       immediate: shouldStartBackgroundSyncImmediately(app.getState(), syncIntervalMs),
     });
 
-    console.log(`Granola server listening on ${server.url.href}`);
+    console.log(`Gran server listening on ${server.url.href}`);
     console.log(`Network mode: ${networkMode}`);
     if (password) {
       console.log("Server password protection: enabled");
@@ -142,7 +142,7 @@ export const serveCommand: CommandDefinition = {
     console.log("  POST /exports/transcripts");
     console.log("  GET  /sync/events");
     console.log("  POST /sync");
-    console.log(`Attach: granola attach ${server.url.href}`);
+    console.log(`Attach: gran attach ${server.url.href}`);
     if (password) {
       console.log("Attach password: add --password <value>");
     }

@@ -14,19 +14,27 @@ import type {
   GranolaAutomationAgentResult,
 } from "./agents.ts";
 
-const OPENROUTER_REFERER = "https://github.com/kkarimi/granola-toolkit";
-const OPENROUTER_TITLE = "granola-toolkit";
+const OPENROUTER_REFERER = "https://github.com/kkarimi/gran";
+const OPENROUTER_TITLE = "gran";
 
 function trimString(value: string | undefined): string | undefined {
   return value?.trim() ? value.trim() : undefined;
 }
 
 function openaiApiKey(env: NodeJS.ProcessEnv): string | undefined {
-  return trimString(env.OPENAI_API_KEY) ?? trimString(env.GRANOLA_OPENAI_API_KEY);
+  return (
+    trimString(env.OPENAI_API_KEY) ??
+    trimString(env.GRAN_OPENAI_API_KEY) ??
+    trimString(env.GRANOLA_OPENAI_API_KEY)
+  );
 }
 
 function openrouterApiKey(env: NodeJS.ProcessEnv): string | undefined {
-  return trimString(env.OPENROUTER_API_KEY) ?? trimString(env.GRANOLA_OPENROUTER_API_KEY);
+  return (
+    trimString(env.OPENROUTER_API_KEY) ??
+    trimString(env.GRAN_OPENROUTER_API_KEY) ??
+    trimString(env.GRANOLA_OPENROUTER_API_KEY)
+  );
 }
 
 async function responseError(response: Response, label: string): Promise<Error> {
@@ -88,7 +96,7 @@ function messageText(content: unknown): string {
 }
 
 async function runCodexCliCommand(request: CodexCommandRequest): Promise<CodexCommandResult> {
-  const tempDirectory = await mkdtemp(join(tmpdir(), "granola-toolkit-codex-"));
+  const tempDirectory = await mkdtemp(join(tmpdir(), "gran-codex-"));
   const outputFile = join(tempDirectory, "last-message.txt");
   const args = ["exec", "--skip-git-repo-check", "--color", "never"];
   if (request.cwd) {
@@ -288,7 +296,7 @@ export function createDefaultGranolaAgentProviderRegistry(
         const token = openaiApiKey(env);
         if (!token) {
           throw new Error(
-            "OpenAI API key not found. Set OPENAI_API_KEY or GRANOLA_OPENAI_API_KEY.",
+            "OpenAI API key not found. Set OPENAI_API_KEY or GRAN_OPENAI_API_KEY (legacy: GRANOLA_OPENAI_API_KEY).",
           );
         }
 
@@ -313,7 +321,7 @@ export function createDefaultGranolaAgentProviderRegistry(
         const token = openrouterApiKey(env);
         if (!token) {
           throw new Error(
-            "OpenRouter API key not found. Set OPENROUTER_API_KEY or GRANOLA_OPENROUTER_API_KEY.",
+            "OpenRouter API key not found. Set OPENROUTER_API_KEY or GRAN_OPENROUTER_API_KEY (legacy: GRANOLA_OPENROUTER_API_KEY).",
           );
         }
 

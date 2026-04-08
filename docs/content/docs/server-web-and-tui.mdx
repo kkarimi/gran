@@ -8,7 +8,7 @@ application.
 
 ## Server
 
-`granola serve` starts a long-lived local Granola Toolkit server on one shared app instance.
+`gran serve` starts a long-lived local Gran 👵🏻 server on one shared app instance.
 
 High-level API surface:
 
@@ -28,7 +28,7 @@ Security defaults:
 
 ## Background Service
 
-`granola service start` wraps the same local HTTP server and sync loop in a detached background
+`gran service start` wraps the same local HTTP server and sync loop in a detached background
 process.
 
 Use it when you want:
@@ -40,33 +40,33 @@ Use it when you want:
 Examples:
 
 ```bash
-granola service start
-granola service start --network lan --password "change-me"
-granola service status
-granola service stop
+gran service start
+gran service start --network lan --password "change-me"
+gran service status
+gran service stop
 ```
 
-The service persists its discovery metadata in the shared Granola Toolkit data directory, so other
+The service persists its discovery metadata in the shared Gran 👵🏻 data directory, so other
 surfaces can find it automatically.
 
 ## Web
 
-`granola web` now prefers the reusable background service: it will attach to the running service if
+`gran web` now prefers the reusable background service: it will attach to the running service if
 one exists, or start that service for you before opening `/` in your default browser. Pass
 `--foreground` when you explicitly want a throwaway foreground browser runtime instead.
 
 Examples:
 
 ```bash
-granola web
-granola web --meeting 1234abcd
-granola web --foreground --open=false --port 4096
-granola web --open=false --port 4096
-granola web --network lan --password "change-me"
+gran web
+gran web --meeting 1234abcd
+gran web --foreground --open=false --port 4096
+gran web --open=false --port 4096
+gran web --network lan --password "change-me"
 ```
 
 If you do not pass runtime overrides like `--port`, `--hostname`, `--network`, `--password`, or
-`--sync-interval`, `granola web` will stay on the shared service path instead of starting another
+`--sync-interval`, `gran web` will stay on the shared service path instead of starting another
 local runtime.
 
 The browser workspace gives you:
@@ -82,7 +82,7 @@ The browser workspace gives you:
 
 ## TUI
 
-`granola tui` starts a full-screen terminal workspace on the shared app core.
+`gran tui` starts a full-screen terminal workspace on the shared app core.
 
 Main controls:
 
@@ -96,17 +96,17 @@ Main controls:
 
 ## Attach
 
-`granola attach` connects a terminal workspace to an existing local server instead of starting a
+`gran attach` connects a terminal workspace to an existing local server instead of starting a
 second isolated app. If the background service is already running, you can omit the URL entirely.
 
 Examples:
 
 ```bash
-granola service start
-granola attach
-granola serve --port 4096
-granola attach http://127.0.0.1:4096
-granola attach http://127.0.0.1:4096 --meeting 1234abcd
+gran service start
+gran attach
+gran serve --port 4096
+gran attach http://127.0.0.1:4096
+gran attach http://127.0.0.1:4096 --meeting 1234abcd
 ```
 
 ## Runtime Boundaries

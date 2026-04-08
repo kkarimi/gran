@@ -31,16 +31,16 @@ export default function HomePage() {
       <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-6">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-fd-muted-foreground">
-            Granola Toolkit
+            Gran 👵🏻
           </p>
           <div className="space-y-4">
             <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-fd-foreground sm:text-6xl">
               The unofficial open-source Swiss army knife for Granola.
             </h1>
             <p className="max-w-3xl text-lg leading-8 text-fd-muted-foreground">
-              Granola Toolkit gives you a local-first way to sync, search, export, review, and
-              automate Granola meetings with your own tools and your own agents instead of living
-              inside one closed workflow.
+              Gran 👵🏻 gives you a local-first way to sync, search, export, review, and automate
+              Granola meetings with your own tools and your own agents instead of living inside one
+              closed workflow.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

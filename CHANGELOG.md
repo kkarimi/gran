@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `granola-toolkit` are recorded here.
+All notable changes to Gran are recorded here.
 
 ## 0.63.0 - 2026-04-05
 

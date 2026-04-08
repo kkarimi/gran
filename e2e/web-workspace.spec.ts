@@ -16,7 +16,7 @@ test.describe("toolkit web workspace", () => {
   test("uses page-based navigation instead of a giant meeting sidebar", async ({ page }) => {
     await page.goto(server.url);
 
-    await expect(page.locator(".primary-nav").getByText("Granola Toolkit")).toBeVisible({
+    await expect(page.locator(".primary-nav").getByText("Gran 👵🏻")).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.locator(".primary-nav").getByText("Workspace")).toBeVisible({
@@ -199,7 +199,7 @@ test.describe("toolkit web workspace", () => {
 
       await expect(
         page.getByRole("heading", {
-          name: "Set up Granola Toolkit in three steps.",
+          name: "Set up Gran 👵🏻 in three steps.",
         }),
       ).toBeVisible();
       await expect(page.getByText("Background service active")).toBeVisible();
@@ -217,7 +217,7 @@ test.describe("toolkit web workspace", () => {
 
       await expect(
         page.getByRole("heading", {
-          name: "Set up Granola Toolkit in three steps.",
+          name: "Set up Gran 👵🏻 in three steps.",
         }),
       ).toHaveCount(0, {
         timeout: 30_000,

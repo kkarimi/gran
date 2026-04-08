@@ -6,15 +6,15 @@ import { debug } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function authHelp(): string {
-  return `Granola auth
+  return `Gran auth
 
 Usage:
-  granola auth <login|status|logout|refresh|use> [options]
+  gran auth <login|status|logout|refresh|use> [options]
 
 Subcommands:
   login               Recommended: store a Granola Personal API key with --api-key
                       Fallback: import credentials from the Granola desktop app
-  status              Show the current Granola auth state
+  status              Show the current Gran auth state
   logout              Delete stored Granola credentials
   refresh             Refresh the stored Granola session
   use <api-key|stored|supabase>
@@ -23,7 +23,7 @@ Subcommands:
 Options:
   --api-key <token>   Store a Granola Personal API key
   --supabase <path>   Path to supabase.json for auth login
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   --debug             Enable debug logging
   -h, --help          Show help
 `;
@@ -60,7 +60,7 @@ function printAuthState(state: GranolaAppAuthState): void {
 }
 
 export const authCommand: CommandDefinition = {
-  description: "Manage Granola auth sources",
+  description: "Manage Gran auth sources",
   flags: {
     "api-key": { type: "string" },
     help: { type: "boolean" },

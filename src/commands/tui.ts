@@ -42,10 +42,10 @@ function canReuseRunningService(
 }
 
 function tuiHelp(): string {
-  return `Granola tui
+  return `Gran tui
 
 Usage:
-  granola tui [options]
+  gran tui [options]
 
 Options:
   --meeting <id>     Open the workspace focused on a specific meeting
@@ -58,13 +58,13 @@ Options:
   --timeout <value>  Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>  Path to supabase.json
   --debug            Enable debug logging
-  --config <path>    Path to .granola.toml
+  --config <path>    Path to .gran.json
   -h, --help         Show help
 `;
 }
 
 export const tuiCommand: CommandDefinition = {
-  description: "Start the Granola Toolkit terminal workspace",
+  description: "Start the Gran 👵🏻 terminal workspace",
   flags: {
     cache: { type: "string" },
     foreground: { type: "boolean" },
@@ -95,9 +95,9 @@ export const tuiCommand: CommandDefinition = {
     if (restartRequested) {
       const stopResult = await stopGranolaServiceProcess();
       if (stopResult === "stopped") {
-        console.log("Granola Toolkit stopped the previous background service.");
+        console.log("Gran 👵🏻 stopped the previous background service.");
       } else if (stopResult === "force-stopped") {
-        console.log("Granola Toolkit force-stopped the previous background service.");
+        console.log("Gran 👵🏻 force-stopped the previous background service.");
       }
     }
 
@@ -105,7 +105,7 @@ export const tuiCommand: CommandDefinition = {
       if (!restartRequested) {
         const runningService = await discoverGranolaService();
         if (runningService) {
-          console.log(`Attaching to Granola Toolkit background service at ${runningService.url}`);
+          console.log(`Attaching to Gran 👵🏻 background service at ${runningService.url}`);
           const app = await createGranolaServerClient(runningService.url, {
             password,
           });
@@ -139,8 +139,8 @@ export const tuiCommand: CommandDefinition = {
 
       console.log(
         restartRequested
-          ? `Granola Toolkit background service restarted on ${startedService.record.url}`
-          : `Granola Toolkit background service started on ${startedService.record.url}`,
+          ? `Gran 👵🏻 background service restarted on ${startedService.record.url}`
+          : `Gran 👵🏻 background service started on ${startedService.record.url}`,
       );
       const app = await createGranolaServerClient(startedService.record.url, {
         password,

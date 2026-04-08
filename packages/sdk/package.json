@@ -1,0 +1,27 @@
+{
+  "name": "gran-sdk",
+  "version": "0.67.0",
+  "description": "Node and TypeScript SDK for Gran 👵🏻",
+  "license": "MIT",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check",
+    "test": "vp test",
+    "typecheck": "vp exec tsc --noEmit"
+  }
+}

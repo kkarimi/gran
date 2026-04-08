@@ -9,10 +9,10 @@ import type { CommandDefinition } from "./types.ts";
 type ExportListFormat = "json" | "text" | "yaml";
 
 function exportsHelp(): string {
-  return `Granola exports
+  return `Gran exports
 
 Usage:
-  granola exports <list|rerun> [options]
+  gran exports <list|rerun> [options]
 
 Subcommands:
   list                Show recent export jobs
@@ -25,7 +25,7 @@ Options:
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   -h, --help          Show help
 `;
 }

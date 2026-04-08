@@ -32,6 +32,7 @@ export function serialiseManagedServiceFlags(
 
   const env = { ...process.env };
   if (typeof globalFlags["api-key"] === "string" && globalFlags["api-key"].trim()) {
+    env.GRAN_API_KEY = globalFlags["api-key"].trim();
     env.GRANOLA_API_KEY = globalFlags["api-key"].trim();
   }
 

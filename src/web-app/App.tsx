@@ -5,10 +5,11 @@ import { createStore } from "solid-js/store";
 
 import {
   buildBrowserUrlPath,
-  granolaWebWorkspaceStorageKey,
+  granWebWorkspaceStorageKey,
   nextWorkspaceTab,
   parseWorkspacePreferences,
   parseWorkspaceTab,
+  readWorkspacePreferencesStorage,
   serialiseWorkspacePreferences,
   startupSelectionFromSearch,
   type WebWorkspacePreferences,
@@ -64,7 +65,7 @@ import type { GranolaWebAppState, MeetingReturnPage } from "./types.ts";
 export function App() {
   const startup = startupSelectionFromSearch(window.location.search);
   const initialPreferences = parseWorkspacePreferences(
-    window.localStorage.getItem(granolaWebWorkspaceStorageKey),
+    readWorkspacePreferencesStorage(window.localStorage),
   );
   const initialPage: WebMainPage = startup.meetingId
     ? "meeting"
@@ -166,7 +167,7 @@ export function App() {
       recentMeetings: state.recentMeetings,
       savedFilters: state.savedFilters,
     });
-    window.localStorage.setItem(granolaWebWorkspaceStorageKey, serialiseWorkspacePreferences(next));
+    window.localStorage.setItem(granWebWorkspaceStorageKey, serialiseWorkspacePreferences(next));
     setState("recentMeetings", next.recentMeetings);
     setState("savedFilters", next.savedFilters);
   };

@@ -8,25 +8,25 @@ you think in terms of search, folder context, or one specific meeting id.
 
 ## Folder Views
 
-`folder` makes Granola folders a first-class concept in the toolkit.
+`folder` makes folders a first-class concept in Gran.
 
 The current surface includes:
 
-- `granola folder list`
-- `granola folder view <id|name>`
-- `granola meeting list --folder <id|name>`
-- `granola export --folder <id|name>`
+- `gran folder list`
+- `gran folder view <id|name>`
+- `gran meeting list --folder <id|name>`
+- `gran export --folder <id|name>`
 
-If you still want a narrower one-off export, `granola notes --folder ...` and
-`granola transcripts --folder ...` remain available, but the bundled export command should be the
+If you still want a narrower one-off export, `gran notes --folder ...` and
+`gran transcripts --folder ...` remain available, but the bundled export command should be the
 default path.
 
 Examples:
 
 ```bash
-granola folder list
-granola folder view Team
-granola meeting list --folder Team
+gran folder list
+gran folder view Team
+gran meeting list --folder Team
 ```
 
 ## Meeting Views
@@ -35,20 +35,20 @@ granola meeting list --folder Team
 on-demand transcript loading when the desktop transcript file does not already have what you need,
 so you can inspect one meeting at a time.
 
-Once you have run `granola sync`, the toolkit also keeps a local full-text search dataset for
+Once you have run `gran sync`, the toolkit also keeps a local full-text search dataset for
 titles, notes, transcripts, folders, tags, and generated artefacts.
 
 Examples:
 
 ```bash
-granola search planning decision
-granola meeting list --limit 10
-granola meeting list --search planning
-granola meeting view 1234abcd
-granola meeting notes 1234abcd
-granola meeting transcript 1234abcd --format json
-granola meeting export 1234abcd --format yaml
-granola meeting open 1234abcd
+gran search planning decision
+gran meeting list --limit 10
+gran meeting list --search planning
+gran meeting view 1234abcd
+gran meeting notes 1234abcd
+gran meeting transcript 1234abcd --format json
+gran meeting export 1234abcd --format yaml
+gran meeting open 1234abcd
 ```
 
 ## Browser and TUI Navigation

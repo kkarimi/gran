@@ -39,7 +39,7 @@ describe("granolaAuthRecommendation", () => {
     ).toEqual({
       detail:
         "A stored Personal API key is available. Switch to it for the cleanest background-service auth path.",
-      nextAction: "granola auth use api-key",
+      nextAction: "gran auth use api-key",
       status: "Stored API key available",
     });
   });

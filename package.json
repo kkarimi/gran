@@ -1,7 +1,7 @@
 {
-  "name": "granola-toolkit",
+  "name": "@kkarimi/gran",
   "version": "0.67.0",
-  "description": "Unofficial open-source toolkit for syncing, browsing, exporting, and automating Granola locally",
+  "description": "Unofficial open-source toolkit for syncing, browsing, exporting, and automating Granola locally under the Gran brand",
   "keywords": [
     "automation",
     "byoa",
@@ -14,20 +14,22 @@
     "tui",
     "web"
   ],
-  "homepage": "https://kkarimi.github.io/granola-toolkit/",
+  "homepage": "https://kkarimi.github.io/gran/",
   "bugs": {
-    "url": "https://github.com/kkarimi/granola-toolkit/issues"
+    "url": "https://github.com/kkarimi/gran/issues"
   },
   "license": "MIT",
   "author": "Nima Karimi",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kkarimi/granola-toolkit.git"
+    "url": "git+https://github.com/kkarimi/gran.git"
   },
   "bin": {
-    "granola": "dist/cli.js",
-    "granola-toolkit": "dist/cli.js"
+    "gran": "dist/cli.js"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "files": [
     "README.md",
     "dist/cli.js"
@@ -59,6 +61,10 @@
     "release:minor": "node scripts/release.mjs minor",
     "release:notes": "node scripts/release-notes.mjs",
     "release:patch": "node scripts/release.mjs patch",
+    "sdk:build": "vp run gran-sdk#build",
+    "sdk:check": "vp run gran-sdk#check",
+    "sdk:pack:dry-run": "npm pack --dry-run --workspace gran-sdk",
+    "sdk:test": "vp run gran-sdk#test",
     "standalone:build": "node scripts/build-standalone.mjs",
     "standalone:smoke": "node scripts/build-standalone.mjs --smoke-test",
     "staged:check": "node scripts/staged-check.mjs",

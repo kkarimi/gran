@@ -17,10 +17,10 @@ import type { CommandDefinition } from "./types.ts";
 import { resolveGranolaWebWorkspaceOptions, runGranolaWebWorkspace } from "./web-shared.ts";
 
 function meetingHelp(): string {
-  return `Granola meeting
+  return `Gran meeting
 
 Usage:
-  granola meeting <list|view|export|notes|transcript|open> [options]
+  gran meeting <list|view|export|notes|transcript|open> [options]
 
 Subcommands:
   list                List meetings from the Granola API
@@ -45,7 +45,7 @@ Options:
   --trusted-origins <v> open: comma-separated extra browser origins to trust
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   -h, --help          Show help
 `;
 }
@@ -136,7 +136,7 @@ function parseLimit(value: string | boolean | undefined): number {
 }
 
 export const meetingCommand: CommandDefinition = {
-  description: "Inspect and export individual Granola meetings",
+  description: "Inspect and export individual meetings",
   flags: {
     cache: { type: "string" },
     folder: { type: "string" },

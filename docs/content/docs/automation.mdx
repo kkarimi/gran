@@ -8,24 +8,24 @@ description: Match durable sync events against local rules and run local actions
 For a fresh project, start with:
 
 ```bash
-granola init --provider openrouter
+gran init --provider openrouter
 ```
 
-That generates a local `.granola.toml`, starter harnesses, starter prompts, and starter automation
+That generates a local `.gran.json`, starter harnesses, starter prompts, and starter automation
 rules that you can edit in place. The examples below describe the same shapes in raw JSON so you
 can extend them beyond the starter setup.
 
 The toolkit reads automation rules from a JSON file. By default it uses the shared toolkit data
 directory:
 
-- macOS: `~/Library/Application Support/granola-toolkit/automation-rules.json`
-- Linux: `~/.config/granola-toolkit/automation-rules.json`
+- macOS: `~/Library/Application Support/gran/automation-rules.json`
+- Linux: `~/.config/gran/automation-rules.json`
 
 Override that path with either:
 
 - `--rules /path/to/rules.json`
 - `GRANOLA_AUTOMATION_RULES_FILE`
-- `automation-rules-file = "/path/to/rules.json"` in `.granola.toml`
+- `automation-rules-file = "/path/to/rules.json"` in `.gran.json`
 
 ## Rule Shape
 
@@ -229,9 +229,9 @@ automation.
 The simplest fixture is a JSON meeting bundle exported from the toolkit itself:
 
 ```bash
-granola meeting export <meeting-id> --format json > eval-fixtures/customer-sync.json
-granola automation evaluate --fixture eval-fixtures/customer-sync.json --harness customer-call
-granola automation evaluate --fixture eval-fixtures/customer-sync.json --harness customer-call --provider openrouter --model openai/gpt-5-mini
+gran meeting export <meeting-id> --format json > eval-fixtures/customer-sync.json
+gran automation evaluate --fixture eval-fixtures/customer-sync.json --harness customer-call
+gran automation evaluate --fixture eval-fixtures/customer-sync.json --harness customer-call --provider openrouter --model openai/gpt-5-mini
 ```
 
 You can also point `--fixture` at a directory of `.json` files. Each file can be either:
@@ -239,7 +239,7 @@ You can also point `--fixture` at a directory of `.json` files. Each file can be
 - a raw `meeting export` JSON bundle
 - a wrapper with `{ "cases": [{ "id": "...", "title": "...", "bundle": { ... } }] }`
 
-`granola automation evaluate` runs the selected harnesses against each case, parses the pipeline
+`gran automation evaluate` runs the selected harnesses against each case, parses the pipeline
 output with the same structured-output rules as live automation, and prints a comparison-friendly
 report. Use `--format json` or `--format yaml` when you want to diff reports or feed them into
 other tooling. Use `--provider` and `--model` to compare the same harness against a different
@@ -270,15 +270,15 @@ Fields are combined with `AND`, while multiple values inside one field are treat
 
 ## Provider Credentials
 
-For HTTP providers, set credentials in the environment used by `granola sync`, `granola serve`, or
+For HTTP providers, set credentials in the environment used by `gran sync`, `gran serve`, or
 whatever process runs your automation:
 
-- `OPENROUTER_API_KEY` or `GRANOLA_OPENROUTER_API_KEY`
-- `OPENAI_API_KEY` or `GRANOLA_OPENAI_API_KEY`
+- `OPENROUTER_API_KEY` or `GRAN_OPENROUTER_API_KEY` (`GRANOLA_OPENROUTER_API_KEY` still works)
+- `OPENAI_API_KEY` or `GRAN_OPENAI_API_KEY` (`GRANOLA_OPENAI_API_KEY` still works)
 
 For local Codex runs, the toolkit shells out to `codex exec`, so it uses whatever local Codex login
-state you already have. You can override the command path with `GRANOLA_CODEX_COMMAND` or
-`codex-command = "..."` in `.granola.toml`.
+state you already have. You can override the command path with `GRAN_CODEX_COMMAND` (`GRANOLA_CODEX_COMMAND`
+still works) or `"codex-command": "..."` in `.gran.json`.
 
 For approval-phase delivery actions, provide any external endpoints in the same runtime
 environment, for example:
@@ -286,16 +286,18 @@ environment, for example:
 - `SLACK_WEBHOOK_URL`
 - `POST_REVIEW_WEBHOOK_URL`
 
-Non-secret defaults can live in `.granola.toml`:
+Non-secret defaults can live in `.gran.json`:
 
-```toml
-agent-provider = "openrouter"
-agent-model = "openai/gpt-5-mini"
-agent-harnesses-file = "./agent-harnesses.json"
-agent-timeout = "5m"
-agent-max-retries = 2
-agent-dry-run = false
-codex-command = "codex"
+```json
+{
+  "agent-provider": "openrouter",
+  "agent-model": "openai/gpt-5-mini",
+  "agent-harnesses-file": "./agent-harnesses.json",
+  "agent-timeout": "5m",
+  "agent-max-retries": 2,
+  "agent-dry-run": false,
+  "codex-command": "codex"
+}
 ```
 
 Harness definitions live in `agent-harnesses.json` by default under the shared toolkit data
@@ -329,7 +331,7 @@ directory. You can also point them at a project-local file:
 ```
 
 PKM targets live in `pkm-targets.json` under the shared toolkit data directory by default. Override
-that with `GRANOLA_PKM_TARGETS_FILE` or `pkm-targets-file = "..."` in `.granola.toml`.
+that with `GRAN_PKM_TARGETS_FILE` (`GRANOLA_PKM_TARGETS_FILE` still works) or `"pkm-targets-file": "..."` in `.gran.json`.
 
 Example PKM targets:
 
@@ -361,47 +363,47 @@ disable frontmatter if you want cleaner plain Markdown files.
 Inspect the configured rules:
 
 ```bash
-granola automation rules
-granola automation rules --format json
+gran automation rules
+gran automation rules --format json
 ```
 
 Inspect recent rule matches produced by sync runs:
 
 ```bash
-granola automation matches
-granola automation matches --limit 50
+gran automation matches
+gran automation matches --limit 50
 ```
 
 Inspect recent action runs and resolve pending approval items:
 
 ```bash
-granola automation runs
-granola automation runs --status pending
-granola automation approve <run-id>
-granola automation reject <run-id> --note "not relevant"
+gran automation runs
+gran automation runs --status pending
+gran automation approve <run-id>
+gran automation reject <run-id> --note "not relevant"
 ```
 
 Inspect generated artefacts, review them, and replay a pipeline:
 
 ```bash
-granola automation artefacts
-granola automation artefacts --kind notes --meeting doc-alpha-1111
-granola automation approve-artefact <artefact-id>
-granola automation reject-artefact <artefact-id> --note "needs tighter action items"
-granola automation rerun <artefact-id>
+gran automation artefacts
+gran automation artefacts --kind notes --meeting doc-alpha-1111
+gran automation approve-artefact <artefact-id>
+gran automation reject-artefact <artefact-id> --note "needs tighter action items"
+gran automation rerun <artefact-id>
 ```
 
 Inspect recovery candidates and trigger explicit recovery flows:
 
 ```bash
-granola automation health
-granola automation health --severity error
-granola automation recover <issue-id>
+gran automation health
+gran automation health --severity error
+gran automation recover <issue-id>
 ```
 
 ## How It Works
 
-`granola sync` and `granola sync --watch` enrich each durable sync event with the meeting title,
+`gran sync` and `gran sync --watch` enrich each durable sync event with the meeting title,
 folders, tags, and transcript readiness. The toolkit then flows through three layers:
 
 - sync discovers change and persists events

@@ -5,10 +5,10 @@ import { runGranolaTui } from "../tui/workspace.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function attachHelp(): string {
-  return `Granola attach
+  return `Gran attach
 
 Usage:
-  granola attach [url] [options]
+  gran attach [url] [options]
 
 Options:
   --meeting <id>      Open the workspace focused on a specific meeting
@@ -18,7 +18,7 @@ Options:
 }
 
 export const attachCommand: CommandDefinition = {
-  description: "Attach the terminal workspace to an existing Granola server",
+  description: "Attach the terminal workspace to an existing Gran service",
   flags: {
     help: { type: "boolean" },
     meeting: { type: "string" },
@@ -32,7 +32,7 @@ export const attachCommand: CommandDefinition = {
       const discovered = await discoverGranolaService();
       if (!discovered) {
         throw new Error(
-          "attach requires a server URL or a running background service. Start one with `granola service start`.",
+          "attach requires a server URL or a running background service. Start one with `gran service start`.",
         );
       }
 

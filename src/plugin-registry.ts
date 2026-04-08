@@ -68,7 +68,7 @@ const builtInPlugins: GranolaPluginDefinition[] = [
     capabilities: ["automation"],
     compatibility: {
       configEnabledKeys: ["automation-plugin-enabled", "automationPluginEnabled"],
-      envEnabledKeys: ["GRANOLA_AUTOMATION_PLUGIN_ENABLED"],
+      envEnabledKeys: ["GRAN_AUTOMATION_PLUGIN_ENABLED", "GRANOLA_AUTOMATION_PLUGIN_ENABLED"],
       legacySettingsEnabledKey: "automationEnabled",
     },
     configurable: true,
@@ -102,7 +102,10 @@ const builtInPlugins: GranolaPluginDefinition[] = [
     capabilities: ["markdown-rendering"],
     compatibility: {
       configEnabledKeys: ["markdown-viewer-plugin-enabled", "markdownViewerPluginEnabled"],
-      envEnabledKeys: ["GRANOLA_MARKDOWN_VIEWER_PLUGIN_ENABLED"],
+      envEnabledKeys: [
+        "GRAN_MARKDOWN_VIEWER_PLUGIN_ENABLED",
+        "GRANOLA_MARKDOWN_VIEWER_PLUGIN_ENABLED",
+      ],
       legacySettingsEnabledKey: "markdownViewerEnabled",
     },
     configurable: true,

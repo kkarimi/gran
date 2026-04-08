@@ -120,11 +120,8 @@ async function fetchServerInfo(
   }
 
   const info = (await response.json()) as GranolaServerInfo;
-  if (
-    info.product !== "granola-toolkit" ||
-    info.protocolVersion !== GRANOLA_TRANSPORT_PROTOCOL_VERSION
-  ) {
-    throw new Error("service metadata did not match the expected Granola Toolkit protocol");
+  if (info.product !== "gran" || info.protocolVersion !== GRANOLA_TRANSPORT_PROTOCOL_VERSION) {
+    throw new Error("service metadata did not match the expected Gran protocol");
   }
 
   return info;

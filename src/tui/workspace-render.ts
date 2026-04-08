@@ -369,7 +369,7 @@ export function renderWorkspace(
     view.selectedMeeting?.meeting.meeting.title || view.selectedMeetingId || "none";
 
   const headerTitle = padLine(
-    `${granolaTuiTheme.accent("Granola Toolkit TUI")} ${granolaTuiTheme.dim(
+    `${granolaTuiTheme.accent("Gran 👵🏻 TUI")} ${granolaTuiTheme.dim(
       view.loadingMeetings ? "loading…" : selectedLabel,
     )}`,
     width,

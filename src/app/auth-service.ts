@@ -84,7 +84,7 @@ export class GranolaAuthService {
 
   private requireAuthController(): DefaultGranolaAuthController {
     if (!this.deps.authController) {
-      throw new Error("Granola auth control is not configured");
+      throw new Error("Gran auth control is not configured");
     }
 
     return this.deps.authController;

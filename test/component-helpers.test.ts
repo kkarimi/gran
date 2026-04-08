@@ -116,14 +116,12 @@ describe("web meeting helpers", () => {
     expect(formatDateTimeLabel("2026-04-07T12:34:56.000Z")).toBe("2026-04-07 12:34:56");
     expect(formatDateTimeLabel()).toBe("Not recorded");
     expect(
-      compactPathLabel(
-        "/Users/nima/Library/Application Support/granola-toolkit/meeting-index.json",
-      ),
-    ).toBe(".../Application Support/granola-toolkit/meeting-index.json");
+      compactPathLabel("/Users/nima/Library/Application Support/gran/meeting-index.json"),
+    ).toBe(".../Application Support/gran/meeting-index.json");
     expect(compactPathLabel()).toBe("Not configured");
-    expect(
-      pathLeafLabel("/Users/nima/Library/Application Support/granola-toolkit/meeting-index.json"),
-    ).toBe("meeting-index.json");
+    expect(pathLeafLabel("/Users/nima/Library/Application Support/gran/meeting-index.json")).toBe(
+      "meeting-index.json",
+    );
     expect(formatBytesLabel(4_096)).toBe("4.0 KB");
     expect(formatBytesLabel(128)).toBe("128 B");
   });
@@ -132,7 +130,7 @@ describe("web meeting helpers", () => {
     expect(
       syncCadenceLabel({
         build: {
-          packageName: "granola-toolkit",
+          packageName: "@kkarimi/gran",
           version: "0.66.0",
         },
         config: {},
@@ -156,8 +154,8 @@ describe("web meeting helpers", () => {
           syncEvents: true,
           syncState: true,
         },
-        product: "granola-toolkit",
-        protocolVersion: 3,
+        product: "gran",
+        protocolVersion: 4,
         runtime: {
           mode: "background-service",
           startedAt: "2026-04-07T12:34:56.000Z",
@@ -170,7 +168,7 @@ describe("web meeting helpers", () => {
     expect(
       syncCadenceLabel({
         build: {
-          packageName: "granola-toolkit",
+          packageName: "@kkarimi/gran",
           version: "0.66.0",
         },
         config: {},
@@ -194,8 +192,8 @@ describe("web meeting helpers", () => {
           syncEvents: true,
           syncState: true,
         },
-        product: "granola-toolkit",
-        protocolVersion: 3,
+        product: "gran",
+        protocolVersion: 4,
         runtime: {
           mode: "background-service",
           startedAt: "2026-04-07T12:34:56.000Z",

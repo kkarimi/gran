@@ -1,0 +1,101 @@
+---
+title: SDK
+description: Use Gran's Node and TypeScript SDK to load config, create the local app core, connect to a running service, and export archives from code.
+---
+
+`gran-sdk` is the Node-first package for people who want Gran's local-first core without shelling
+out to CLI commands.
+
+Install it alongside `@kkarimi/gran` when you want to embed Gran in scripts, local apps, or agent
+workflows:
+
+```bash
+npm install gran-sdk
+```
+
+## Create The App Core
+
+```ts
+import { createGranSdk } from "gran-sdk";
+
+const { app, config } = await createGranSdk({
+  apiKey: process.env.GRAN_API_KEY,
+});
+
+console.log(config.notes.output);
+const meetings = await app.listMeetings({ limit: 10 });
+```
+
+If you want config loading separated from app creation:
+
+```ts
+import { createGranApp, loadGranConfig } from "gran-sdk";
+
+const config = await loadGranConfig({ config: ".gran.json" });
+const app = await createGranApp(config, { surface: "server" });
+```
+
+## Connect To A Running Local Service
+
+If `gran service start` or `gran web` already has the shared runtime running, you can connect to it
+over the existing local transport:
+
+```ts
+import { connectGranService } from "gran-sdk";
+
+const client = await connectGranService("http://127.0.0.1:5051");
+
+console.log(client.getState().sync.lastCompletedAt);
+const folders = await client.listFolders();
+await client.close();
+```
+
+This is the easiest path for browser-side tooling, agent integrations, or other local processes
+that should reuse the existing Gran runtime instead of spinning up another app instance.
+
+## Export An Archive
+
+The SDK exposes the same bundled export shape as the CLI:
+
+```ts
+import { createGranSdk, exportGranArchive } from "gran-sdk";
+
+const { app } = await createGranSdk({
+  apiKey: process.env.GRAN_API_KEY,
+});
+
+await exportGranArchive(app, {
+  folder: "Team",
+  outputRoot: "./gran-exports",
+});
+```
+
+By default that writes:
+
+- notes to `./gran-exports/notes`
+- transcripts to `./gran-exports/transcripts`
+
+You can also use `includeNotes: false` or `includeTranscripts: false` when you only want one side.
+
+## Save Named Export Targets
+
+```ts
+import { createGranExportTarget, createGranSdk, saveGranExportTarget } from "gran-sdk";
+
+const { app } = await createGranSdk({
+  apiKey: process.env.GRAN_API_KEY,
+});
+
+await saveGranExportTarget(
+  app,
+  createGranExportTarget("obsidian-vault", {
+    dailyNotesDir: "Daily",
+    id: "obsidian",
+    name: "My Obsidian Vault",
+    outputDir: "/Users/you/Documents/Obsidian",
+  }),
+);
+```
+
+The helper fills in sensible defaults for bundle-folder and Obsidian-friendly targets, so user code
+does not need to know the internal default subdirectory or format rules.

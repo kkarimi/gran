@@ -30,14 +30,20 @@ jobs:
         run: npm run web:check
       - name: Check
         run: vp check
+      - name: SDK Check
+        run: npm run sdk:check
       - name: Test
         run: vp test
+      - name: SDK Test
+        run: npm run sdk:test
       - name: Coverage
         run: npm run coverage
       - name: Standalone Smoke Build
         run: npm run standalone:smoke
       - name: Pack
         run: vp pack
+      - name: SDK Pack
+        run: npm run sdk:build
       - name: Build Docs
         run: npm run docs:check
       - name: Install Playwright Browser
@@ -46,6 +52,8 @@ jobs:
         run: npm run browser:e2e
       - name: Pack Dry Run
         run: npm pack --dry-run
+      - name: SDK Pack Dry Run
+        run: npm run sdk:pack:dry-run
 
   prepare-publish:
     if: |
@@ -58,6 +66,7 @@ jobs:
     outputs:
       package_name: ${{ steps.package.outputs.package_name }}
       package_version: ${{ steps.package.outputs.package_version }}
+      publish_matrix: ${{ steps.npm.outputs.publish_matrix }}
       should_publish: ${{ steps.npm.outputs.should_publish }}
     steps:
       - uses: actions/checkout@v6
@@ -66,23 +75,47 @@ jobs:
         run: |
           node <<'EOF'
           const fs = require('node:fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `package_name=${pkg.name}\n`);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `package_version=${pkg.version}\n`);
+          const rootPkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const sdkPkg = JSON.parse(fs.readFileSync('packages/sdk/package.json', 'utf8'));
+          const packages = [
+            { name: rootPkg.name, version: rootPkg.version, workspace: '.', publishName: rootPkg.name },
+            { name: sdkPkg.name, version: sdkPkg.version, workspace: 'gran-sdk', publishName: sdkPkg.name },
+          ];
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `package_name=${rootPkg.name}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `package_version=${rootPkg.version}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `packages=${JSON.stringify(packages)}\n`);
           EOF
       - id: npm
-        name: Check whether the version is already published
+        name: Check whether package versions are already published
         env:
-          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
-          PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
+          PACKAGES_JSON: ${{ steps.package.outputs.packages }}
         run: |
-          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
-            echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} is already on npm."
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} is unpublished and ready for review."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          fi
+          node <<'EOF'
+          const { execSync } = require('node:child_process');
+          const fs = require('node:fs');
+
+          const packages = JSON.parse(process.env.PACKAGES_JSON);
+          const publishable = [];
+
+          for (const pkg of packages) {
+            try {
+              execSync(`npm view "${pkg.name}@${pkg.version}" version`, { stdio: 'ignore' });
+              console.log(`Version ${pkg.name}@${pkg.version} is already on npm.`);
+            } catch {
+              console.log(`Version ${pkg.name}@${pkg.version} is unpublished and ready for review.`);
+              publishable.push(pkg);
+            }
+          }
+
+          fs.appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `should_publish=${publishable.length > 0 ? 'true' : 'false'}\n`,
+          );
+          fs.appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `publish_matrix=${JSON.stringify(publishable)}\n`,
+          );
+          EOF
 
   publish:
     if: needs.prepare-publish.outputs.should_publish == 'true'
@@ -96,6 +129,10 @@ jobs:
     concurrency:
       group: npm-publish-production
       cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.prepare-publish.outputs.publish_matrix) }}
     environment:
       name: production
       url: https://www.npmjs.com/package/${{ needs.prepare-publish.outputs.package_name }}
@@ -108,7 +145,17 @@ jobs:
       - name: Install
         run: vp install --frozen-lockfile
       - name: Publish
-        run: npm publish --provenance --access public
+        env:
+          PACKAGE_NAME: ${{ matrix.name }}
+          PACKAGE_VERSION: ${{ matrix.version }}
+          PACKAGE_WORKSPACE: ${{ matrix.workspace }}
+        run: |
+          echo "Publishing ${PACKAGE_NAME}@${PACKAGE_VERSION}"
+          if [ "${PACKAGE_WORKSPACE}" = "." ]; then
+            npm publish --provenance --access public
+          else
+            npm publish --provenance --access public --workspace "${PACKAGE_WORKSPACE}"
+          fi
 
   standalone-assets:
     if: needs.prepare-publish.outputs.should_publish == 'true'

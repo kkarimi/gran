@@ -14,7 +14,7 @@ import type { AppConfig } from "../src/types.ts";
 
 function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
-    configFileUsed: "/tmp/.granola.toml",
+    configFileUsed: "/tmp/.gran.json",
     debug: true,
     notes: {
       output: "/tmp/notes",
@@ -91,7 +91,7 @@ describe("createCommandAppContext", () => {
       app,
       config,
     });
-    expect(error).toHaveBeenCalledWith("[debug]", "using config", "/tmp/.granola.toml");
+    expect(error).toHaveBeenCalledWith("[debug]", "using config", "/tmp/.gran.json");
     expect(error).toHaveBeenCalledWith("[debug]", "supabase", supabasePath);
     expect(error).toHaveBeenCalledWith("[debug]", "cacheFile", cachePath);
     expect(error).toHaveBeenCalledWith("[debug]", "timeoutMs", 120_000);

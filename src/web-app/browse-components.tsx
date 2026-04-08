@@ -178,7 +178,7 @@ function LoadingCardGrid(props: { label: string; count?: number }): JSX.Element 
 export function ToolbarFilters(props: ToolbarFiltersProps): JSX.Element {
   return (
     <section class="hero">
-      <h1>Granola Toolkit</h1>
+      <h1>Gran 👵🏻</h1>
       <p>
         Start from folders, recent meetings, or search. The browser stays attached to the same local
         service and sync loop as the CLI and TUI.
@@ -360,11 +360,11 @@ export function HomeDashboardPanel(props: HomeDashboardPanelProps): JSX.Element 
         ? props.appState.documents.count
         : 0;
   const configLabel = () =>
-    props.appState?.config.configFileUsed ? "Custom .granola.toml loaded" : "No custom config file";
+    props.appState?.config.configFileUsed ? "Custom .gran.json loaded" : "No custom config file";
   const configDetail = () =>
     props.appState?.config.configFileUsed
       ? `${pathLeafLabel(props.appState.config.configFileUsed)} · ${compactPathLabel(props.appState.config.configFileUsed)}`
-      : "Using toolkit defaults. Change values from Auth, Plugins, and Exports, or add a .granola.toml later.";
+      : "Using toolkit defaults. Change values from Auth, Plugins, and Exports, or add a .gran.json later.";
   const transcriptLabel = () =>
     props.appState?.cache.loaded && props.appState.cache.transcriptCount > 0
       ? `${props.appState.cache.transcriptCount} transcript sets available locally`

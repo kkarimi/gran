@@ -33,6 +33,15 @@ export function readPackageMetadata() {
   return JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 }
 
+export function readSdkPackageMetadata() {
+  const sdkPackagePath = resolve(root, "packages/sdk/package.json");
+  if (!existsSync(sdkPackagePath)) {
+    return undefined;
+  }
+
+  return JSON.parse(readFileSync(sdkPackagePath, "utf8"));
+}
+
 export function parseCommitSubject(subject) {
   const trimmed = subject.trim();
   const match = /^(?<type>[a-z]+)(?:\([^)]+\))?(?<breaking>!)?: (?<summary>.+)$/i.exec(trimmed);
@@ -132,6 +141,47 @@ export function renderChangeBullet(change, repository) {
   return `- ${prefix}${change.summary} ([${change.shortHash}](${repository}/commit/${change.hash}))`;
 }
 
+export function releaseArtefactLines({ baseTag, homepage, packageName, repository, version }) {
+  const sdkPackage = readSdkPackageMetadata();
+  return [
+    "### Artefacts",
+    "",
+    `- npm: [${packageName}@${version}](https://www.npmjs.com/package/${packageName}/v/${version})`,
+    `- install: \`npm install -g ${packageName}@${version}\``,
+    ...(sdkPackage
+      ? [
+          `- SDK: [${sdkPackage.name}@${sdkPackage.version}](https://www.npmjs.com/package/${sdkPackage.name}/v/${sdkPackage.version})`,
+          `- SDK install: \`npm install ${sdkPackage.name}@${sdkPackage.version}\``,
+        ]
+      : []),
+    `- GitHub Release: ${releaseUrl({ repository, version })}`,
+    `- standalone binaries: ${releaseUrl({ repository, version })}`,
+    `- docs: ${homepage}`,
+    `- compare: ${compareUrl({ repository, baseTag, version })}`,
+    "",
+  ];
+}
+
+export function upsertReleaseArtefacts(markdown, options) {
+  const artefacts = releaseArtefactLines(options).join("\n");
+  const marker = "\n### Artefacts\n";
+  const start = markdown.indexOf(marker);
+
+  if (start === -1) {
+    return `${markdown.trimEnd()}\n\n${artefacts}`.trimEnd();
+  }
+
+  const afterStart = start + 1;
+  const rest = markdown.slice(afterStart);
+  const nextHeading = rest.indexOf("\n### ", "### Artefacts\n".length);
+
+  if (nextHeading === -1) {
+    return `${markdown.slice(0, afterStart)}${artefacts}`.trimEnd();
+  }
+
+  return `${markdown.slice(0, afterStart)}${artefacts}\n${rest.slice(nextHeading + 1)}`.trimEnd();
+}
+
 export function renderReleaseEntry({
   packageName,
   version,
@@ -166,27 +216,20 @@ export function renderReleaseEntry({
   }
 
   lines.push(
-    "### Artefacts",
-    "",
-    `- npm: [${packageName}@${version}](https://www.npmjs.com/package/${packageName}/v/${version})`,
-    `- install: \`npm install -g ${packageName}@${version}\``,
-    `- GitHub Release: ${releaseUrl({ repository, version })}`,
-    `- standalone binaries: ${releaseUrl({ repository, version })}`,
-    `- docs: ${homepage}`,
-    `- compare: ${compareUrl({ repository, baseTag, version })}`,
-    "",
+    ...releaseArtefactLines({
+      baseTag,
+      homepage,
+      packageName,
+      repository,
+      version,
+    }),
   );
 
   return lines.join("\n");
 }
 
 export function changelogHeader() {
-  return [
-    "# Changelog",
-    "",
-    "All notable changes to `granola-toolkit` are recorded here.",
-    "",
-  ].join("\n");
+  return ["# Changelog", "", "All notable changes to Gran are recorded here.", ""].join("\n");
 }
 
 export function extractChangelogEntry(markdown, version) {

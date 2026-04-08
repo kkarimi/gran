@@ -4,10 +4,10 @@ import { createCommandAppContext } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function searchHelp(): string {
-  return `Granola search
+  return `Gran search
 
 Usage:
-  granola search <query> [options]
+  gran search <query> [options]
 
 Options:
   --folder <query>    Filter search results to one folder id or name
@@ -16,7 +16,7 @@ Options:
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   -h, --help          Show help
 `;
 }

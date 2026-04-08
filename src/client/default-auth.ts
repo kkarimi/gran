@@ -81,7 +81,7 @@ function resolveActiveMode(options: {
 
 function missingSupabaseError(): Error {
   return new Error(
-    `supabase.json not found. Pass --supabase or create .granola.toml. Expected locations include: ${granolaSupabaseCandidates().join(", ")}`,
+    `supabase.json not found. Pass --supabase or create .gran.json. Expected locations include: ${granolaSupabaseCandidates().join(", ")}`,
   );
 }
 

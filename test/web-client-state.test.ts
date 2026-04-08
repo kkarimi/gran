@@ -43,25 +43,22 @@ describe("web client state helpers", () => {
 
   test("builds browser URLs without leaving stale folder or tab state behind", () => {
     expect(
-      buildBrowserUrlPath("https://kkarimi.github.io/granola-toolkit/docs/?foo=bar#workspace", {
+      buildBrowserUrlPath("https://kkarimi.github.io/gran/docs/?foo=bar#workspace", {
         selectedFolderId: "folder-sales-2222",
         selectedMeetingId: "doc-bravo-2222",
         workspaceTab: "transcript",
       }),
     ).toBe(
-      "/granola-toolkit/docs/?foo=bar&folder=folder-sales-2222&meeting=doc-bravo-2222&tab=transcript#workspace",
+      "/gran/docs/?foo=bar&folder=folder-sales-2222&meeting=doc-bravo-2222&tab=transcript#workspace",
     );
 
     expect(
-      buildBrowserUrlPath(
-        "https://kkarimi.github.io/granola-toolkit/docs/?folder=old&meeting=old&tab=raw",
-        {
-          selectedFolderId: null,
-          selectedMeetingId: null,
-          workspaceTab: "notes",
-        },
-      ),
-    ).toBe("/granola-toolkit/docs/");
+      buildBrowserUrlPath("https://kkarimi.github.io/gran/docs/?folder=old&meeting=old&tab=raw", {
+        selectedFolderId: null,
+        selectedMeetingId: null,
+        workspaceTab: "notes",
+      }),
+    ).toBe("/gran/docs/");
   });
 
   test("summarises filters and keeps the selected meeting only when still visible", () => {

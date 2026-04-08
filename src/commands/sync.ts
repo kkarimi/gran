@@ -11,11 +11,11 @@ import {
 import type { CommandDefinition } from "./types.ts";
 
 function syncHelp(): string {
-  return `Granola sync
+  return `Gran sync
 
 Usage:
-  granola sync [options]
-  granola sync events [options]
+  gran sync [options]
+  gran sync events [options]
 
 Options:
   --watch             Keep syncing in the background until interrupted
@@ -25,7 +25,7 @@ Options:
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   -h, --help          Show help
 `;
 }

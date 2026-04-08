@@ -65,8 +65,8 @@ function makeServerInfo(overrides: Partial<GranolaServerInfo> = {}): GranolaServ
   const build = {
     gitCommit: "1234567890abcdef1234567890abcdef12345678",
     gitCommitShort: "1234567",
-    packageName: "granola-toolkit",
-    repositoryUrl: "git+https://github.com/kkarimi/granola-toolkit.git",
+    packageName: "@kkarimi/gran",
+    repositoryUrl: "git+https://github.com/kkarimi/gran.git",
     version: "0.66.0",
     ...overrides.build,
   };
@@ -81,7 +81,7 @@ function makeServerInfo(overrides: Partial<GranolaServerInfo> = {}): GranolaServ
     build,
     config: {
       automationRulesFile: "/tmp/automation-rules.json",
-      configFile: "/tmp/.granola.toml",
+      configFile: "/tmp/.gran.json",
       notesOutputDir: "/tmp/notes",
       pluginsFile: "/tmp/plugins.json",
       supabaseFile: "/tmp/supabase.json",
@@ -103,7 +103,7 @@ function makeServerInfo(overrides: Partial<GranolaServerInfo> = {}): GranolaServ
     },
     persistence: {
       catalogSnapshotFile: "/tmp/catalog-snapshot.json",
-      dataDirectory: "/tmp/granola-toolkit",
+      dataDirectory: "/tmp/gran",
       exportJobs: true,
       exportJobsFile: "/tmp/export-jobs.json",
       meetingIndex: true,
@@ -118,7 +118,7 @@ function makeServerInfo(overrides: Partial<GranolaServerInfo> = {}): GranolaServ
       syncState: true,
       syncStateFile: "/tmp/sync-state.json",
     },
-    product: "granola-toolkit",
+    product: "gran",
     protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
     runtime,
     transport: "local-http",
@@ -801,7 +801,7 @@ describe("command execution", () => {
     expect(log).toHaveBeenCalledWith("Recommended: No stored API key yet");
     expect(log).toHaveBeenCalledWith("API key: missing");
     expect(log).toHaveBeenCalledWith("Stored session: missing");
-    expect(log).toHaveBeenCalledWith("Next step: granola auth login --api-key grn_...");
+    expect(log).toHaveBeenCalledWith("Next step: gran auth login --api-key grn_...");
   });
 
   test("auth login forwards an API key to the app layer", async () => {
@@ -981,7 +981,7 @@ describe("command execution", () => {
       makeContext({
         commandArgs: ["start"],
         globalFlags: {
-          config: "/tmp/.granola.toml",
+          config: "/tmp/.gran.json",
         },
       }),
     );
@@ -989,10 +989,10 @@ describe("command execution", () => {
     expect(exitCode).toBe(0);
     expect(serviceModule.spawnGranolaServiceProcess).toHaveBeenCalledWith(
       expect.objectContaining({
-        commandArgs: ["--config", "/tmp/.granola.toml"],
+        commandArgs: ["--config", "/tmp/.gran.json"],
       }),
     );
-    expect(log).toHaveBeenCalledWith("Granola Toolkit service started on http://127.0.0.1:4123/");
+    expect(log).toHaveBeenCalledWith("Gran 👵🏻 service started on http://127.0.0.1:4123/");
     expect(log).toHaveBeenCalledWith("PID: 4321");
   });
 
@@ -1007,7 +1007,7 @@ describe("command execution", () => {
     );
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith("Granola Toolkit service stopped.");
+    expect(log).toHaveBeenCalledWith("Gran 👵🏻 service stopped.");
   });
 
   test("service stop force-stops an unreachable background process", async () => {
@@ -1021,7 +1021,7 @@ describe("command execution", () => {
     );
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith("Granola Toolkit service force-stopped.");
+    expect(log).toHaveBeenCalledWith("Gran 👵🏻 service force-stopped.");
   });
 
   test("sync command prints a structured sync summary", async () => {
@@ -1861,7 +1861,7 @@ describe("command execution", () => {
       initialMeetingId: "doc-alpha-1111",
     });
     expect(log).toHaveBeenCalledWith(
-      "Attaching to Granola Toolkit background service at http://127.0.0.1:4123/",
+      "Attaching to Gran 👵🏻 background service at http://127.0.0.1:4123/",
     );
   });
 
@@ -1908,7 +1908,7 @@ describe("command execution", () => {
       initialMeetingId: "doc-alpha-1111",
     });
     expect(log).toHaveBeenCalledWith(
-      "Granola Toolkit background service started on http://127.0.0.1:4123/",
+      "Gran 👵🏻 background service started on http://127.0.0.1:4123/",
     );
   });
 
@@ -1962,7 +1962,7 @@ describe("command execution", () => {
       new URL("http://127.0.0.1:4123/?meeting=doc-alpha-1111"),
     );
     expect(log).toHaveBeenCalledWith(
-      "Granola Toolkit web workspace already running on http://127.0.0.1:4123/",
+      "Gran 👵🏻 web workspace already running on http://127.0.0.1:4123/",
     );
   });
 
@@ -2001,7 +2001,7 @@ describe("command execution", () => {
       new URL("http://127.0.0.1:4123/?meeting=doc-alpha-1111"),
     );
     expect(log).toHaveBeenCalledWith(
-      "Granola Toolkit background service started on http://127.0.0.1:4123/",
+      "Gran 👵🏻 background service started on http://127.0.0.1:4123/",
     );
   });
 
@@ -2041,9 +2041,9 @@ describe("command execution", () => {
     expect(openExternalUrl).toHaveBeenCalledWith(
       new URL("http://127.0.0.1:4123/?meeting=doc-alpha-1111"),
     );
-    expect(log).toHaveBeenCalledWith("Granola Toolkit stopped the previous background service.");
+    expect(log).toHaveBeenCalledWith("Gran 👵🏻 stopped the previous background service.");
     expect(log).toHaveBeenCalledWith(
-      "Granola Toolkit background service restarted on http://127.0.0.1:4123/",
+      "Gran 👵🏻 background service restarted on http://127.0.0.1:4123/",
     );
   });
 });

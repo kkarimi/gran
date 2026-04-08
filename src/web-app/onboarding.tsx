@@ -77,10 +77,10 @@ function providerSetupHint(provider: GranolaAgentProviderKind): string {
     case "codex":
       return "Codex uses your local `codex` CLI. Make sure `codex exec` works in this workspace before you rely on it for automation.";
     case "openai":
-      return "OpenAI requires `OPENAI_API_KEY` or `GRANOLA_OPENAI_API_KEY` in the environment where the toolkit is running.";
+      return "OpenAI requires `OPENAI_API_KEY` or `GRAN_OPENAI_API_KEY` (legacy: `GRANOLA_OPENAI_API_KEY`) in the environment where the toolkit is running.";
     case "openrouter":
     default:
-      return "OpenRouter requires `OPENROUTER_API_KEY` or `GRANOLA_OPENROUTER_API_KEY` in the environment where the toolkit is running.";
+      return "OpenRouter requires `OPENROUTER_API_KEY` or `GRAN_OPENROUTER_API_KEY` (legacy: `GRANOLA_OPENROUTER_API_KEY`) in the environment where the toolkit is running.";
   }
 }
 
@@ -127,8 +127,8 @@ function describeService(serverInfo?: GranolaServerInfo | null): {
     case "server":
       return {
         detail: runtime.syncEnabled
-          ? `Connected to a local Granola server${intervalLabel ? ` · sync ${intervalLabel}` : ""}.`
-          : "Connected to a local Granola server · sync is currently disabled.",
+          ? `Connected to a local Gran service${intervalLabel ? ` · sync ${intervalLabel}` : ""}.`
+          : "Connected to a local Gran service · sync is currently disabled.",
       };
     case "web-workspace":
       return {
@@ -191,7 +191,7 @@ export function deriveOnboardingState(input: {
       detail: pipelineReady
         ? automationEnabled
           ? "Starter harnesses and automation rules are ready."
-          : "You can keep using Granola Toolkit without enabling automation yet."
+          : "You can keep using Gran 👵🏻 without enabling automation yet."
         : "The starter pipeline generates reviewable meeting notes on transcript-ready events.",
       id: "agent",
       title: automationEnabled ? "Choose An Agent" : "Automation Plugin",
@@ -289,7 +289,7 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
       <div class="onboarding-panel__hero">
         <div>
           <p class="onboarding-panel__eyebrow">First-Run Setup</p>
-          <h2>Set up Granola Toolkit in three steps.</h2>
+          <h2>Set up Gran 👵🏻 in three steps.</h2>
           <p>
             Add your Granola API key, import your meetings, and choose the agent that should draft
             reviewable notes. The goal is to reach one useful default without dropping you into

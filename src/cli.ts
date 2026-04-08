@@ -1,7 +1,6 @@
 import { commandMap, commands } from "./commands/index.ts";
 import type { CommandDefinition } from "./commands/types.ts";
 import { parseFlags } from "./flags.ts";
-import { granolaCacheCandidates, granolaSupabaseCandidates } from "./utils.ts";
 
 function splitCommand(argv: string[]): { command?: CommandDefinition; rest: string[] } {
   const rest: string[] = [];
@@ -26,35 +25,35 @@ function rootHelp(): string {
     .map((command) => `  ${command.name.padEnd(commandWidth)}  ${command.description}`)
     .join("\n");
 
-  return `Granola Toolkit
+  return `Gran 👵🏻
 
 Sync, search, export, and automate your Granola archive locally.
 
 Usage:
-  granola <command> [options]
+  gran <command> [options]
 
 Commands:
 ${commandLines}
 
 Global options:
   --api-key <token>   Granola Personal API key
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   --debug             Enable debug logging
   --rules <path>      Path to automation rules JSON
   --supabase <path>   Path to supabase.json
   -h, --help          Show help
 
 Examples:
-  granola attach http://127.0.0.1:4123
-  granola export --folder Team
-  granola targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work
-  granola folder list
-  granola intelligence run decisions --last 5
-  granola init --provider openrouter
-  granola service start
-  granola sync
-  granola notes --supabase "${granolaSupabaseCandidates()[0] ?? "/path/to/supabase.json"}"
-  granola transcripts --cache "${granolaCacheCandidates()[0] ?? "/path/to/cache-v3.json"}"
+  gran attach http://127.0.0.1:4123
+  gran export --folder Team
+  gran targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work
+  gran folder list
+  gran intelligence run decisions --last 5
+  gran init --provider openrouter
+  gran service start
+  gran sync
+  gran notes --supabase "/path/to/supabase.json"
+  gran transcripts --cache "/path/to/granola-cache.json"
 `;
 }
 

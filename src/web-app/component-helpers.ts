@@ -578,10 +578,10 @@ export function providerSetupHint(provider: GranolaAgentProviderKind): string {
     case "codex":
       return "Codex uses your local `codex` CLI. Make sure `codex exec` works anywhere you run sync and automation.";
     case "openai":
-      return "OpenAI needs `OPENAI_API_KEY` or `GRANOLA_OPENAI_API_KEY` in the toolkit runtime environment.";
+      return "OpenAI needs `OPENAI_API_KEY` or `GRAN_OPENAI_API_KEY` (legacy: `GRANOLA_OPENAI_API_KEY`) in the toolkit runtime environment.";
     case "openrouter":
     default:
-      return "OpenRouter needs `OPENROUTER_API_KEY` or `GRANOLA_OPENROUTER_API_KEY` in the toolkit runtime environment.";
+      return "OpenRouter needs `OPENROUTER_API_KEY` or `GRAN_OPENROUTER_API_KEY` (legacy: `GRANOLA_OPENROUTER_API_KEY`) in the toolkit runtime environment.";
   }
 }
 

@@ -11,10 +11,10 @@ import { debug } from "./shared.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function folderHelp(): string {
-  return `Granola folder
+  return `Gran folder
 
 Usage:
-  granola folder <list|view> [options]
+  gran folder <list|view> [options]
 
 Subcommands:
   list                List folders from the Granola API
@@ -27,7 +27,7 @@ Options:
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   -h, --help          Show help
 `;
 }
@@ -67,7 +67,7 @@ function parseLimit(value: string | boolean | undefined): number {
 }
 
 export const folderCommand: CommandDefinition = {
-  description: "Inspect Granola folders and their meetings",
+  description: "Inspect folders and their meetings",
   flags: {
     format: { type: "string" },
     help: { type: "boolean" },

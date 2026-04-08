@@ -42,6 +42,48 @@ function pickNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+function pickEnvString(
+  env: Record<string, string | undefined>,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = pickString(env[key]);
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function pickEnvNumber(
+  env: Record<string, string | undefined>,
+  ...keys: string[]
+): number | undefined {
+  for (const key of keys) {
+    const value = pickNumber(env[key]);
+    if (value !== undefined) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function pickEnvFlag(
+  env: Record<string, string | undefined>,
+  ...keys: string[]
+): boolean | undefined {
+  for (const key of keys) {
+    const value = envFlag(env[key]);
+    if (value !== undefined) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 function parseTomlScalar(rawValue: string): unknown {
   const value = rawValue.trim();
 
@@ -92,7 +134,16 @@ function parseSimpleToml(contents: string): Record<string, unknown> {
   return values;
 }
 
-async function loadTomlConfig(
+function parseJsonConfig(contents: string): Record<string, unknown> {
+  const parsed = JSON.parse(contents) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("config file must contain a JSON object");
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+async function loadConfigFile(
   configPath?: string,
 ): Promise<{ path?: string; values: Record<string, unknown> }> {
   if (configPath) {
@@ -103,17 +154,22 @@ async function loadTomlConfig(
     const contents = await readUtf8(configPath);
     return {
       path: configPath,
-      values: parseSimpleToml(contents),
+      values: configPath.endsWith(".toml") ? parseSimpleToml(contents) : parseJsonConfig(contents),
     };
   }
 
-  const candidates = [join(process.cwd(), ".granola.toml"), join(homedir(), ".granola.toml")];
+  const candidates = [
+    join(process.cwd(), ".gran.json"),
+    join(process.cwd(), ".granola.toml"),
+    join(homedir(), ".gran.json"),
+    join(homedir(), ".granola.toml"),
+  ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
       const contents = await readUtf8(candidate);
       return {
         path: candidate,
-        values: parseSimpleToml(contents),
+        values: candidate.endsWith(".toml") ? parseSimpleToml(contents) : parseJsonConfig(contents),
       };
     }
   }
@@ -186,14 +242,14 @@ export async function loadConfig(options: {
 }): Promise<AppConfig> {
   const env = options.env ?? process.env;
   const configFile = pickString(options.globalFlags.config);
-  const config = await loadTomlConfig(configFile);
+  const config = await loadConfigFile(configFile);
   const configPath = config.path;
 
   const configValues = config.values;
   const defaultSupabase = firstExistingPath(granolaSupabaseCandidates());
   const defaultCache = firstExistingPath(granolaCacheCandidates());
   const pluginsFile =
-    pickString(env.GRANOLA_PLUGINS_FILE) ??
+    pickEnvString(env, "GRAN_PLUGINS_FILE", "GRANOLA_PLUGINS_FILE") ??
     resolveConfigPath(
       configPath,
       pickString(configValues["plugins-file"]) ?? pickString(configValues.pluginsFile),
@@ -205,7 +261,7 @@ export async function loadConfig(options: {
     pluginDefinitions,
   ).readSettings();
   const agentTimeoutValue =
-    pickString(env.GRANOLA_AGENT_TIMEOUT) ??
+    pickEnvString(env, "GRAN_AGENT_TIMEOUT", "GRANOLA_AGENT_TIMEOUT") ??
     pickString(configValues["agent-timeout"]) ??
     pickString(configValues.agentTimeout) ??
     "5m";
@@ -219,7 +275,7 @@ export async function loadConfig(options: {
   return {
     automation: {
       artefactsFile:
-        pickString(env.GRANOLA_AUTOMATION_ARTEFACTS_FILE) ??
+        pickEnvString(env, "GRAN_AUTOMATION_ARTEFACTS_FILE", "GRANOLA_AUTOMATION_ARTEFACTS_FILE") ??
         resolveConfigPath(
           configPath,
           pickString(configValues["automation-artefacts-file"]) ??
@@ -227,7 +283,7 @@ export async function loadConfig(options: {
         ) ??
         defaultGranolaToolkitPersistenceLayout().automationArtefactsFile,
       pkmTargetsFile:
-        pickString(env.GRANOLA_PKM_TARGETS_FILE) ??
+        pickEnvString(env, "GRAN_PKM_TARGETS_FILE", "GRANOLA_PKM_TARGETS_FILE") ??
         resolveConfigPath(
           configPath,
           pickString(configValues["pkm-targets-file"]) ?? pickString(configValues.pkmTargetsFile),
@@ -235,7 +291,7 @@ export async function loadConfig(options: {
         defaultGranolaToolkitPersistenceLayout().pkmTargetsFile,
       rulesFile:
         pickString(options.globalFlags.rules) ??
-        pickString(env.GRANOLA_AUTOMATION_RULES_FILE) ??
+        pickEnvString(env, "GRAN_AUTOMATION_RULES_FILE", "GRANOLA_AUTOMATION_RULES_FILE") ??
         resolveConfigPath(
           configPath,
           pickString(configValues["automation-rules-file"]) ??
@@ -245,17 +301,17 @@ export async function loadConfig(options: {
     },
     agents: {
       codexCommand:
-        pickString(env.GRANOLA_CODEX_COMMAND) ??
+        pickEnvString(env, "GRAN_CODEX_COMMAND", "GRANOLA_CODEX_COMMAND") ??
         pickString(configValues["codex-command"]) ??
         pickString(configValues.codexCommand) ??
         "codex",
       defaultModel:
-        pickString(env.GRANOLA_AGENT_MODEL) ??
+        pickEnvString(env, "GRAN_AGENT_MODEL", "GRANOLA_AGENT_MODEL") ??
         pickString(configValues["agent-model"]) ??
         pickString(configValues.agentModel),
       defaultProvider: (() => {
         const value =
-          pickString(env.GRANOLA_AGENT_PROVIDER) ??
+          pickEnvString(env, "GRAN_AGENT_PROVIDER", "GRANOLA_AGENT_PROVIDER") ??
           pickString(configValues["agent-provider"]) ??
           pickString(configValues.agentProvider);
         return value === "codex" || value === "openai" || value === "openrouter"
@@ -263,12 +319,12 @@ export async function loadConfig(options: {
           : undefined;
       })(),
       dryRun:
-        envFlag(env.GRANOLA_AGENT_DRY_RUN) ??
+        pickEnvFlag(env, "GRAN_AGENT_DRY_RUN", "GRANOLA_AGENT_DRY_RUN") ??
         pickBoolean(configValues["agent-dry-run"]) ??
         pickBoolean(configValues.agentDryRun) ??
         false,
       harnessesFile:
-        pickString(env.GRANOLA_AGENT_HARNESSES_FILE) ??
+        pickEnvString(env, "GRAN_AGENT_HARNESSES_FILE", "GRANOLA_AGENT_HARNESSES_FILE") ??
         resolveConfigPath(
           configPath,
           pickString(configValues["agent-harnesses-file"]) ??
@@ -276,18 +332,18 @@ export async function loadConfig(options: {
         ) ??
         defaultGranolaToolkitPersistenceLayout().agentHarnessesFile,
       maxRetries:
-        pickNumber(env.GRANOLA_AGENT_MAX_RETRIES) ??
+        pickEnvNumber(env, "GRAN_AGENT_MAX_RETRIES", "GRANOLA_AGENT_MAX_RETRIES") ??
         pickNumber(configValues["agent-max-retries"]) ??
         pickNumber(configValues.agentMaxRetries) ??
         2,
       openaiBaseUrl:
-        pickString(env.GRANOLA_OPENAI_BASE_URL) ??
+        pickEnvString(env, "GRAN_OPENAI_BASE_URL", "GRANOLA_OPENAI_BASE_URL") ??
         pickString(env.OPENAI_BASE_URL) ??
         pickString(configValues["openai-base-url"]) ??
         pickString(configValues.openaiBaseUrl) ??
         "https://api.openai.com/v1",
       openrouterBaseUrl:
-        pickString(env.GRANOLA_OPENROUTER_BASE_URL) ??
+        pickEnvString(env, "GRAN_OPENROUTER_BASE_URL", "GRANOLA_OPENROUTER_BASE_URL") ??
         pickString(env.OPENROUTER_BASE_URL) ??
         pickString(configValues["openrouter-base-url"]) ??
         pickString(configValues.openrouterBaseUrl) ??
@@ -296,7 +352,7 @@ export async function loadConfig(options: {
     },
     apiKey:
       pickString(options.globalFlags["api-key"]) ??
-      pickString(env.GRANOLA_API_KEY) ??
+      pickEnvString(env, "GRAN_API_KEY", "GRANOLA_API_KEY") ??
       pickString(configValues["api-key"]) ??
       pickString(configValues.apiKey),
     configFileUsed: config.path,
@@ -307,7 +363,7 @@ export async function loadConfig(options: {
       false,
     exports: {
       targetsFile:
-        pickString(env.GRANOLA_EXPORT_TARGETS_FILE) ??
+        pickEnvString(env, "GRAN_EXPORT_TARGETS_FILE", "GRANOLA_EXPORT_TARGETS_FILE") ??
         resolveConfigPath(
           configPath,
           pickString(configValues["export-targets-file"]) ??

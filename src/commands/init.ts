@@ -6,13 +6,13 @@ import type { GranolaAgentProviderKind } from "../types.ts";
 import type { CommandDefinition } from "./types.ts";
 
 function initHelp(): string {
-  return `Granola init
+  return `Gran init
 
 Usage:
-  granola init [options]
+  gran init [options]
 
 Create a local project bootstrap with:
-  - .granola.toml
+  - .gran.json
   - starter automation rules
   - starter harness definitions
   - prompt files for common meeting types
@@ -51,7 +51,7 @@ function providerNextStep(provider: GranolaAgentProviderKind): string {
 }
 
 export const initCommand: CommandDefinition = {
-  description: "Create a local Granola Toolkit project bootstrap",
+  description: "Create a local Gran project bootstrap",
   flags: {
     dir: { type: "string" },
     force: { type: "boolean" },
@@ -63,7 +63,7 @@ export const initCommand: CommandDefinition = {
   name: "init",
   async run({ commandArgs, commandFlags }) {
     if (commandArgs.length > 0) {
-      throw new Error("granola init does not accept positional arguments");
+      throw new Error("gran init does not accept positional arguments");
     }
 
     const directory =
@@ -79,7 +79,7 @@ export const initCommand: CommandDefinition = {
     });
     const root = resolvePath(result.directory);
 
-    console.log(`Initialised Granola Toolkit in ${root}`);
+    console.log(`Initialised Gran 👵🏻 in ${root}`);
     console.log("");
     console.log("Created:");
     for (const filePath of result.createdFiles) {
@@ -87,16 +87,14 @@ export const initCommand: CommandDefinition = {
     }
     console.log("");
     console.log("Next:");
-    console.log("1. Store Granola auth once with `granola auth login --api-key grn_...`.");
+    console.log("1. Store Gran auth once with `gran auth login --api-key grn_...`.");
     console.log(providerNextStep(provider));
     console.log(
-      "3. Edit the prompt files under ./.granola/prompts/ to match your real meeting types.",
+      "3. Edit the prompt files under ./.gran/prompts/ to match your real meeting types.",
     );
+    console.log("4. Run `gran sync --config ./.gran.json` and `gran web --config ./.gran.json`.");
     console.log(
-      "4. Run `granola sync --config ./.granola.toml` and `granola web --config ./.granola.toml`.",
-    );
-    console.log(
-      "5. If your folders are not named Team or Customers, adjust ./.granola/automation-rules.json and ./.granola/agent-harnesses.json before enabling a watch loop.",
+      "5. If your folders are not named Team or Customers, adjust ./.gran/automation-rules.json and ./.gran/agent-harnesses.json before enabling a watch loop.",
     );
     return 0;
   },

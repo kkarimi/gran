@@ -12,11 +12,11 @@ const ibmPlexSans = IBM_Plex_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: "Granola Toolkit Docs",
-    template: "%s | Granola Toolkit Docs",
+    default: "Gran 👵🏻 Docs",
+    template: "%s | Gran 👵🏻 Docs",
   },
   description:
-    "Documentation for Granola Toolkit, the unofficial open-source Swiss army knife for syncing, browsing, exporting, and automating Granola meetings locally.",
+    "Documentation for Gran 👵🏻, the unofficial open-source Swiss army knife for syncing, browsing, exporting, and automating Granola meetings locally.",
   metadataBase: new URL(docsSiteUrl),
 };
 

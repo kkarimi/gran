@@ -96,7 +96,7 @@ function standaloneReadme(target) {
   const invoke = target.platform === "win32" ? `.\\${executable} --help` : `./${executable} --help`;
 
   return [
-    "Granola Toolkit standalone binary",
+    "Gran 👵🏻 standalone binary",
     "",
     `Target: ${target.id}`,
     `Command: ${executable}`,
@@ -140,7 +140,7 @@ async function buildStandalone() {
   const archivePath = resolve(outputDir, standaloneArchiveName(pkg.name, pkg.version, target));
   const executableName = standaloneExecutableName(standaloneCommandName, target);
   const executablePath = resolve(assetDir, executableName);
-  const tempDir = await mkdtemp(join(tmpdir(), "granola-standalone-"));
+  const tempDir = await mkdtemp(join(tmpdir(), "gran-standalone-"));
 
   try {
     await rm(assetDir, { force: true, recursive: true });

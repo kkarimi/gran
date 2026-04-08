@@ -17,10 +17,10 @@ import { serialiseManagedServiceFlags } from "./service-shared.ts";
 import { resolveGranolaWebWorkspaceOptions, runGranolaWebWorkspace } from "./web-shared.ts";
 
 function webHelp(): string {
-  return `Granola web
+  return `Gran web
 
 Usage:
-  granola web [options]
+  gran web [options]
 
 Options:
   --meeting <id>         Open a specific meeting on load
@@ -38,7 +38,7 @@ Options:
   --supabase <path>       Path to supabase.json
   --open[=true|false]     Open the browser automatically (default: true)
   --debug                 Enable debug logging
-  --config <path>         Path to .granola.toml
+  --config <path>         Path to .gran.json
   -h, --help              Show help
 `;
 }
@@ -73,7 +73,7 @@ function targetWebUrl(serviceUrl: string, meetingId?: string): URL {
 }
 
 export const webCommand: CommandDefinition = {
-  description: "Open the Granola Toolkit web workspace",
+  description: "Open the Gran 👵🏻 web workspace",
   flags: {
     cache: { type: "string" },
     foreground: { type: "boolean" },
@@ -106,9 +106,9 @@ export const webCommand: CommandDefinition = {
     if (restartRequested) {
       const stopResult = await stopGranolaServiceProcess();
       if (stopResult === "stopped") {
-        console.log("Granola Toolkit stopped the previous background service.");
+        console.log("Gran 👵🏻 stopped the previous background service.");
       } else if (stopResult === "force-stopped") {
-        console.log("Granola Toolkit force-stopped the previous background service.");
+        console.log("Gran 👵🏻 force-stopped the previous background service.");
       }
     }
 
@@ -117,7 +117,7 @@ export const webCommand: CommandDefinition = {
         const runningService = await discoverGranolaService();
         if (runningService) {
           const targetUrl = targetWebUrl(runningService.url, targetMeetingId);
-          console.log(`Granola Toolkit web workspace already running on ${runningService.url}`);
+          console.log(`Gran 👵🏻 web workspace already running on ${runningService.url}`);
           if (targetUrl.href !== runningService.url) {
             console.log(`Focused meeting URL: ${targetUrl.href}`);
           }
@@ -159,8 +159,8 @@ export const webCommand: CommandDefinition = {
       const targetUrl = targetWebUrl(startedService.record.url, targetMeetingId);
       console.log(
         restartRequested
-          ? `Granola Toolkit background service restarted on ${startedService.record.url}`
-          : `Granola Toolkit background service started on ${startedService.record.url}`,
+          ? `Gran 👵🏻 background service restarted on ${startedService.record.url}`
+          : `Gran 👵🏻 background service started on ${startedService.record.url}`,
       );
       if (targetUrl.href !== startedService.record.url) {
         console.log(`Focused meeting URL: ${targetUrl.href}`);

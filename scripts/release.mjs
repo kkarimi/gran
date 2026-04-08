@@ -67,22 +67,26 @@ const release = () => {
 
   run("npm run web:check");
   run("vp check");
+  run("npm run sdk:check");
   run("vp test");
+  run("npm run sdk:test");
   run("npm run coverage");
   run("npm run hooks:smoke");
   run("npm run standalone:smoke");
   run("vp pack");
+  run("npm run sdk:build");
   run("npm run docs:check");
   run("npm run browser:e2e");
   run("npm pack --dry-run");
-  run(`npm version ${kind} --no-git-tag-version`);
+  run("npm run sdk:pack:dry-run");
+  run(`npm version ${kind} --workspaces --include-workspace-root --no-git-tag-version`);
   run("node scripts/update-changelog.mjs");
 
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   const next = pkg.version;
   ensureTagMissing(next);
 
-  run("git add package.json package-lock.json CHANGELOG.md");
+  run("git add package.json packages/sdk/package.json package-lock.json CHANGELOG.md");
   run(`git commit -m "chore: release v${next}"`);
   run(`git tag -a "v${next}" -m "v${next}"`);
   run(`git push origin main "v${next}"`);

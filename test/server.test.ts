@@ -131,7 +131,7 @@ describe("startGranolaServer", () => {
     expect(await health.json()).toEqual(
       expect.objectContaining({
         ok: true,
-        service: "granola-toolkit",
+        service: "gran",
       }),
     );
 
@@ -150,7 +150,7 @@ describe("startGranolaServer", () => {
     expect(await serverInfo.json()).toEqual(
       expect.objectContaining({
         build: expect.objectContaining({
-          packageName: "granola-toolkit",
+          packageName: "@kkarimi/gran",
           version: expect.any(String),
         }),
         config: expect.objectContaining({
@@ -186,7 +186,7 @@ describe("startGranolaServer", () => {
           syncState: true,
           syncStateFile: expect.any(String),
         }),
-        product: "granola-toolkit",
+        product: "gran",
         protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
         runtime: expect.objectContaining({
           startedAt: expect.any(String),
@@ -466,8 +466,8 @@ describe("startGranolaServer", () => {
     expect(response.headers.get("content-type")).toContain("text/html");
 
     const html = await response.text();
-    expect(html).toContain("<title>Granola Toolkit</title>");
-    expect(html).toContain('<div id="granola-web-root"></div>');
+    expect(html).toContain("<title>Gran 👵🏻</title>");
+    expect(html).toContain('<div id="gran-web-root"></div>');
     expect(html).toContain('"passwordRequired":false');
     expect(html).toContain(`href="${granolaWebAssetPaths.stylesheet}"`);
     expect(html).toContain(`src="${granolaWebAssetPaths.script}"`);
@@ -480,7 +480,7 @@ describe("startGranolaServer", () => {
     const script = await fetch(new URL(granolaWebAssetPaths.script, server.url));
     expect(script.ok).toBe(true);
     expect(script.headers.get("content-type")).toContain("text/javascript");
-    expect(await script.text()).toContain("Granola Toolkit");
+    expect(await script.text()).toContain("Gran 👵🏻");
   });
 
   test("supports meeting filters and quick-open routes", async () => {

@@ -1,10 +1,10 @@
 ---
-name: granola-toolkit
-description: Use granola-toolkit to inspect Granola meetings, fetch notes and transcripts, work automation review queues, and export targeted meeting data.
-metadata: { "openclaw": { "requires": { "anyBins": ["granola", "granola-toolkit"] } } }
+name: gran
+description: Use Gran to inspect Granola meetings, fetch notes and transcripts, work automation review queues, and export targeted meeting data.
+metadata: { "openclaw": { "requires": { "anyBins": ["gran", "gran-toolkit"] } } }
 ---
 
-# Granola Toolkit
+# Gran 👵🏻
 
 Use this skill when the user wants to:
 
@@ -15,17 +15,17 @@ Use this skill when the user wants to:
 
 ## Command Selection
 
-- Prefer `granola` when it exists in `PATH`.
-- Fall back to `granola-toolkit` if the shorter bin is unavailable.
+- Prefer `gran` when it exists in `PATH`.
+- Fall back to `gran-toolkit` only when dealing with a legacy install.
 - Prefer `--format json` whenever another agent step will parse the output.
 
 Use this shell snippet at the start of a task:
 
 ```bash
-if command -v granola >/dev/null 2>&1; then
-  G=granola
+if command -v gran >/dev/null 2>&1; then
+  G=gran
 else
-  G=granola-toolkit
+  G=gran-toolkit
 fi
 ```
 
@@ -114,8 +114,7 @@ $G automation recover <issue-id>
 ### Export a folder to local files
 
 ```bash
-$G notes --folder Team --output ./exports/team-notes
-$G transcripts --folder Team --output ./exports/team-transcripts
+$G export --folder Team --output ./exports/team-archive
 ```
 
 ### Open one meeting in the local web workspace

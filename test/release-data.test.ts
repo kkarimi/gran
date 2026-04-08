@@ -7,6 +7,7 @@ import {
   releaseSectionForType,
   renderReleaseEntry,
   stripChangelogEntry,
+  upsertReleaseArtefacts,
 } from "../scripts/release-data.mjs";
 
 describe("parseCommitSubject", () => {
@@ -108,9 +109,9 @@ describe("renderReleaseEntry", () => {
         },
       ],
       date: "2026-04-05",
-      homepage: "https://kkarimi.github.io/granola-toolkit/",
-      packageName: "granola-toolkit",
-      repository: "https://github.com/kkarimi/granola-toolkit",
+      homepage: "https://kkarimi.github.io/gran/",
+      packageName: "@kkarimi/gran",
+      repository: "https://github.com/kkarimi/gran",
       version: "0.62.0",
     });
 
@@ -118,9 +119,36 @@ describe("renderReleaseEntry", () => {
     expect(markdown).toContain("### Highlights");
     expect(markdown).toContain("### Features");
     expect(markdown).toContain("### Fixes");
-    expect(markdown).toContain(
-      "https://github.com/kkarimi/granola-toolkit/compare/v0.61.0...v0.62.0",
-    );
+    expect(markdown).toContain("SDK: [gran-sdk@0.67.0]");
+    expect(markdown).toContain("https://github.com/kkarimi/gran/compare/v0.61.0...v0.62.0");
+  });
+});
+
+describe("upsertReleaseArtefacts", () => {
+  test("refreshes the artefacts section for an existing changelog entry", () => {
+    const original = `## 0.67.0 - 2026-04-07
+
+### Features
+
+- add sdk
+
+### Artefacts
+
+- npm: [@kkarimi/gran@0.67.0](https://www.npmjs.com/package/@kkarimi/gran/v/0.67.0)
+- install: \`npm install -g @kkarimi/gran@0.67.0\`
+`;
+
+    const next = upsertReleaseArtefacts(original, {
+      baseTag: "v0.66.0",
+      homepage: "https://kkarimi.github.io/gran/",
+      packageName: "@kkarimi/gran",
+      repository: "https://github.com/kkarimi/gran",
+      version: "0.67.0",
+    });
+
+    expect(next).toContain("SDK: [gran-sdk@0.67.0]");
+    expect(next).toContain("SDK install: `npm install gran-sdk@0.67.0`");
+    expect(next).toContain("https://github.com/kkarimi/gran/compare/v0.66.0...v0.67.0");
   });
 });
 
@@ -128,7 +156,7 @@ describe("changelog extraction", () => {
   test("extracts and replaces one entry without touching the others", () => {
     const original = `# Changelog
 
-All notable changes to \`granola-toolkit\` are recorded here.
+All notable changes to Gran are recorded here.
 
 ## 0.62.0 - 2026-04-05
 

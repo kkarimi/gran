@@ -174,7 +174,7 @@ export async function startGranolaServer(
       syncState: true,
       syncStateFile: persistenceLayout.syncStateFile,
     },
-    product: "granola-toolkit",
+    product: "gran",
     protocolVersion: GRANOLA_TRANSPORT_PROTOCOL_VERSION,
     runtime,
     transport: "local-http",

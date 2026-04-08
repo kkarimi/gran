@@ -1,6 +1,6 @@
-# granola-toolkit docs
+# gran docs
 
-This directory is the dedicated documentation app for `granola-toolkit`.
+This directory is the dedicated documentation app for `gran`.
 
 It follows the same broad shape as the `emdash` repo:
 

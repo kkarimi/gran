@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 
@@ -26,13 +27,22 @@ export interface GranolaToolkitPersistenceLayout {
   syncStateFile: string;
 }
 
+function legacyGranolaToolkitDataDirectory(
+  targetPlatform: NodeJS.Platform,
+  homeDirectory: string,
+): string {
+  return targetPlatform === "darwin"
+    ? join(homeDirectory, "Library", "Application Support", "granola-toolkit")
+    : join(homeDirectory, ".config", "granola-toolkit");
+}
+
 export function defaultGranolaToolkitDataDirectory(
   targetPlatform: NodeJS.Platform = platform(),
   homeDirectory = homedir(),
 ): string {
   return targetPlatform === "darwin"
-    ? join(homeDirectory, "Library", "Application Support", "granola-toolkit")
-    : join(homeDirectory, ".config", "granola-toolkit");
+    ? join(homeDirectory, "Library", "Application Support", "gran")
+    : join(homeDirectory, ".config", "gran");
 }
 
 export function defaultGranolaToolkitPersistenceLayout(
@@ -42,10 +52,13 @@ export function defaultGranolaToolkitPersistenceLayout(
   } = {},
 ): GranolaToolkitPersistenceLayout {
   const targetPlatform = options.platform ?? platform();
-  const dataDirectory = defaultGranolaToolkitDataDirectory(
-    targetPlatform,
-    options.homeDirectory ?? homedir(),
-  );
+  const homeDirectory = options.homeDirectory ?? homedir();
+  const defaultDataDirectory = defaultGranolaToolkitDataDirectory(targetPlatform, homeDirectory);
+  const legacyDirectory = legacyGranolaToolkitDataDirectory(targetPlatform, homeDirectory);
+  const dataDirectory =
+    !existsSync(defaultDataDirectory) && existsSync(legacyDirectory)
+      ? legacyDirectory
+      : defaultDataDirectory;
 
   return {
     agentHarnessesFile: join(dataDirectory, "agent-harnesses.json"),

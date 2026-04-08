@@ -18,9 +18,9 @@ async function exists(pathname: string): Promise<boolean> {
 
 describe("export state", () => {
   test("keeps note filenames stable and skips rewrites when content is unchanged", async () => {
-    const outputDir = await mkdtemp(join(tmpdir(), "granola-toolkit-notes-"));
+    const outputDir = await mkdtemp(join(tmpdir(), "gran-notes-"));
     const alphaPath = join(outputDir, "Alpha.md");
-    const statePath = join(outputDir, ".granola-toolkit-notes-state.json");
+    const statePath = join(outputDir, ".gran-notes-state.json");
 
     const initialCount = await writeNotes(
       [
@@ -97,10 +97,10 @@ describe("export state", () => {
   });
 
   test("migrates transcript extensions and deletes stale files", async () => {
-    const outputDir = await mkdtemp(join(tmpdir(), "granola-toolkit-transcripts-"));
+    const outputDir = await mkdtemp(join(tmpdir(), "gran-transcripts-"));
     const textPath = join(outputDir, "Meeting.txt");
     const jsonPath = join(outputDir, "Meeting.json");
-    const statePath = join(outputDir, ".granola-toolkit-transcripts-state.json");
+    const statePath = join(outputDir, ".gran-transcripts-state.json");
 
     const cacheData = {
       documents: {

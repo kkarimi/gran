@@ -1,4 +1,4 @@
-export const standaloneCommandName = "granola";
+export const standaloneCommandName = "gran";
 
 export const supportedStandaloneTargets = [
   {
@@ -53,8 +53,18 @@ export function standaloneExecutableName(commandName, target) {
   return target.platform === "win32" ? `${commandName}.exe` : commandName;
 }
 
+export function standalonePackageLabel(packageName) {
+  const trimmed = typeof packageName === "string" ? packageName.trim() : "";
+  if (!trimmed) {
+    return standaloneCommandName;
+  }
+
+  const unscoped = trimmed.split("/").filter(Boolean).at(-1);
+  return unscoped || trimmed.replace(/^@/, "").replaceAll("/", "-");
+}
+
 export function standaloneAssetBaseName(packageName, version, target) {
-  return `${packageName}-v${version}-${target.id}`;
+  return `${standalonePackageLabel(packageName)}-v${version}-${target.id}`;
 }
 
 export function standaloneArchiveName(packageName, version, target) {

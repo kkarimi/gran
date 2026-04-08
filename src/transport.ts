@@ -9,7 +9,7 @@ import type {
 } from "./app/index.ts";
 import type { GranolaToolkitSessionStoreKind } from "./persistence/layout.ts";
 
-export const GRANOLA_TRANSPORT_PROTOCOL_VERSION = 3;
+export const GRANOLA_TRANSPORT_PROTOCOL_VERSION = 4;
 
 export type GranolaServerRuntimeMode = "background-service" | "server" | "web-workspace";
 
@@ -84,7 +84,7 @@ export interface GranolaServerInfo {
     syncState: boolean;
     syncStateFile?: string;
   };
-  product: "granola-toolkit";
+  product: "gran";
   protocolVersion: number;
   runtime: {
     mode: GranolaServerRuntimeMode;

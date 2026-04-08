@@ -3,7 +3,7 @@ title: Exporting
 description: Keep Granola notes and transcripts in durable local files you control, with bundled exports, named targets, and stable incremental state.
 ---
 
-`granola export` is the default archive workflow.
+`gran export` is the default archive workflow.
 
 Instead of treating notes and transcripts as two unrelated commands, the toolkit now exports them
 together by default and keeps persistent job history so the CLI, web app, and future integrations
@@ -11,7 +11,7 @@ all point at the same export runtime.
 
 ## Bundled Export
 
-By default, `granola export` writes:
+By default, `gran export` writes:
 
 - notes to `<output>/notes`
 - transcripts to `<output>/transcripts`
@@ -19,14 +19,14 @@ By default, `granola export` writes:
 Examples:
 
 ```bash
-granola export
-granola export --folder Team
-granola export --output ./exports
-granola export --notes-only
-granola export --transcripts-only
+gran export
+gran export --folder Team
+gran export --output ./exports
+gran export --notes-only
+gran export --transcripts-only
 ```
 
-You can still use `granola notes` or `granola transcripts` when you explicitly want a narrower
+You can still use `gran notes` or `gran transcripts` when you explicitly want a narrower
 one-off export, but the bundled command should be the normal path.
 
 ## Named Export Targets
@@ -41,11 +41,11 @@ Current built-in target kinds:
 Examples:
 
 ```bash
-granola targets list
-granola targets add --id work-archive --output ./exports
-granola targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work --daily-notes-dir Daily
-granola export --target work-vault
-granola targets remove work-archive
+gran targets list
+gran targets add --id work-archive --output ./exports
+gran targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work --daily-notes-dir Daily
+gran export --target work-vault
+gran targets remove work-archive
 ```
 
 For Obsidian vault targets, the toolkit defaults to:
@@ -75,10 +75,10 @@ Transcripts support:
 Examples:
 
 ```bash
-granola export --notes-format json
-granola export --transcripts-format yaml
-granola export --transcripts-format markdown
-granola export --target work-vault --notes-format markdown
+gran export --notes-format json
+gran export --transcripts-format yaml
+gran export --transcripts-format markdown
+gran export --target work-vault --notes-format markdown
 ```
 
 ## Folder-Scoped Exports
@@ -89,8 +89,8 @@ into a stable per-folder subdirectory under the output root.
 Examples:
 
 ```bash
-granola export --folder Team
-granola export --folder Team --target work-vault
+gran export --folder Team
+gran export --folder Team --target work-vault
 ```
 
 ## Export Jobs
@@ -100,8 +100,8 @@ rerun support, so the browser and automation flows can treat exports as part of 
 runtime instead of a fire-and-forget shell command.
 
 ```bash
-granola exports list
-granola exports rerun notes-1234abcd
+gran exports list
+gran exports rerun notes-1234abcd
 ```
 
 ## Incremental Writes

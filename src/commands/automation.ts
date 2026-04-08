@@ -18,10 +18,10 @@ import type { CommandDefinition } from "./types.ts";
 type AutomationFormat = "json" | "text" | "yaml";
 
 function automationHelp(): string {
-  return `Granola automation
+  return `Gran automation
 
 Usage:
-  granola automation <rules|matches|runs|artefacts|health|evaluate|recover|approve|reject|approve-artefact|reject-artefact|rerun> [options]
+  gran automation <rules|matches|runs|artefacts|health|evaluate|recover|approve|reject|approve-artefact|reject-artefact|rerun> [options]
 
 Subcommands:
   rules               List configured automation rules
@@ -55,7 +55,7 @@ Options:
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
-  --config <path>     Path to .granola.toml
+  --config <path>     Path to .gran.json
   -h, --help          Show help
 `;
 }

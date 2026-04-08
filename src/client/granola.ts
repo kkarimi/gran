@@ -14,7 +14,12 @@ const FOLDERS_URLS = [
 ] as const;
 
 function resolveClientVersion(value?: string): string {
-  return value?.trim() || process.env.GRANOLA_CLIENT_VERSION?.trim() || DEFAULT_CLIENT_VERSION;
+  return (
+    value?.trim() ||
+    process.env.GRAN_CLIENT_VERSION?.trim() ||
+    process.env.GRANOLA_CLIENT_VERSION?.trim() ||
+    DEFAULT_CLIENT_VERSION
+  );
 }
 
 function parseTranscriptSegment(

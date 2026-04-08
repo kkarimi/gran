@@ -45,7 +45,7 @@ try {
     "git",
     [
       "-c",
-      "user.name=Granola Toolkit Smoke",
+      "user.name=Gran 👵🏻 Smoke",
       "-c",
       "user.email=smoke@example.com",
       "commit",

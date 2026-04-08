@@ -73,8 +73,8 @@ describe("automation agent runner", () => {
       expect(requestUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
       const headers = new Headers(init?.headers);
       expect(headers.get("authorization")).toBe("Bearer or_test_123");
-      expect(headers.get("http-referer")).toBe("https://github.com/kkarimi/granola-toolkit");
-      expect(headers.get("x-title")).toBe("granola-toolkit");
+      expect(headers.get("http-referer")).toBe("https://github.com/kkarimi/gran");
+      expect(headers.get("x-title")).toBe("gran");
       expect(JSON.parse(init?.body as string)).toEqual({
         messages: [
           {

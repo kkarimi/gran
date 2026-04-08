@@ -1,6 +1,6 @@
 ---
 title: Agent Skills
-description: Reuse granola-toolkit from external agents, including the built-in OpenClaw skill directory shipped in this repo.
+description: Reuse Gran from external agents, including the built-in OpenClaw skill directory shipped in this repo.
 ---
 
 ## OpenClaw Skill
@@ -8,17 +8,18 @@ description: Reuse granola-toolkit from external agents, including the built-in 
 This repo ships an OpenClaw-ready skill directory at:
 
 ```text
-skills/openclaw-granola-toolkit
+skills/openclaw-gran
 ```
 
 The entry file is:
 
 ```text
-skills/openclaw-granola-toolkit/SKILL.md
+skills/openclaw-gran/SKILL.md
 ```
 
 Point OpenClaw at that directory, or copy/symlink it into your own OpenClaw skills path. The skill
-assumes the toolkit is installed as either `granola` or `granola-toolkit`.
+assumes the toolkit is installed as `gran`. Legacy `gran-toolkit` installs can still be used when
+needed.
 
 ## What The Skill Covers
 
@@ -46,7 +47,7 @@ It also tells the agent to prefer `--format json` when another step needs to par
 The skill directory also includes extra examples in:
 
 ```text
-skills/openclaw-granola-toolkit/references/cli-examples.md
+skills/openclaw-gran/references/cli-examples.md
 ```
 
 That file is useful when you want to adapt the same commands for another agent system or a local

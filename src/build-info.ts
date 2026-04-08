@@ -52,6 +52,10 @@ function repositoryUrlFromPackageJson(repository: unknown): string | undefined {
 }
 
 function readGitCommit(rootDir: string): string | undefined {
+  if (typeof process.env.GRAN_GIT_SHA === "string" && process.env.GRAN_GIT_SHA.trim()) {
+    return process.env.GRAN_GIT_SHA.trim();
+  }
+
   if (
     typeof process.env.GRANOLA_TOOLKIT_GIT_SHA === "string" &&
     process.env.GRANOLA_TOOLKIT_GIT_SHA.trim()
@@ -84,7 +88,7 @@ export function resolveGranolaBuildInfo(): GranolaBuildInfo {
     packageName:
       typeof packageJson.name === "string" && packageJson.name.trim()
         ? packageJson.name.trim()
-        : "granola-toolkit",
+        : "@kkarimi/gran",
     repositoryUrl: repositoryUrlFromPackageJson(packageJson.repository),
     version:
       typeof packageJson.version === "string" && packageJson.version.trim()

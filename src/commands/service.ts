@@ -33,12 +33,12 @@ import type { CommandDefinition } from "./types.ts";
 import type { AppConfig } from "../types.ts";
 
 function serviceHelp(): string {
-  return `Granola service
+  return `Gran service
 
 Usage:
-  granola service start [options]
-  granola service status
-  granola service stop
+  gran service start [options]
+  gran service status
+  gran service stop
 
 Options:
   --network <mode>        Network mode: local or lan (default: local)
@@ -52,7 +52,7 @@ Options:
   --timeout <value>       Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>       Path to supabase.json
   --debug                 Enable debug logging
-  --config <path>         Path to .granola.toml
+  --config <path>         Path to .gran.json
   -h, --help              Show help
 `;
 }
@@ -60,7 +60,7 @@ Options:
 function printServiceStatus(status: Awaited<ReturnType<typeof inspectGranolaService>>): void {
   switch (status.kind) {
     case "running":
-      console.log(`Granola Toolkit service is running on ${status.record?.url}`);
+      console.log(`Gran 👵🏻 service is running on ${status.record?.url}`);
       console.log(`PID: ${status.record?.pid}`);
       console.log(`Log: ${status.record?.logFile}`);
       console.log(
@@ -73,10 +73,10 @@ function printServiceStatus(status: Awaited<ReturnType<typeof inspectGranolaServ
       }
       return;
     case "stale":
-      console.log("Granola Toolkit service metadata exists, but the process is not running.");
+      console.log("Gran 👵🏻 service metadata exists, but the process is not running.");
       return;
     case "unreachable":
-      console.log("Granola Toolkit service metadata exists, but the server did not respond.");
+      console.log("Gran 👵🏻 service metadata exists, but the server did not respond.");
       if (status.record?.url) {
         console.log(`Last known URL: ${status.record.url}`);
       }
@@ -85,11 +85,11 @@ function printServiceStatus(status: Awaited<ReturnType<typeof inspectGranolaServ
       }
       return;
     case "invalid":
-      console.log("Granola Toolkit service metadata is invalid.");
+      console.log("Gran 👵🏻 service metadata is invalid.");
       return;
     case "missing":
     default:
-      console.log("Granola Toolkit service is not running.");
+      console.log("Gran 👵🏻 service is not running.");
   }
 }
 
@@ -99,7 +99,7 @@ function printServiceRunBanner(record: {
   syncIntervalMs: number;
   url: string;
 }): void {
-  console.log(`Granola Toolkit background service listening on ${record.url}`);
+  console.log(`Gran 👵🏻 background service listening on ${record.url}`);
   console.log(
     record.syncEnabled
       ? `Background sync: enabled (${record.syncIntervalMs}ms)`
@@ -180,7 +180,7 @@ async function runServiceProcess(config: AppConfig, commandFlags: FlagValues): P
 }
 
 export const serviceCommand: CommandDefinition = {
-  description: "Run and manage the Granola Toolkit background service",
+  description: "Run and manage the Gran 👵🏻 background service",
   flags: {
     cache: { type: "string" },
     help: { type: "boolean" },
@@ -212,14 +212,12 @@ export const serviceCommand: CommandDefinition = {
     if (action === "stop") {
       const result = await stopGranolaServiceProcess();
       if (result === "missing") {
-        console.log("Granola Toolkit service is not running.");
+        console.log("Gran 👵🏻 service is not running.");
         return 0;
       }
 
       console.log(
-        result === "force-stopped"
-          ? "Granola Toolkit service force-stopped."
-          : "Granola Toolkit service stopped.",
+        result === "force-stopped" ? "Gran 👵🏻 service force-stopped." : "Gran 👵🏻 service stopped.",
       );
       return 0;
     }
@@ -239,7 +237,7 @@ export const serviceCommand: CommandDefinition = {
     if (action === "start") {
       const existing = await discoverGranolaService();
       if (existing) {
-        console.log(`Granola Toolkit service is already running on ${existing.url}`);
+        console.log(`Gran 👵🏻 service is already running on ${existing.url}`);
         console.log(`PID: ${existing.pid}`);
         return 0;
       }
@@ -247,7 +245,11 @@ export const serviceCommand: CommandDefinition = {
       await loadConfig({
         env:
           typeof globalFlags["api-key"] === "string" && globalFlags["api-key"].trim()
-            ? { ...process.env, GRANOLA_API_KEY: globalFlags["api-key"].trim() }
+            ? {
+                ...process.env,
+                GRAN_API_KEY: globalFlags["api-key"].trim(),
+                GRANOLA_API_KEY: globalFlags["api-key"].trim(),
+              }
             : process.env,
         globalFlags,
         subcommandFlags: commandFlags,
@@ -269,7 +271,7 @@ export const serviceCommand: CommandDefinition = {
         );
       }
 
-      console.log(`Granola Toolkit service started on ${status.record.url}`);
+      console.log(`Gran 👵🏻 service started on ${status.record.url}`);
       console.log(`PID: ${status.record.pid}`);
       console.log(`Log: ${status.record.logFile}`);
       return 0;

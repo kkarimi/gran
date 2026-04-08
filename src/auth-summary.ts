@@ -28,7 +28,7 @@ export function granolaAuthRecommendation(auth: GranolaAppAuthState): {
     return {
       detail:
         "A stored Personal API key is available. Switch to it for the cleanest background-service auth path.",
-      nextAction: "granola auth use api-key",
+      nextAction: "gran auth use api-key",
       status: "Stored API key available",
     };
   }
@@ -36,7 +36,7 @@ export function granolaAuthRecommendation(auth: GranolaAppAuthState): {
   return {
     detail:
       "Recommended: create a Personal API key in Granola Settings -> API. Desktop-session import remains available as a fallback.",
-    nextAction: "granola auth login --api-key grn_...",
+    nextAction: "gran auth login --api-key grn_...",
     status: "No stored API key yet",
   };
 }

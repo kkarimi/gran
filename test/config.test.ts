@@ -7,27 +7,31 @@ import { describe, expect, test } from "vite-plus/test";
 import { loadConfig } from "../src/config.ts";
 
 describe("loadConfig", () => {
-  test("loads flat TOML config values", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "granola-toolkit-config-"));
-    const configPath = join(directory, ".granola.toml");
+  test("loads flat JSON config values", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "gran-config-"));
+    const configPath = join(directory, ".gran.json");
 
     await writeFile(
       configPath,
-      [
-        "debug = true",
-        'supabase = "/tmp/supabase.json"',
-        'output = "./notes-out"',
-        'timeout = "30s"',
-        'cache-file = "/tmp/cache.json"',
-        'transcript-output = "./transcripts-out"',
-        'agent-provider = "openrouter"',
-        'agent-model = "openai/gpt-5-mini"',
-        "agent-dry-run = true",
-        'agent-harnesses-file = "./agent-harnesses.json"',
-        "agent-max-retries = 4",
-        'agent-timeout = "45s"',
-        'codex-command = "codex-beta"',
-      ].join("\n"),
+      JSON.stringify(
+        {
+          "agent-dry-run": true,
+          "agent-harnesses-file": "./agent-harnesses.json",
+          "agent-max-retries": 4,
+          "agent-model": "openai/gpt-5-mini",
+          "agent-provider": "openrouter",
+          "agent-timeout": "45s",
+          "cache-file": "/tmp/cache.json",
+          "codex-command": "codex-beta",
+          debug: true,
+          output: "./notes-out",
+          supabase: "/tmp/supabase.json",
+          timeout: "30s",
+          "transcript-output": "./transcripts-out",
+        },
+        null,
+        2,
+      ),
       "utf8",
     );
 
@@ -58,7 +62,7 @@ describe("loadConfig", () => {
   });
 
   test("throws a clean error when an explicit config file is missing", async () => {
-    const configPath = join(tmpdir(), "granola-toolkit-missing-config.toml");
+    const configPath = join(tmpdir(), "gran-missing-config.json");
 
     await expect(
       loadConfig({

@@ -1,10 +1,10 @@
 # Contributing
 
-Thanks for contributing to `granola-toolkit`.
+Thanks for contributing to `@kkarimi/gran` and Gran 👵🏻.
 
 ## Before You Start
 
-- Read the [README](/Users/nima/dev/personal/granola-cli/README.md) for product framing and install flow.
+- Read the [README](./README.md) for product framing and install flow.
 - Use the current repo build when testing locally:
   - `npm run web:restart`
   - `node dist/cli.js ...`
