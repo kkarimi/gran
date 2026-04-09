@@ -382,6 +382,71 @@ function renderDetailPane(
   return lines;
 }
 
+function hasConfiguredAuth(view: GranolaTuiWorkspaceViewModel): boolean {
+  const auth = view.appState.auth;
+  return auth.apiKeyAvailable || auth.storedSessionAvailable || auth.supabaseAvailable;
+}
+
+function shouldShowOnboardingPane(view: GranolaTuiWorkspaceViewModel): boolean {
+  return (
+    !view.loadingMeetings &&
+    view.meetings.length === 0 &&
+    !view.selectedMeeting &&
+    !view.selectedMeetingId
+  );
+}
+
+function renderOnboardingPane(
+  view: GranolaTuiWorkspaceViewModel,
+  width: number,
+  height: number,
+): string[] {
+  const lines: string[] = [];
+  const authReady = hasConfiguredAuth(view);
+  const body = authReady
+    ? [
+        granolaTuiTheme.strong("No meetings imported yet"),
+        "",
+        "This workspace is ready to use, but the local archive is still empty.",
+        "",
+        "Next:",
+        "  r  import meetings now",
+        "  a  inspect or change connection settings",
+        "  /  open quick actions later",
+      ]
+    : [
+        granolaTuiTheme.strong("Connect Granola to get started"),
+        "",
+        "This terminal workspace is ready, but there is no saved Granola connection yet.",
+        "",
+        "Next:",
+        "  a  open auth controls",
+        "  r  import meetings after connecting",
+        "  q  quit for now",
+      ];
+
+  if (view.listError) {
+    body.push("", granolaTuiTheme.warning(view.listError));
+  }
+
+  const wrapped = body.flatMap((line) => wrapBlock(line, Math.max(1, width - 2)));
+  const topPadding = Math.max(0, Math.floor((height - wrapped.length) / 2));
+
+  for (let index = 0; index < topPadding; index += 1) {
+    lines.push(" ".repeat(Math.max(1, width - 2)));
+  }
+
+  for (const line of wrapped.slice(0, height)) {
+    lines.push(padLine(line, Math.max(1, width - 2)));
+  }
+
+  while (lines.length < height) {
+    lines.push(" ".repeat(Math.max(1, width - 2)));
+  }
+
+  return lines;
+}
+
 export function renderWorkspace(
   view: GranolaTuiWorkspaceViewModel,
   width: number,
@@ -406,7 +471,9 @@ export function renderWorkspace(
   );
 
   const listLines = renderListPane(view, listWidth, bodyHeight);
-  const detailLines = renderDetailPane(view, detailWidth, bodyHeight);
+  const detailLines = shouldShowOnboardingPane(view)
+    ? renderOnboardingPane(view, detailWidth, bodyHeight)
+    : renderDetailPane(view, detailWidth, bodyHeight);
   const bodyLines: string[] = [];
 
   for (let index = 0; index < bodyHeight; index += 1) {
@@ -418,7 +485,9 @@ export function renderWorkspace(
   const footerStatus = padLine(toneText(view.statusTone, view.statusMessage), width);
   const footerHints = padLine(
     granolaTuiTheme.dim(
-      "h folders  Tab cycle views  l meetings  j/k move  Enter open  / palette  a auth  u automation  r sync  1-4 tabs  PgUp/PgDn scroll  q quit",
+      shouldShowOnboardingPane(view)
+        ? "a auth  r import meetings  / quick actions  Tab cycle views  q quit"
+        : "h folders  Tab cycle views  l meetings  j/k move  Enter open  / palette  a auth  u automation  r sync  1-4 tabs  PgUp/PgDn scroll  q quit",
     ),
     width,
   );

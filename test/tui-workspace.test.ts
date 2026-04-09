@@ -470,6 +470,10 @@ function createWorkspaceHarness(
   const state = {
     ...createAppState(),
     ...options.state,
+    auth: {
+      ...createAppState().auth,
+      ...options.state?.auth,
+    },
     cache: {
       ...createAppState().cache,
       ...options.state?.cache,
@@ -1058,6 +1062,46 @@ describe("GranolaTuiWorkspace", () => {
 
     expect(harness.getMeeting).toHaveBeenCalledWith("doc-alpha-1111");
     expect(harness.workspace.render(100).join("\n")).toContain("Opened Alpha Sync");
+  });
+
+  test("renders a first-run onboarding state when there is no auth and no local archive", async () => {
+    const harness = createWorkspaceHarness({
+      initialMeetingId: undefined,
+      state: {
+        auth: {
+          apiKeyAvailable: false,
+          mode: "api-key",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: false,
+        },
+        documents: {
+          count: 0,
+          loaded: false,
+        },
+        index: {
+          available: true,
+          loaded: true,
+          meetingCount: 0,
+        },
+        sync: {
+          eventCount: 0,
+          lastChanges: [],
+          running: false,
+        },
+      },
+    });
+    harness.listMeetings.mockResolvedValue({
+      meetings: [],
+      source: "live" as const,
+    });
+
+    await harness.workspace.initialise();
+
+    const rendered = harness.workspace.render(100).join("\n");
+    expect(rendered).toContain("Connect Granola to get started");
+    expect(rendered).toContain("a  open auth controls");
+    expect(rendered).toContain("r  import meetings after connecting");
   });
 
   test("surfaces refresh failures and recovers on the next refresh", async () => {
