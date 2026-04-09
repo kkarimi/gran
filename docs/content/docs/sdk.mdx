@@ -100,6 +100,9 @@ await saveGranExportTarget(
 The helper fills in sensible defaults for folder and Obsidian-friendly knowledge-base profiles, so
 user code does not need to know the internal default subdirectory or format rules.
 
+For API-backed destinations like Notion, Capacities, or Tana, keep Gran as the source-side SDK and
+let Yazd own the actual knowledge-base plugin and remote publish flow.
+
 ## Build Obsidian Open URLs
 
 ```ts

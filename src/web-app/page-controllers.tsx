@@ -449,7 +449,7 @@ export function SettingsPageController(props: {
   return (
     <>
       <PageHeader
-        description="Manage how Gran connects, publishes into knowledge bases, automates, and stores local state."
+        description="Manage how Gran connects, publishes into local knowledge bases, automates, and stores local state."
         eyebrow="Settings"
         title="Settings"
       />

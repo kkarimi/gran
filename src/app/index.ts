@@ -18,13 +18,20 @@ export {
   buildGranolaYazdKnowledgeBaseRef,
   legacyPkmPreviewFromYazdKnowledgeBasePreview,
   legacyPkmSyncResultFromYazdKnowledgeBasePublishResult,
+  listGranolaYazdKnowledgeBasePluginDefinitions,
   listGranolaYazdKnowledgeBasePlugins,
   previewGranolaYazdKnowledgeBasePublish,
   previewGranolaYazdKnowledgeBasePublishSync,
   publishGranolaYazdKnowledgeBase,
+  resolveGranolaYazdKnowledgeBasePluginDefinition,
   resolveGranolaYazdKnowledgeBasePlugin,
 } from "../yazd-knowledge-bases.ts";
 export type { GranolaYazdKnowledgeBasePlugin } from "../yazd-knowledge-bases.ts";
+export type {
+  GranolaYazdKnowledgeBasePluginDefinition,
+  GranolaYazdKnowledgeBasePluginManager,
+  GranolaYazdKnowledgeBasePluginTransport,
+} from "../yazd-kb-plugin-definitions.ts";
 export {
   buildMeetingPkmArtifactBundle,
   buildPkmAutomationArtefactProjection,

@@ -24,13 +24,14 @@ import {
   resolveObsidianTargetRuntime,
 } from "./pkm-target-registry.ts";
 import { asRecord, quoteYamlString, sanitiseFilename, stringValue } from "./utils.ts";
+import {
+  listGranolaYazdKnowledgeBasePluginDefinitions,
+  resolveGranolaYazdKnowledgeBasePluginDefinition,
+  type GranolaYazdKnowledgeBasePluginDefinition,
+} from "./yazd-kb-plugin-definitions.ts";
 import { buildGranolaYazdAutomationArtifactBundle } from "./yazd-source.ts";
 
-export interface GranolaYazdKnowledgeBasePlugin {
-  description?: string;
-  id: string;
-  kinds: readonly GranolaYazdKnowledgeBaseKind[];
-  label: string;
+export interface GranolaYazdKnowledgeBasePlugin extends GranolaYazdKnowledgeBasePluginDefinition {
   previewPublish(
     input: GranolaYazdKnowledgeBasePublishInput,
   ): Promise<GranolaYazdKnowledgeBasePublishPreview>;
@@ -659,10 +660,7 @@ function buildKnowledgeBasePlan(
 }
 
 const granMarkdownVaultKnowledgeBasePlugin: GranolaYazdKnowledgeBasePlugin = {
-  description: "Publish Gran/Yazd artifacts into a local markdown folder or Obsidian vault.",
-  id: "gran-markdown-vault",
-  kinds: ["folder", "obsidian-vault"],
-  label: "Markdown vault",
+  ...resolveGranolaYazdKnowledgeBasePluginDefinition("folder"),
   async previewPublish(input) {
     const plan = buildKnowledgeBasePlan(input);
     return {
@@ -729,6 +727,13 @@ const granMarkdownVaultKnowledgeBasePlugin: GranolaYazdKnowledgeBasePlugin = {
   },
 };
 
+function buildRemoteKnowledgeBaseError(kind: GranolaYazdKnowledgeBaseKind): Error {
+  const definition = resolveGranolaYazdKnowledgeBasePluginDefinition(kind);
+  return new Error(
+    `${definition.label} knowledge bases are managed in Yazd, not Gran. ${definition.setupHint}`,
+  );
+}
+
 export function buildGranolaYazdKnowledgeBaseRef(
   target: GranolaPkmTarget,
 ): GranolaYazdKnowledgeBaseRef {
@@ -752,6 +757,11 @@ export function buildGranolaYazdKnowledgeBaseRef(
 export function resolveGranolaYazdKnowledgeBasePlugin(
   knowledgeBase: Pick<GranolaYazdKnowledgeBaseRef, "kind">,
 ): GranolaYazdKnowledgeBasePlugin {
+  const definition = resolveGranolaYazdKnowledgeBasePluginDefinition(knowledgeBase.kind);
+  if (definition.managedBy !== "gran") {
+    throw buildRemoteKnowledgeBaseError(knowledgeBase.kind);
+  }
+
   if (granMarkdownVaultKnowledgeBasePlugin.kinds.includes(knowledgeBase.kind)) {
     return granMarkdownVaultKnowledgeBasePlugin;
   }
@@ -767,6 +777,11 @@ export function listGranolaYazdKnowledgeBasePlugins(): GranolaYazdKnowledgeBaseP
     },
   ];
 }
+
+export {
+  listGranolaYazdKnowledgeBasePluginDefinitions,
+  resolveGranolaYazdKnowledgeBasePluginDefinition,
+};
 
 export function previewGranolaYazdKnowledgeBasePublishSync(
   input: GranolaYazdKnowledgeBasePublishInput,

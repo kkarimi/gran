@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createGranolaYazdAgentPlugin,
   buildObsidianOpenFileUri,
+  listGranolaYazdKnowledgeBasePluginDefinitions,
   listGranolaExportTargetDefinitions,
   loadConfig,
 } from "../src/index.ts";
@@ -70,5 +71,22 @@ describe("@kkarimi/gran-core", () => {
 
     const result = await plugin.run({ prompt: "Summarise this meeting." });
     expect(result.text).toBe("ok");
+  });
+
+  it("exports the Yazd knowledge-base plugin definitions", () => {
+    const definitions = listGranolaYazdKnowledgeBasePluginDefinitions();
+
+    expect(definitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "gran-markdown-vault",
+          managedBy: "gran",
+        }),
+        expect.objectContaining({
+          id: "yazd-notion",
+          managedBy: "yazd",
+        }),
+      ]),
+    );
   });
 });

@@ -42,13 +42,18 @@ export {
   type GranolaProcessingRecoveryResult,
   type GranolaTranscriptsExportResult,
   type GranolaYazdArtifactBundle,
+  type GranolaYazdKnowledgeBasePluginDefinition,
+  type GranolaYazdKnowledgeBasePluginManager,
+  type GranolaYazdKnowledgeBasePluginTransport,
   type GranolaYazdSourceChangesResult,
   type GranolaYazdSourceFetchResult,
   type GranolaYazdSourceInfo,
   type GranolaYazdSourceListOptions,
   type GranolaYazdSourceListResult,
+  listGranolaYazdKnowledgeBasePluginDefinitions,
   listGranolaYazdAgentPlugins,
   type NoteOutputFormat,
+  resolveGranolaYazdKnowledgeBasePluginDefinition,
   type TranscriptOutputFormat,
 } from "../../../src/app/index.ts";
 export { loadConfig } from "../../../src/config.ts";

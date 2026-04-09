@@ -264,7 +264,12 @@ export interface GranolaYazdSourceChangesResult {
   nextCursor?: string;
 }
 
-export type GranolaYazdKnowledgeBaseKind = "folder" | "obsidian-vault";
+export type GranolaYazdKnowledgeBaseKind =
+  | "capacities"
+  | "folder"
+  | "notion"
+  | "obsidian-vault"
+  | "tana";
 export type GranolaYazdPublishAction = "delete" | "noop" | "update" | "write";
 
 export interface GranolaYazdKnowledgeBaseRef {

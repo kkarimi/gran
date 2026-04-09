@@ -186,10 +186,13 @@ artefact from the source pipeline action and receive the approved artefact in th
 Approval-triggered actions are how you send reviewed notes into the rest of your stack:
 
 - `write-file` writes approved markdown, text, or JSON payloads to a local directory
-- `pkm-sync` writes approved markdown into saved knowledge bases such as Obsidian vaults or folder archives
+- `pkm-sync` writes approved markdown into Gran-managed local knowledge bases such as Obsidian vaults or folder archives
 - `command` receives the same review payload on stdin for arbitrary local tooling
 - `webhook` posts either JSON or rendered text/markdown bodies to any HTTP endpoint
 - `slack-message` posts a simple text payload to an incoming Slack webhook
+
+If you want API-backed destinations like Notion, Capacities, or Tana, treat Gran as the source app
+and let Yazd own those knowledge-base plugins instead of teaching Gran every remote publish API.
 
 Delivery payloads include the artefact’s structured arrays too, so downstream actions can use:
 

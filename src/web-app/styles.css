@@ -956,6 +956,28 @@ select {
   align-content: start;
 }
 
+.knowledge-base-ecosystem {
+  display: grid;
+  gap: 14px;
+}
+
+.knowledge-base-ecosystem__list {
+  display: grid;
+  gap: 10px;
+}
+
+.knowledge-base-ecosystem__item {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(36, 39, 44, 0.08);
+}
+
+.knowledge-base-ecosystem__item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .auth-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));

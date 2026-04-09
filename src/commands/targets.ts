@@ -17,16 +17,16 @@ Usage:
   gran kb [list|add|remove] [options]
 
 Subcommands:
-  list                Show configured knowledge bases
-  add                 Create or replace one knowledge base
-  remove <id|name>    Remove one knowledge base
+  list                Show configured local knowledge bases
+  add                 Create or replace one local knowledge base
+  remove <id|name>    Remove one local knowledge base
 
 Options:
   --format <value>           text, json, yaml (default: text)
   --id <value>               Optional internal id for add/remove
   --name <value>             Human label for the knowledge base
   --kind <value>             ${kinds} (default: folder)
-  --output <path>            Root folder or vault path
+  --output <path>            Root folder or vault path managed by Gran
   --path <path>              Alias for --output
   --notes-subdir <path>      Notes subdirectory inside the knowledge base
   --transcripts-subdir <path>
@@ -192,7 +192,7 @@ function buildTargetFromFlags(
 
 export const targetsCommand: CommandDefinition = {
   aliases: ["targets"],
-  description: "Manage knowledge base destinations",
+  description: "Manage local knowledge base destinations",
   flags: {
     "daily-notes-dir": { type: "string" },
     format: { type: "string" },

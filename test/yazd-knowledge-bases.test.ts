@@ -7,6 +7,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   buildGranolaAutomationKnowledgeBaseBundle,
   buildGranolaYazdKnowledgeBaseRef,
+  listGranolaYazdKnowledgeBasePluginDefinitions,
   previewGranolaYazdKnowledgeBasePublishSync,
   publishGranolaYazdKnowledgeBase,
 } from "../src/yazd-knowledge-bases.ts";
@@ -150,6 +151,31 @@ function buildBundle(): GranolaMeetingBundle {
 }
 
 describe("yazd knowledge bases", () => {
+  test("lists Gran-managed and Yazd-managed knowledge-base plugin definitions", () => {
+    expect(listGranolaYazdKnowledgeBasePluginDefinitions()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "gran-markdown-vault",
+          managedBy: "gran",
+        }),
+        expect.objectContaining({
+          id: "yazd-notion",
+          label: "Notion",
+          managedBy: "yazd",
+          transport: "api",
+        }),
+        expect.objectContaining({
+          id: "yazd-capacities",
+          managedBy: "yazd",
+        }),
+        expect.objectContaining({
+          id: "yazd-tana",
+          managedBy: "yazd",
+        }),
+      ]),
+    );
+  });
+
   test("previews publish entries from an automation artifact bundle", async () => {
     const outputDir = await mkdtemp(join(tmpdir(), "gran-yazd-preview-"));
     const knowledgeBase = buildGranolaYazdKnowledgeBaseRef({
@@ -222,6 +248,25 @@ describe("yazd knowledge bases", () => {
     expect(await readFile(transcriptPath, "utf8")).toContain("## Transcript");
     expect(await readFile(dailyNotePath, "utf8")).toContain(
       "[[Meetings/Team/Launch Review-notes]]",
+    );
+  });
+
+  test("rejects api-backed knowledge bases that are meant to stay in Yazd", async () => {
+    await expect(
+      publishGranolaYazdKnowledgeBase({
+        bundle: buildGranolaAutomationKnowledgeBaseBundle({
+          artefact,
+          bundle: buildBundle(),
+        }),
+        knowledgeBase: {
+          id: "notion-team",
+          kind: "notion",
+          label: "Team wiki",
+          rootDir: "not-used",
+        },
+      }),
+    ).rejects.toThrow(
+      "Notion knowledge bases are managed in Yazd, not Gran. Configure the workspace, database, and publish rules in Yazd.",
     );
   });
 });

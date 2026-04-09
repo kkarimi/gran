@@ -118,6 +118,10 @@ test.describe("toolkit web workspace", () => {
     await expect(page.getByRole("button", { name: "Disable markdown viewer" })).toBeVisible();
     await page.locator(".settings-shell").getByRole("button", { name: "Knowledge bases" }).click();
     await expect(page.getByRole("heading", { name: "Knowledge bases" })).toBeVisible();
+    await expect(page.getByText("More destinations live in Yazd")).toBeVisible();
+    await expect(
+      page.locator(".knowledge-base-ecosystem__item").getByText("Notion", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "Export archive" })).toBeVisible();
     await expect(page.getByText("All meetings", { exact: true })).toBeVisible();
     await page.locator(".settings-shell").getByRole("button", { name: "Advanced" }).click();

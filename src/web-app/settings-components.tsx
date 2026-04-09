@@ -21,6 +21,7 @@ import {
 } from "../export-target-registry.ts";
 import type { GranolaLocalPathInfo, GranolaServerInfo } from "../transport.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
+import { listGranolaYazdKnowledgeBasePluginDefinitions } from "../yazd-kb-plugin-definitions.ts";
 import { describeAuthStatus, describeSyncStatus } from "../web/client-state.ts";
 import type { GranolaWebExportMode } from "./types.ts";
 
@@ -1112,6 +1113,9 @@ export function KnowledgeBasesPanel(props: KnowledgeBasesPanelProps): JSX.Elemen
   const [draft, setDraft] = createSignal<KnowledgeBaseDraft>(
     createKnowledgeBaseDraft("obsidian-vault"),
   );
+  const ecosystemKnowledgeBases = listGranolaYazdKnowledgeBasePluginDefinitions().filter(
+    (definition) => definition.managedBy === "yazd",
+  );
   const selectedKnowledgeBase = () =>
     props.targets.find((candidate) => candidate.id === props.selectedTargetId) ?? null;
 
@@ -1169,6 +1173,31 @@ export function KnowledgeBasesPanel(props: KnowledgeBasesPanelProps): JSX.Elemen
               </span>
             </article>
           </div>
+          <section class="auth-card knowledge-base-ecosystem">
+            <div class="auth-section-head">
+              <h4>More destinations live in Yazd</h4>
+              <p>
+                Gran manages local folders and Obsidian vaults here. API-backed destinations stay in
+                Yazd so Gran can stay focused on the Granola source and local workspace.
+              </p>
+            </div>
+            <div class="knowledge-base-ecosystem__list">
+              <For each={ecosystemKnowledgeBases}>
+                {(definition) => (
+                  <article class="knowledge-base-ecosystem__item">
+                    <div>
+                      <strong>{definition.label}</strong>
+                      <div class="auth-card__meta">{definition.description}</div>
+                    </div>
+                    <div class="auth-card__meta">
+                      {definition.transport === "api" ? "Managed in Yazd" : "Local plugin"} ·{" "}
+                      {definition.setupHint}
+                    </div>
+                  </article>
+                )}
+              </For>
+            </div>
+          </section>
           <section class="knowledge-base-shell">
             <div class="knowledge-base-list">
               <button
@@ -1259,7 +1288,7 @@ export function KnowledgeBasesPanel(props: KnowledgeBasesPanelProps): JSX.Elemen
                 <h4>{editingId() ? "Edit knowledge base" : "Add knowledge base"}</h4>
                 <p>
                   Start with an Obsidian vault, or point Gran at a plain folder when you just want a
-                  durable local archive.
+                  durable local archive. Notion, Capacities, and Tana stay in Yazd.
                 </p>
               </div>
               <div class="toolbar-actions">
