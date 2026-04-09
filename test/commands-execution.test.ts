@@ -865,7 +865,7 @@ describe("command execution", () => {
       configPath: "/tmp/project/.gran.json",
       globalFlags: {},
     });
-    expect(log).toHaveBeenCalledWith("Initialised Gran 👵🏻 in /tmp/project");
+    expect(log).toHaveBeenCalledWith("Created a local Gran project in /tmp/project");
   });
 
   test("meeting command lists meetings inside a resolved folder", async () => {

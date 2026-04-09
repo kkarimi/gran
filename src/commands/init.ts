@@ -1,4 +1,4 @@
-import { relative, resolve as resolvePath } from "node:path";
+import { resolve as resolvePath } from "node:path";
 
 import { initialiseGranolaToolkitProject } from "../init.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
@@ -84,12 +84,11 @@ export const initCommand: CommandDefinition = {
     });
     const root = resolvePath(result.directory);
 
-    console.log(`Initialised Gran 👵🏻 in ${root}`);
+    console.log(`Created a local Gran project in ${root}`);
     console.log("");
-    console.log("Created:");
-    for (const filePath of result.createdFiles) {
-      console.log(`  - ./${relative(root, filePath)}`);
-    }
+    console.log("Project files:");
+    console.log("  .gran.json");
+    console.log("  ./.gran/");
 
     const guidedExitCode = await maybeRunGuidedSetupAfterInit({
       commandFlags,

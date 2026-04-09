@@ -22,8 +22,8 @@ afterEach(() => {
 });
 
 describe("guided setup", () => {
-  test("saves an API key, imports meetings, and returns a web launch plan", async () => {
-    const prompt = new FakePrompt(["", "1", "grn_test_123", ""]);
+  test("saves an API key, imports meetings, and returns a browser launch plan", async () => {
+    const prompt = new FakePrompt(["", "", "grn_test_123", "", ""]);
     const inspectAuth = vi.fn(async () => ({
       apiKeyAvailable: false,
       mode: "api-key" as const,
@@ -52,6 +52,13 @@ describe("guided setup", () => {
     }));
     const createAppContext = vi.fn(async () => ({
       app: {
+        getState: () => ({
+          index: {
+            loaded: false,
+            meetingCount: 0,
+          },
+          sync: {},
+        }),
         inspectAuth,
         loginAuth,
         sync,
@@ -84,12 +91,62 @@ describe("guided setup", () => {
     );
   });
 
+  test("reuses existing auth and local archive without forcing another refresh", async () => {
+    const prompt = new FakePrompt(["", "", ""]);
+    const loginAuth = vi.fn();
+    const sync = vi.fn();
+    const createAppContext = vi.fn(async () => ({
+      app: {
+        getState: () => ({
+          index: {
+            loaded: true,
+            meetingCount: 7,
+          },
+          sync: {
+            lastCompletedAt: "2026-04-09T13:00:00.000Z",
+          },
+        }),
+        inspectAuth: vi.fn(async () => ({
+          apiKeyAvailable: true,
+          mode: "api-key" as const,
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: false,
+        })),
+        loginAuth,
+        sync,
+      },
+      config: {},
+    })) as unknown as (...args: unknown[]) => Promise<CommandAppContext>;
+
+    const plan = await runGuidedSetupFlow({
+      configPath: "/tmp/project/.gran.json",
+      createAppContext,
+      globalFlags: {},
+      log: vi.fn(),
+      prompt,
+    });
+
+    expect(plan).toEqual({
+      surface: "web",
+    });
+    expect(loginAuth).not.toHaveBeenCalled();
+    expect(sync).not.toHaveBeenCalled();
+  });
+
   test("can skip auth and launch the terminal workspace from init", async () => {
-    const prompt = new FakePrompt(["2", "3"]);
+    const prompt = new FakePrompt(["n", "2"]);
     const launchTui = vi.fn(async () => 0);
     const launchWeb = vi.fn(async () => 0);
     const createAppContext = vi.fn(async () => ({
       app: {
+        getState: () => ({
+          index: {
+            loaded: false,
+            meetingCount: 0,
+          },
+          sync: {},
+        }),
         inspectAuth: vi.fn(async () => ({
           apiKeyAvailable: false,
           mode: "api-key" as const,

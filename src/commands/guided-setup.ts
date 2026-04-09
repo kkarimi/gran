@@ -12,6 +12,7 @@ import { webCommand } from "./web.ts";
 
 type GuidedSetupSurface = "tui" | "web";
 type GuidedSetupAuthChoice = "api-key" | "desktop" | "keep" | "skip";
+type GuidedSetupDestination = GuidedSetupSurface | "none";
 
 export interface GuidedSetupPrompter {
   ask(prompt: string): Promise<string>;
@@ -174,12 +175,38 @@ function authChoices(state: GranolaAppAuthState): Array<{
   return choices;
 }
 
+function describeIndexedArchive(app: GranolaApp): string | undefined {
+  const state = app.getState();
+  if (!state.index.loaded || state.index.meetingCount <= 0) {
+    return undefined;
+  }
+
+  const lastCompletedAt = state.sync.lastCompletedAt;
+  return lastCompletedAt
+    ? `${state.index.meetingCount} meeting(s) already indexed from the last sync at ${lastCompletedAt}`
+    : `${state.index.meetingCount} meeting(s) already indexed locally`;
+}
+
 async function runAuthSetup(
   app: GranolaApp,
   prompt: GuidedSetupPrompter,
   log: typeof console.log,
 ): Promise<GranolaAppAuthState> {
   let authState = await app.inspectAuth();
+  if (hasConfiguredAuth(authState)) {
+    log("");
+    log(formatAuthSummary(authState));
+    if (await askConfirm(prompt, "Use this connection?", true, log)) {
+      return authState;
+    }
+  } else {
+    log("");
+    if (!(await askConfirm(prompt, "Connect Granola now?", true, log))) {
+      log("Skipping connection setup for now.");
+      return authState;
+    }
+  }
+
   const defaultChoice: GuidedSetupAuthChoice = hasConfiguredAuth(authState) ? "keep" : "api-key";
 
   while (true) {
@@ -229,6 +256,36 @@ async function runAuthSetup(
   }
 }
 
+async function chooseDestination(
+  prompt: GuidedSetupPrompter,
+  log: typeof console.log,
+): Promise<GuidedSetupDestination> {
+  log("");
+  return await askChoice(
+    prompt,
+    log,
+    "Where should Gran open next?",
+    [
+      {
+        description: "Recommended. Full workspace with search, folders, review, and settings.",
+        label: "Browser workspace",
+        value: "web",
+      },
+      {
+        description: "Keyboard-first workspace in the terminal.",
+        label: "Terminal workspace",
+        value: "tui",
+      },
+      {
+        description: "Finish now. Open a workspace later with gran web or gran tui.",
+        label: "Finish setup",
+        value: "none",
+      },
+    ],
+    "web",
+  );
+}
+
 function launchContext(
   commandFlags: FlagValues,
   globalFlags: FlagValues,
@@ -261,30 +318,16 @@ export async function runGuidedSetupFlow(
   log("Guided setup");
   log("");
 
-  const surface = await askChoice(
-    options.prompt,
-    log,
-    "Where should Gran open after setup?",
-    [
-      {
-        description: "Recommended. Full browser workspace with settings and review.",
-        label: "Browser workspace",
-        value: "web",
-      },
-      {
-        description: "Stay in the terminal with the keyboard-first workspace.",
-        label: "Terminal workspace",
-        value: "tui",
-      },
-    ],
-    "web",
-  );
-
   const authState = await runAuthSetup(app, options.prompt, log);
+  const indexedArchiveSummary = describeIndexedArchive(app);
 
   if (hasConfiguredAuth(authState)) {
     log("");
-    if (await askConfirm(options.prompt, "Import meetings now?", true, log)) {
+    const shouldImport = indexedArchiveSummary
+      ? await askConfirm(options.prompt, `${indexedArchiveSummary}. Refresh it now?`, false, log)
+      : await askConfirm(options.prompt, "Import meetings now?", true, log);
+
+    if (shouldImport) {
       try {
         const result = await app.sync({
           foreground: true,
@@ -293,27 +336,27 @@ export async function runGuidedSetupFlow(
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         log(`Could not import meetings right now: ${message}`);
-        const continueToSurface = await askConfirm(
-          options.prompt,
-          `Open the ${surface === "web" ? "browser" : "terminal"} workspace anyway?`,
-          true,
-          log,
-        );
-        if (!continueToSurface) {
-          log("Setup finished without opening a workspace.");
-          return undefined;
-        }
       }
     } else {
-      log("Skipping the first import for now.");
+      log(
+        indexedArchiveSummary
+          ? "Keeping the current local archive as-is."
+          : "Skipping the first import for now.",
+      );
     }
   } else {
     log("");
     log("No Gran connection is saved yet. You can finish connection from the workspace.");
   }
 
+  const destination = await chooseDestination(options.prompt, log);
+  if (destination === "none") {
+    log("Setup finished. Open a workspace later with `gran web` or `gran tui`.");
+    return undefined;
+  }
+
   return {
-    surface,
+    surface: destination,
   };
 }
 

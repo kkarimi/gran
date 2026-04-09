@@ -62,24 +62,20 @@ Windows).
 gran init
 ```
 
-In an interactive terminal, `gran init` now offers a guided setup flow that:
+In an interactive terminal, `gran init` guides you through:
 
-1. creates a local `.gran.json` plus editable files under `./.gran/`
-2. asks whether you want the browser workspace or terminal workspace
-3. lets you save a Personal API key or import the desktop session
-4. runs the first import
-5. opens the workspace you picked
+1. connecting Granola
+2. importing your meetings
+3. opening a local workspace
 
 If you skip the guide or run `gran init` in a non-interactive shell, the shortest follow-up is:
 
 ```bash
 gran web --config ./.gran.json
-gran tui --config ./.gran.json
 ```
 
-`gran web` still prefers the long-running background-service path by default: it will reuse the
-existing service when one is already running, or start it for you when you have not asked for a
-foreground/debug session.
+That opens the browser workspace, which is the default first-run path. You can still choose the
+terminal workspace from guided setup, or run `gran tui --config ./.gran.json` later.
 
 ## Example Workflows
 
@@ -124,7 +120,8 @@ run.
 ## Project Setup And Config
 
 `gran init` writes a project-local `.gran.json` for you. That is the normal way to set up a
-project. If you want to inspect or edit the generated config and companion files directly, see
+project. It also creates `./.gran/` for prompts, rules, and target files. If you want to inspect
+or edit the generated config and companion files directly, see
 [`Auth and configuration`](https://kkarimi.github.io/gran/docs/auth-and-configuration/) in the
 docs.
 

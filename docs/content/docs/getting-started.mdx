@@ -46,10 +46,9 @@ shape first.
 
 In an interactive terminal, `gran init` now offers guided setup immediately:
 
-1. choose browser or terminal
-2. save a Personal API key or import the desktop session
-3. run the first meeting import
-4. open the workspace you picked
+1. connect Granola
+2. import meetings into the local archive
+3. open the browser workspace by default, or choose the terminal workspace instead
 
 That means `gran init` is usually enough for the first run.
 
@@ -57,31 +56,12 @@ If you skip the guide or you are running in a non-interactive shell, continue wi
 
 ```bash
 gran web --config ./.gran.json
-gran tui --config ./.gran.json
 ```
 
 `gran web` prefers the reusable background-service path, so it will reuse or start the local
 runtime for you.
 
-If you prefer CLI auth instead, store a Granola Personal API key once:
-
-```bash
-gran auth login --api-key grn_...
-gran auth status
-```
-
-If you prefer to reuse the desktop app session, `gran auth login` imports it from
-`supabase.json`.
-
-Then run the first sync and verify that folders and meetings resolve cleanly:
-
-```bash
-gran service start
-gran sync
-gran folder list
-gran meeting list --limit 10
-gran search onboarding
-```
+Use `gran tui --config ./.gran.json` later when you want the keyboard-first terminal workspace.
 
 ## Choose A Surface
 
@@ -113,6 +93,26 @@ gran service status
 
 Use this when you want the sync loop and local runtime running before you open either browser or
 terminal UI.
+
+## Advanced Alternatives
+
+If you prefer CLI auth instead, store a Granola Personal API key once:
+
+```bash
+gran auth login --api-key grn_...
+gran auth status
+```
+
+If you prefer to reuse the desktop app session, `gran auth login` imports it from
+`supabase.json`.
+
+If you want to verify that the local archive is ready without opening a UI:
+
+```bash
+gran sync
+gran folder list
+gran meeting list --limit 10
+```
 
 ## Common Next Steps
 
