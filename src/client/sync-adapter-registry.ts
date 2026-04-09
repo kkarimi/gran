@@ -184,7 +184,7 @@ export function createDefaultGranolaSyncAdapterRegistry(
 
       if (!auth.apiKeyAvailable && !auth.storedSessionAvailable && !config.supabase) {
         throw new Error(
-          `Granola credentials not found. Set --api-key or GRAN_API_KEY (legacy: GRANOLA_API_KEY), use gran auth login --api-key, or fall back to --supabase. Expected supabase locations include: ${granolaSupabaseCandidates().join(", ")}`,
+          `Granola credentials not found. Set --api-key or GRAN_API_KEY, use gran auth login --api-key, or fall back to --supabase. Expected supabase locations include: ${granolaSupabaseCandidates().join(", ")}`,
         );
       }
 
@@ -211,7 +211,7 @@ export function createDefaultGranolaSyncAdapterRegistry(
         const apiKey = config.apiKey?.trim() || (await apiKeyStore.readApiKey());
         if (!apiKey) {
           throw new Error(
-            "Granola API key not found. Set --api-key or GRAN_API_KEY (legacy: GRANOLA_API_KEY), or run gran auth login --api-key <token>.",
+            "Granola API key not found. Set --api-key or GRAN_API_KEY, or run gran auth login --api-key <token>.",
           );
         }
 

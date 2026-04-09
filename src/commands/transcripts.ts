@@ -16,7 +16,7 @@ Options:
   --format <value>    Output format: text, json, yaml, raw (default: text)
   --output <path>     Output directory for transcript files (default: ./transcripts)
   --debug             Enable debug logging
-  --config <path>     Path to .gran.json
+  --config <path>     Path to JSON config file
   -h, --help          Show help
 `;
 }

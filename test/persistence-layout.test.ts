@@ -6,16 +6,12 @@ import {
 } from "../src/persistence/layout.ts";
 
 describe("defaultGranolaToolkitDataDirectory", () => {
-  test("uses Application Support on macOS", () => {
-    expect(defaultGranolaToolkitDataDirectory("darwin", "/Users/nima")).toBe(
-      "/Users/nima/Library/Application Support/gran",
-    );
+  test("uses ~/.config on macOS", () => {
+    expect(defaultGranolaToolkitDataDirectory("/Users/nima")).toBe("/Users/nima/.config/gran");
   });
 
   test("uses ~/.config on Linux", () => {
-    expect(defaultGranolaToolkitDataDirectory("linux", "/home/nima")).toBe(
-      "/home/nima/.config/gran",
-    );
+    expect(defaultGranolaToolkitDataDirectory("/home/nima")).toBe("/home/nima/.config/gran");
   });
 });
 

@@ -512,13 +512,11 @@ export function DiagnosticsPanel(props: {
       {
         detail: props.appState?.config.configFileUsed
           ? "Custom config file currently in use."
-          : "No custom config file found. Change values from the Connection, Automation, and Knowledge bases tabs, or add a .gran.json later.",
+          : "No custom config file found. Change values from the Connection, Automation, and Knowledge bases tabs, or add a project .gran/config.json later.",
         fallbackPath: props.appState?.config.configFileUsed || undefined,
         file: props.serverInfo?.files?.config,
         label: "Config file",
-        title: props.appState?.config.configFileUsed
-          ? "Custom .gran.json"
-          : "No custom config file",
+        title: props.appState?.config.configFileUsed ? "Config file" : "No custom config file",
       },
       {
         detail: "Toolkit-owned local state directory.",

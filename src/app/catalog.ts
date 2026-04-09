@@ -585,7 +585,7 @@ export class GranolaCatalogService {
 
   private missingCacheError(): Error {
     return new Error(
-      `Granola cache file not found. Pass --cache or create .gran.json. Expected locations include: ${granolaCacheCandidates().join(", ")}`,
+      `Granola cache file not found. Pass --cache or configure Gran first. Expected locations include: ${granolaCacheCandidates().join(", ")}`,
     );
   }
 

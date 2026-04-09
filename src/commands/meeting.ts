@@ -45,7 +45,7 @@ Options:
   --trusted-origins <v> open: comma-separated extra browser origins to trust
   --supabase <path>   Path to supabase.json
   --debug             Enable debug logging
-  --config <path>     Path to .gran.json
+  --config <path>     Path to JSON config file
   -h, --help          Show help
 `;
 }

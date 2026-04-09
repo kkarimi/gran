@@ -23,7 +23,7 @@ Subcommands:
 Options:
   --api-key <token>   Store a Granola Personal API key
   --supabase <path>   Path to supabase.json for auth login
-  --config <path>     Path to .gran.json
+  --config <path>     Path to JSON config file
   --debug             Enable debug logging
   -h, --help          Show help
 `;

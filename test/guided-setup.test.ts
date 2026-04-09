@@ -67,7 +67,7 @@ describe("guided setup", () => {
     })) as unknown as (...args: unknown[]) => Promise<CommandAppContext>;
 
     const plan = await runGuidedSetupFlow({
-      configPath: "/tmp/project/.gran.json",
+      configPath: "/tmp/project/.gran/config.json",
       createAppContext,
       globalFlags: {},
       log: vi.fn(),
@@ -86,7 +86,7 @@ describe("guided setup", () => {
     expect(createAppContext).toHaveBeenCalledWith(
       {},
       {
-        config: "/tmp/project/.gran.json",
+        config: "/tmp/project/.gran/config.json",
       },
     );
   });
@@ -120,7 +120,7 @@ describe("guided setup", () => {
     })) as unknown as (...args: unknown[]) => Promise<CommandAppContext>;
 
     const plan = await runGuidedSetupFlow({
-      configPath: "/tmp/project/.gran.json",
+      configPath: "/tmp/project/.gran/config.json",
       createAppContext,
       globalFlags: {},
       log: vi.fn(),
@@ -162,7 +162,7 @@ describe("guided setup", () => {
       commandFlags: {
         guided: true,
       },
-      configPath: "/tmp/project/.gran.json",
+      configPath: "/tmp/project/.gran/config.json",
       createAppContext,
       globalFlags: {},
       interactive: true,
@@ -179,7 +179,7 @@ describe("guided setup", () => {
         foreground: true,
       },
       globalFlags: {
-        config: "/tmp/project/.gran.json",
+        config: "/tmp/project/.gran/config.json",
       },
     });
     expect(launchWeb).not.toHaveBeenCalled();

@@ -295,9 +295,7 @@ export function createDefaultGranolaAgentProviderRegistry(
       async run(context) {
         const token = openaiApiKey(env);
         if (!token) {
-          throw new Error(
-            "OpenAI API key not found. Set OPENAI_API_KEY or GRAN_OPENAI_API_KEY (legacy: GRANOLA_OPENAI_API_KEY).",
-          );
+          throw new Error("OpenAI API key not found. Set OPENAI_API_KEY or GRAN_OPENAI_API_KEY.");
         }
 
         return {
@@ -321,7 +319,7 @@ export function createDefaultGranolaAgentProviderRegistry(
         const token = openrouterApiKey(env);
         if (!token) {
           throw new Error(
-            "OpenRouter API key not found. Set OPENROUTER_API_KEY or GRAN_OPENROUTER_API_KEY (legacy: GRANOLA_OPENROUTER_API_KEY).",
+            "OpenRouter API key not found. Set OPENROUTER_API_KEY or GRAN_OPENROUTER_API_KEY.",
           );
         }
 

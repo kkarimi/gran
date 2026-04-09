@@ -7,7 +7,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { initialiseGranolaToolkitProject, inspectGranolaToolkitProject } from "../src/init.ts";
 
 describe("initialiseGranolaToolkitProject", () => {
-  test("creates a local bootstrap with starter config, harnesses, rules, and prompts", async () => {
+  test("creates a global bootstrap with starter config, harnesses, rules, and prompts", async () => {
     const directory = await mkdtemp(join(tmpdir(), "gran-init-"));
 
     const result = await initialiseGranolaToolkitProject({
@@ -15,30 +15,47 @@ describe("initialiseGranolaToolkitProject", () => {
       provider: "openrouter",
     });
 
-    expect(result.configPath).toBe(join(directory, ".gran.json"));
+    expect(result.configPath).toBe(join(directory, "config.json"));
     expect(result.createdFiles).toEqual([
-      join(directory, ".gran.json"),
+      join(directory, "config.json"),
+      join(directory, "agent-harnesses.json"),
+      join(directory, "automation-rules.json"),
+      join(directory, "pkm-targets.json"),
+      join(directory, "prompts", "team-notes.md"),
+      join(directory, "prompts", "customer-follow-up.md"),
+    ]);
+
+    const configContents = await readFile(join(directory, "config.json"), "utf8");
+    const harnessContents = await readFile(join(directory, "agent-harnesses.json"), "utf8");
+    const rulesContents = await readFile(join(directory, "automation-rules.json"), "utf8");
+
+    expect(configContents).toContain('"agent-provider": "openrouter"');
+    expect(configContents).toContain('"agent-model": "openai/gpt-5-mini"');
+    expect(configContents).toContain('"agent-harnesses-file": "./agent-harnesses.json"');
+    expect(harnessContents).toContain('"id": "team-notes"');
+    expect(harnessContents).toContain('"promptFile": "./prompts/team-notes.md"');
+    expect(rulesContents).toContain('"harnessId": "team-notes"');
+    expect(rulesContents).toContain('"folderNames": [');
+  });
+
+  test("can still create a project-local bootstrap when requested", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "gran-init-"));
+
+    const result = await initialiseGranolaToolkitProject({
+      directory,
+      provider: "codex",
+      scope: "project",
+    });
+
+    expect(result.configPath).toBe(join(directory, ".gran", "config.json"));
+    expect(result.createdFiles).toEqual([
+      join(directory, ".gran", "config.json"),
       join(directory, ".gran", "agent-harnesses.json"),
       join(directory, ".gran", "automation-rules.json"),
       join(directory, ".gran", "pkm-targets.json"),
       join(directory, ".gran", "prompts", "team-notes.md"),
       join(directory, ".gran", "prompts", "customer-follow-up.md"),
     ]);
-
-    const configContents = await readFile(join(directory, ".gran.json"), "utf8");
-    const harnessContents = await readFile(
-      join(directory, ".gran", "agent-harnesses.json"),
-      "utf8",
-    );
-    const rulesContents = await readFile(join(directory, ".gran", "automation-rules.json"), "utf8");
-
-    expect(configContents).toContain('"agent-provider": "openrouter"');
-    expect(configContents).toContain('"agent-model": "openai/gpt-5-mini"');
-    expect(configContents).toContain('"agent-harnesses-file": "./.gran/agent-harnesses.json"');
-    expect(harnessContents).toContain('"id": "team-notes"');
-    expect(harnessContents).toContain('"promptFile": "./.gran/prompts/team-notes.md"');
-    expect(rulesContents).toContain('"harnessId": "team-notes"');
-    expect(rulesContents).toContain('"folderNames": [');
   });
 
   test("refuses to overwrite generated files unless forced", async () => {
@@ -80,10 +97,11 @@ describe("initialiseGranolaToolkitProject", () => {
     await initialiseGranolaToolkitProject({
       directory,
       provider: "codex",
+      scope: "project",
     });
     await rm(join(directory, ".gran", "automation-rules.json"));
 
-    const state = await inspectGranolaToolkitProject(directory);
+    const state = await inspectGranolaToolkitProject(directory, "project");
 
     expect(state.hasAnyFiles).toBe(true);
     expect(state.isComplete).toBe(false);

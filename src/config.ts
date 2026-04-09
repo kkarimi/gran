@@ -3,7 +3,10 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
 
 import type { AppConfig } from "./types.ts";
-import { defaultGranolaToolkitPersistenceLayout } from "./persistence/layout.ts";
+import {
+  defaultGranolaToolkitConfigFile,
+  defaultGranolaToolkitPersistenceLayout,
+} from "./persistence/layout.ts";
 import {
   defaultPluginDefinitions,
   resolvePluginConfiguredEnablement,
@@ -84,56 +87,6 @@ function pickEnvFlag(
   return undefined;
 }
 
-function parseTomlScalar(rawValue: string): unknown {
-  const value = rawValue.trim();
-
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    if (value.startsWith('"')) {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value.slice(1, -1);
-      }
-    }
-
-    return value.slice(1, -1);
-  }
-
-  if (/^(true|false)$/i.test(value)) {
-    return value.toLowerCase() === "true";
-  }
-
-  if (/^-?\d+(?:\.\d+)?$/.test(value)) {
-    return Number(value);
-  }
-
-  return value;
-}
-
-function parseSimpleToml(contents: string): Record<string, unknown> {
-  const values: Record<string, unknown> = {};
-
-  for (const rawLine of contents.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-
-    const match = /^([A-Za-z0-9_-]+)\s*=\s*(.+)$/.exec(line);
-    if (!match) {
-      continue;
-    }
-
-    const [, key = "", rawValue = ""] = match;
-    values[key] = parseTomlScalar(rawValue);
-  }
-
-  return values;
-}
-
 function parseJsonConfig(contents: string): Record<string, unknown> {
   const parsed = JSON.parse(contents) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -154,22 +107,20 @@ async function loadConfigFile(
     const contents = await readUtf8(configPath);
     return {
       path: configPath,
-      values: configPath.endsWith(".toml") ? parseSimpleToml(contents) : parseJsonConfig(contents),
+      values: parseJsonConfig(contents),
     };
   }
 
   const candidates = [
-    join(process.cwd(), ".gran.json"),
-    join(process.cwd(), ".granola.toml"),
-    join(homedir(), ".gran.json"),
-    join(homedir(), ".granola.toml"),
+    join(process.cwd(), ".gran", "config.json"),
+    defaultGranolaToolkitConfigFile(homedir()),
   ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
       const contents = await readUtf8(candidate);
       return {
         path: candidate,
-        values: candidate.endsWith(".toml") ? parseSimpleToml(contents) : parseJsonConfig(contents),
+        values: parseJsonConfig(contents),
       };
     }
   }

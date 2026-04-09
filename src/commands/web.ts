@@ -38,7 +38,7 @@ Options:
   --supabase <path>       Path to supabase.json
   --open[=true|false]     Open the browser automatically (default: true)
   --debug                 Enable debug logging
-  --config <path>         Path to .gran.json
+  --config <path>         Path to JSON config file
   -h, --help              Show help
 `;
 }

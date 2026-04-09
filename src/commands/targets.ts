@@ -35,7 +35,7 @@ Options:
   --transcripts-format <value>
                             text, markdown, json, yaml, raw
   --daily-notes-dir <path>   Optional daily note directory for Obsidian vaults
-  --config <path>            Path to .gran.json
+  --config <path>            Path to JSON config file
   --debug                    Enable debug logging
   -h, --help                 Show help
 `;

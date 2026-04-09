@@ -21,7 +21,7 @@ describe("web onboarding", () => {
       },
       config: {
         automationRulesFile: "/tmp/automation-rules.json",
-        configFile: "/tmp/.gran.json",
+        configFile: "/tmp/config.json",
         notesOutputDir: "/tmp/notes",
         pluginsFile: "/tmp/plugins.json",
         supabaseFile: "/tmp/supabase.json",

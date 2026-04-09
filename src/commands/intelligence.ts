@@ -35,7 +35,7 @@ Options:
   --cache <path>             Path to Granola desktop transcript file
   --supabase <path>          Path to supabase.json
   --debug                    Enable debug logging
-  --config <path>            Path to .gran.json
+  --config <path>            Path to JSON config file
   -h, --help                 Show help
 `;
 }

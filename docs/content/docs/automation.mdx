@@ -11,21 +11,19 @@ For a fresh project, start with:
 gran init --provider openrouter
 ```
 
-That generates a local `.gran.json`, starter harnesses, starter prompts, and starter automation
+That generates `~/.config/gran/config.json`, starter harnesses, starter prompts, and starter automation
 rules that you can edit in place. The examples below describe the same shapes in raw JSON so you
 can extend them beyond the starter setup.
 
-The toolkit reads automation rules from a JSON file. By default it uses the shared toolkit data
-directory:
+The toolkit reads automation rules from a JSON file. By default it uses:
 
-- macOS: `~/Library/Application Support/gran/automation-rules.json`
-- Linux: `~/.config/gran/automation-rules.json`
+- `~/.config/gran/automation-rules.json`
 
 Override that path with either:
 
 - `--rules /path/to/rules.json`
-- `GRANOLA_AUTOMATION_RULES_FILE`
-- `automation-rules-file = "/path/to/rules.json"` in `.gran.json`
+- `GRAN_AUTOMATION_RULES_FILE`
+- `"automation-rules-file": "/path/to/rules.json"` in `config.json`
 
 ## Rule Shape
 
@@ -278,7 +276,7 @@ whatever process runs your automation:
 
 For local Codex runs, the toolkit shells out to `codex exec`, so it uses whatever local Codex login
 state you already have. You can override the command path with `GRAN_CODEX_COMMAND` or
-`"codex-command": "..."` in `.gran.json`.
+`"codex-command": "..."` in `config.json`.
 
 For approval-phase delivery actions, provide any external endpoints in the same runtime
 environment, for example:
@@ -286,7 +284,7 @@ environment, for example:
 - `SLACK_WEBHOOK_URL`
 - `POST_REVIEW_WEBHOOK_URL`
 
-Non-secret defaults can live in `.gran.json`:
+Non-secret defaults can live in `config.json`:
 
 ```json
 {
@@ -331,7 +329,7 @@ directory. You can also point them at a project-local file:
 ```
 
 Review publishing profiles live in `pkm-targets.json` under the shared toolkit data directory by default. Override
-that with `GRAN_PKM_TARGETS_FILE` or `"pkm-targets-file": "..."` in `.gran.json`.
+that with `GRAN_PKM_TARGETS_FILE` or `"pkm-targets-file": "..."` in `config.json`.
 
 Example review publishing profiles:
 

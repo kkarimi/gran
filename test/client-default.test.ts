@@ -485,7 +485,7 @@ describe("createDefaultGranolaRuntime", () => {
     vi.spyOn(authModule, "createDefaultSessionStore").mockReturnValue(new MemorySessionStore());
 
     await expect(createDefaultGranolaRuntime(createConfig(), { warn: vi.fn() })).rejects.toThrow(
-      "Granola credentials not found. Set --api-key or GRAN_API_KEY (legacy: GRANOLA_API_KEY)",
+      "Granola credentials not found. Set --api-key or GRAN_API_KEY",
     );
   });
 });

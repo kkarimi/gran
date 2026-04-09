@@ -27,7 +27,7 @@ If you use external agents, the repo also ships an OpenClaw-ready skill at
 
 ## First Run
 
-Create a local project bootstrap first:
+Create your default Gran setup first:
 
 ```bash
 gran init
@@ -35,12 +35,12 @@ gran init
 
 That writes:
 
-- `.gran.json`
-- `./.gran/agent-harnesses.json`
-- `./.gran/automation-rules.json`
-- starter prompt files under `./.gran/prompts/`
+- `~/.config/gran/config.json`
+- `~/.config/gran/agent-harnesses.json`
+- `~/.config/gran/automation-rules.json`
+- starter prompt files under `~/.config/gran/prompts/`
 
-The generated files are intentionally local and editable. They give you a project-local home for
+The generated files are intentionally local and editable. They give you a user-level home for
 config, knowledge-base profiles, prompts, and future automation without forcing you to reverse-engineer the JSON
 shape first.
 
@@ -55,13 +55,15 @@ That means `gran init` is usually enough for the first run.
 If you skip the guide or you are running in a non-interactive shell, continue with one of:
 
 ```bash
-gran web --config ./.gran.json
+gran web
 ```
 
 `gran web` prefers the reusable background-service path, so it will reuse or start the local
 runtime for you.
 
-Use `gran tui --config ./.gran.json` later when you want the keyboard-first terminal workspace.
+Use `gran tui` later when you want the keyboard-first terminal workspace.
+
+If you do want repo-local config instead, run `gran init --project`.
 
 ## Choose A Surface
 

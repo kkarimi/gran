@@ -37,7 +37,7 @@ ${commandLines}
 
 Global options:
   --api-key <token>   Granola Personal API key
-  --config <path>     Path to .gran.json
+  --config <path>     Path to JSON config file
   --debug             Enable debug logging
   --rules <path>      Path to automation rules JSON
   --supabase <path>   Path to supabase.json

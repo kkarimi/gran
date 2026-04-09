@@ -6,11 +6,14 @@ import { defaultGranolaAgentModel } from "./agent-defaults.ts";
 import type { GranolaAutomationRule } from "./app/index.ts";
 import type { GranolaAgentProviderKind } from "./types.ts";
 
+export type GranolaProjectInitScope = "global" | "project";
+
 export interface GranolaProjectInitOptions {
   directory: string;
   force?: boolean;
   model?: string;
   provider: GranolaAgentProviderKind;
+  scope?: GranolaProjectInitScope;
 }
 
 export interface GranolaProjectInitResult {
@@ -64,9 +67,11 @@ function defaultModel(provider: GranolaAgentProviderKind, explicitModel?: string
 function configTemplate(options: {
   harnessesFile: string;
   model: string;
+  notesOutput: string;
   pkmTargetsFile: string;
   provider: GranolaAgentProviderKind;
   rulesFile: string;
+  transcriptOutput: string;
 }): Record<string, unknown> {
   return {
     "agent-provider": options.provider,
@@ -76,8 +81,8 @@ function configTemplate(options: {
     "agent-harnesses-file": options.harnessesFile,
     "automation-rules-file": options.rulesFile,
     "pkm-targets-file": options.pkmTargetsFile,
-    output: "./exports/notes",
-    "transcript-output": "./exports/transcripts",
+    output: options.notesOutput,
+    "transcript-output": options.transcriptOutput,
   };
 }
 
@@ -175,9 +180,10 @@ async function pathExists(filePath: string): Promise<boolean> {
   }
 }
 
-function projectBootstrapFiles(directory: string) {
-  const configPath = join(directory, ".gran.json");
-  const projectDirectory = join(directory, ".gran");
+function projectBootstrapFiles(directory: string, scope: GranolaProjectInitScope) {
+  const configPath =
+    scope === "project" ? join(directory, ".gran", "config.json") : join(directory, "config.json");
+  const projectDirectory = scope === "project" ? join(directory, ".gran") : directory;
   const promptsDirectory = join(projectDirectory, "prompts");
   const teamPromptPath = join(promptsDirectory, "team-notes.md");
   const customerPromptPath = join(promptsDirectory, "customer-follow-up.md");
@@ -207,9 +213,10 @@ function projectBootstrapFiles(directory: string) {
 
 export async function inspectGranolaToolkitProject(
   directory: string,
+  scope: GranolaProjectInitScope = "global",
 ): Promise<GranolaProjectBootstrapState> {
   const resolvedDirectory = resolvePath(directory);
-  const { configPath, files } = projectBootstrapFiles(resolvedDirectory);
+  const { configPath, files } = projectBootstrapFiles(resolvedDirectory, scope);
   const existingFiles: string[] = [];
   const missingFiles: string[] = [];
 
@@ -264,6 +271,7 @@ export async function initialiseGranolaToolkitProject(
   options: GranolaProjectInitOptions,
 ): Promise<GranolaProjectInitResult> {
   const directory = resolvePath(options.directory);
+  const scope = options.scope ?? "global";
   const {
     configPath,
     files,
@@ -272,9 +280,11 @@ export async function initialiseGranolaToolkitProject(
     teamPromptPath,
     customerPromptPath,
     rulesPath,
-  } = projectBootstrapFiles(directory);
+  } = projectBootstrapFiles(directory, scope);
   const provider = options.provider;
   const model = defaultModel(provider, options.model);
+  const configDirectory = dirname(configPath);
+  const harnessesDirectory = dirname(harnessesPath);
 
   await mkdir(directory, { recursive: true });
   await ensureWritable(files, options.force === true);
@@ -283,11 +293,13 @@ export async function initialiseGranolaToolkitProject(
     configPath,
     `${JSON.stringify(
       configTemplate({
-        harnessesFile: `./${relative(directory, harnessesPath)}`,
+        harnessesFile: `./${relative(configDirectory, harnessesPath)}`,
         model,
-        pkmTargetsFile: `./${relative(directory, pkmTargetsPath)}`,
+        notesOutput: scope === "project" ? "../exports/notes" : "./exports/notes",
+        pkmTargetsFile: `./${relative(configDirectory, pkmTargetsPath)}`,
         provider,
-        rulesFile: `./${relative(directory, rulesPath)}`,
+        rulesFile: `./${relative(configDirectory, rulesPath)}`,
+        transcriptOutput: scope === "project" ? "../exports/transcripts" : "./exports/transcripts",
       }),
       null,
       2,
@@ -296,10 +308,10 @@ export async function initialiseGranolaToolkitProject(
   await writeJsonFile(
     harnessesPath,
     harnessesTemplate({
-      customerPromptFile: `./${relative(directory, customerPromptPath)}`,
+      customerPromptFile: `./${relative(harnessesDirectory, customerPromptPath)}`,
       model,
       provider,
-      teamPromptFile: `./${relative(directory, teamPromptPath)}`,
+      teamPromptFile: `./${relative(harnessesDirectory, teamPromptPath)}`,
     }),
   );
   await writeJsonFile(rulesPath, rulesTemplate());

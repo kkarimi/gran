@@ -1,6 +1,7 @@
 import { resolve as resolvePath } from "node:path";
 
 import { initialiseGranolaToolkitProject, inspectGranolaToolkitProject } from "../init.ts";
+import { defaultGranolaToolkitDataDirectory } from "../persistence/layout.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
 
 import { maybeRunGuidedSetupAfterInit } from "./guided-setup.ts";
@@ -13,16 +14,17 @@ Usage:
   gran init [options]
 
 Create a local project bootstrap with:
-  - .gran.json
+  - config.json in ~/.config/gran by default
   - starter automation rules
   - starter harness definitions
   - prompt files for common meeting types
 
 Options:
-  --dir <path>        Target directory (default: current directory)
+  --dir <path>        Target directory (default: ~/.config/gran, or current directory with --project)
   --force             Overwrite existing generated files
   --guided            Start guided setup immediately after bootstrap
   --model <value>     Override the starter model for generated harnesses
+  --project           Create ./.gran/config.json and ./.gran/ in the target directory instead
   --provider <value>  codex, openai, openrouter (default: codex)
   --skip-guide        Skip the interactive guided setup prompt
   -h, --help          Show help
@@ -61,6 +63,7 @@ export const initCommand: CommandDefinition = {
     guided: { type: "boolean" },
     help: { type: "boolean" },
     model: { type: "string" },
+    project: { type: "boolean" },
     provider: { type: "string" },
     "skip-guide": { type: "boolean" },
   },
@@ -71,26 +74,29 @@ export const initCommand: CommandDefinition = {
       throw new Error("gran init does not accept positional arguments");
     }
 
+    const scope = commandFlags.project === true ? "project" : "global";
     const directory =
       typeof commandFlags.dir === "string" && commandFlags.dir.trim()
         ? commandFlags.dir.trim()
-        : process.cwd();
+        : scope === "project"
+          ? process.cwd()
+          : defaultGranolaToolkitDataDirectory();
     const provider = parseProvider(commandFlags.provider);
     const force = commandFlags.force === true;
-    const bootstrap = await inspectGranolaToolkitProject(directory);
+    const bootstrap = await inspectGranolaToolkitProject(directory, scope);
     const root = resolvePath(bootstrap.directory);
     let configPath = bootstrap.configPath;
 
     if (bootstrap.isComplete && !force) {
-      console.log(`Found an existing local Gran project in ${root}`);
+      console.log(`Found an existing Gran setup in ${root}`);
       console.log("");
       console.log("Reusing:");
-      console.log("  .gran.json");
-      console.log("  ./.gran/");
+      console.log(scope === "project" ? "  ./.gran/config.json" : "  config.json");
+      console.log(scope === "project" ? "  ./.gran/" : "  prompts/");
     } else {
       if (bootstrap.hasAnyFiles && !force) {
         throw new Error(
-          `gran init found an incomplete project in ${root}.\nExisting files:\n${bootstrap.existingFiles
+          `gran init found an incomplete setup in ${root}.\nExisting files:\n${bootstrap.existingFiles
             .map((filePath) => `- ${filePath}`)
             .join("\n")}\nMissing files:\n${bootstrap.missingFiles
             .map((filePath) => `- ${filePath}`)
@@ -103,14 +109,15 @@ export const initCommand: CommandDefinition = {
         force,
         model: typeof commandFlags.model === "string" ? commandFlags.model.trim() : undefined,
         provider,
+        scope,
       });
       configPath = result.configPath;
 
-      console.log(`Created a local Gran project in ${root}`);
+      console.log(`Created Gran setup in ${root}`);
       console.log("");
-      console.log("Project files:");
-      console.log("  .gran.json");
-      console.log("  ./.gran/");
+      console.log("Files:");
+      console.log(scope === "project" ? "  ./.gran/config.json" : "  config.json");
+      console.log(scope === "project" ? "  ./.gran/" : "  prompts/");
     }
 
     const guidedExitCode = await maybeRunGuidedSetupAfterInit({
@@ -124,11 +131,15 @@ export const initCommand: CommandDefinition = {
 
     console.log("");
     console.log("Next:");
-    console.log("  gran web --config ./.gran.json");
-    console.log("  gran tui --config ./.gran.json");
+    console.log("  gran web");
+    console.log("  gran tui");
     console.log("");
     console.log(providerNextStep(provider));
-    console.log("Edit ./.gran/prompts/ when you want to tune meeting-specific agent output.");
+    console.log(
+      scope === "project"
+        ? "Edit ./.gran/prompts/ when you want to tune meeting-specific agent output."
+        : `Edit ${root}/prompts/ when you want to tune meeting-specific agent output.`,
+    );
     return 0;
   },
 };

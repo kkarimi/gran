@@ -45,27 +45,29 @@ The CLI reads configuration in this order:
 
 1. command-line flags
 2. environment variables
-3. `.gran.json`
-4. platform defaults
+3. project `./.gran/config.json`
+4. `~/.config/gran/config.json`
+5. platform defaults
 
 ## Config File
 
-`gran init` generates a good starting point automatically. If you prefer to write the config by
-hand, a project-local file can look like this:
+`gran init` generates a good starting point automatically in `~/.config/gran/config.json`. If you
+prefer a project-local override, `gran init --project` writes `./.gran/config.json`, which can
+look like this:
 
 ```json
 {
   "agent-provider": "openrouter",
   "agent-model": "openai/gpt-5-mini",
-  "agent-harnesses-file": "./.gran/agent-harnesses.json",
-  "automation-rules-file": "./.gran/automation-rules.json",
-  "pkm-targets-file": "./.gran/pkm-targets.json",
-  "output": "./exports/notes",
-  "transcript-output": "./exports/transcripts"
+  "agent-harnesses-file": "./agent-harnesses.json",
+  "automation-rules-file": "./automation-rules.json",
+  "pkm-targets-file": "./pkm-targets.json",
+  "output": "../exports/notes",
+  "transcript-output": "../exports/transcripts"
 }
 ```
 
-Relative paths in `.gran.json` resolve from the directory that contains the config file, not
+Relative paths in the chosen config file resolve from the directory that contains that file, not
 from whatever shell directory happened to launch the command.
 
 ## Environment Variables
@@ -100,7 +102,7 @@ For OpenRouter-backed harnesses:
 export OPENROUTER_API_KEY=...
 gran init --provider openrouter
 gran auth login --api-key grn_...
-gran sync --config ./.gran.json
+gran sync
 ```
 
 For OpenAI-backed harnesses:
@@ -109,7 +111,7 @@ For OpenAI-backed harnesses:
 export OPENAI_API_KEY=...
 gran init --provider openai
 gran auth login --api-key grn_...
-gran sync --config ./.gran.json
+gran sync
 ```
 
 For local Codex-backed harnesses:
@@ -118,5 +120,5 @@ For local Codex-backed harnesses:
 gran init --provider codex
 gran auth login --api-key grn_...
 codex exec --help
-gran sync --config ./.gran.json
+gran sync
 ```

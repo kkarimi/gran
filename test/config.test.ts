@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -9,7 +9,7 @@ import { loadConfig } from "../src/config.ts";
 describe("loadConfig", () => {
   test("loads flat JSON config values", async () => {
     const directory = await mkdtemp(join(tmpdir(), "gran-config-"));
-    const configPath = join(directory, ".gran.json");
+    const configPath = join(directory, "config.json");
 
     await writeFile(
       configPath,
@@ -71,5 +71,41 @@ describe("loadConfig", () => {
         subcommandFlags: {},
       }),
     ).rejects.toThrow(`config file not found: ${configPath}`);
+  });
+
+  test("auto-discovers a project-local .gran/config.json", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "gran-config-project-"));
+    const granDirectory = join(directory, ".gran");
+    const configPath = join(granDirectory, "config.json");
+    const originalCwd = process.cwd();
+
+    await mkdir(granDirectory, { recursive: true });
+    await writeFile(
+      configPath,
+      JSON.stringify(
+        {
+          debug: true,
+          output: "../exports/notes",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    process.chdir(directory);
+    try {
+      const config = await loadConfig({
+        env: { NODE_ENV: "test" },
+        globalFlags: {},
+        subcommandFlags: {},
+      });
+
+      expect(config.configFileUsed).toMatch(/\/\.gran\/config\.json$/);
+      expect(config.debug).toBe(true);
+      expect(config.notes.output).toMatch(/\/exports\/notes$/);
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 });

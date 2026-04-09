@@ -31,7 +31,7 @@ If you want config loading separated from app creation:
 ```ts
 import { createGranApp, loadGranConfig } from "@kkarimi/gran-sdk";
 
-const config = await loadGranConfig({ config: ".gran.json" });
+const config = await loadGranConfig({ config: `${process.env.HOME}/.config/gran/config.json` });
 const app = await createGranApp(config, { surface: "server" });
 ```
 

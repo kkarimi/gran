@@ -52,7 +52,7 @@ Options:
   --timeout <value>       Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>       Path to supabase.json
   --debug                 Enable debug logging
-  --config <path>         Path to .gran.json
+  --config <path>         Path to JSON config file
   -h, --help              Show help
 `;
 }
