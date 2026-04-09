@@ -1,4 +1,6 @@
 import {
+  buildObsidianOpenFileUri,
+  buildObsidianSearchUri,
   createGranolaApp,
   type FolderRecord,
   type GranolaApp,
@@ -117,6 +119,8 @@ export async function createGranApp(
 }
 
 export {
+  buildObsidianOpenFileUri,
+  buildObsidianSearchUri,
   connectGranService,
   createDefaultGranolaApiClient,
   createDefaultGranolaAuth,

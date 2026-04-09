@@ -341,8 +341,10 @@ Example PKM targets:
     {
       "id": "obsidian-team",
       "kind": "obsidian",
-      "outputDir": "~/Vaults/Work/Meetings",
-      "folderSubdirectories": true
+      "outputDir": "~/Vaults/Work",
+      "folderSubdirectories": true,
+      "dailyNotesDir": "Daily",
+      "vaultName": "Work"
     },
     {
       "id": "docs-export",
@@ -355,8 +357,15 @@ Example PKM targets:
 ```
 
 `pkm-sync` resolves one of those named targets and writes the approved markdown into it with a
-stable file name. Obsidian targets default to YAML frontmatter, while `docs-folder` targets can
-disable frontmatter if you want cleaner plain Markdown files.
+stable file name. Obsidian targets default to:
+
+- notes in `Meetings`
+- transcripts in `Meeting Transcripts`
+- Obsidian wikilinks between notes, transcripts, and optional daily notes
+- `obsidian://` open URLs when `vaultName` is available
+
+`docs-folder` targets keep the same idempotent publishing model without Obsidian-specific links,
+and can disable frontmatter if you want cleaner plain Markdown files.
 
 ## Commands
 

@@ -200,4 +200,41 @@ describe("pkm vault target", () => {
     expect(transcript).toContain("[Launch Review](../../Meetings/Team/Launch Review-notes.md)");
     expect(transcript).toContain("## Transcript");
   });
+
+  test("adds daily notes and obsidian open URLs for obsidian targets", async () => {
+    const outputDir = await mkdtemp(join(tmpdir(), "gran-pkm-obsidian-"));
+    const target: GranolaPkmTarget = {
+      dailyNotesDir: "Daily",
+      folderSubdirectories: true,
+      id: "obsidian-team",
+      kind: "obsidian",
+      outputDir,
+      vaultName: "Work",
+    };
+
+    const result = await syncMarkdownVaultTarget({
+      artefact,
+      bundle: buildBundle(),
+      match,
+      target,
+    });
+
+    expect(result.filePath).toBe(join(outputDir, "Meetings", "Team", "Launch Review-notes.md"));
+    expect(result.transcriptFilePath).toBe(
+      join(outputDir, "Meeting Transcripts", "Team", "Launch Review-transcript.md"),
+    );
+    expect(result.dailyNoteFilePath).toBe(join(outputDir, "Daily", "2026-04-08.md"));
+    expect(result.noteOpenUrl).toBe(
+      "obsidian://open?file=Meetings%2FTeam%2FLaunch%20Review-notes.md&vault=Work",
+    );
+    expect(result.transcriptOpenUrl).toBe(
+      "obsidian://open?file=Meeting%20Transcripts%2FTeam%2FLaunch%20Review-transcript.md&vault=Work",
+    );
+    expect(result.dailyNoteOpenUrl).toBe("obsidian://open?file=Daily%2F2026-04-08.md&vault=Work");
+
+    const dailyNote = await readFile(result.dailyNoteFilePath!, "utf8");
+    expect(dailyNote).toContain('type: "daily-note"');
+    expect(dailyNote).toContain("[[Meetings/Team/Launch Review-notes]]");
+    expect(dailyNote).toContain("[[Meeting Transcripts/Team/Launch Review-transcript]]");
+  });
 });

@@ -2097,10 +2097,12 @@ describe("GranolaApp", () => {
         now: () => new Date("2024-03-01T12:00:00Z"),
         pkmTargetStore: new MemoryPkmTargetStore([
           {
+            dailyNotesDir: "Daily",
             folderSubdirectories: true,
             id: "obsidian-team",
             kind: "obsidian",
             outputDir,
+            vaultName: "Work",
           },
         ]),
       },
@@ -2126,6 +2128,8 @@ describe("GranolaApp", () => {
     expect(content).toContain("# PKM Notes");
     expect(content).toContain("[[Meeting Transcripts/Team/Alpha Sync-transcript]]");
     expect(await readFile(transcriptFile, "utf8")).toContain("[[Meetings/Team/Alpha Sync-notes]]");
+    const dailyNoteFile = join(outputDir, "Daily", "2024-01-01.md");
+    expect(await readFile(dailyNoteFile, "utf8")).toContain("[[Meetings/Team/Alpha Sync-notes]]");
 
     const artefact = (await app.listAutomationArtefacts({ kind: "notes", limit: 10 })).artefacts[0];
     const runs = await app.listAutomationRuns({ limit: 10 });
@@ -2134,6 +2138,16 @@ describe("GranolaApp", () => {
         expect.objectContaining({
           actionId: "vault-sync",
           artefactIds: [artefact!.id],
+          meta: expect.objectContaining({
+            dailyNoteFilePath: dailyNoteFile,
+            dailyNoteOpenUrl: "obsidian://open?file=Daily%2F2024-01-01.md&vault=Work",
+            filePath: writtenFile,
+            noteOpenUrl: "obsidian://open?file=Meetings%2FTeam%2FAlpha%20Sync-notes.md&vault=Work",
+            targetId: "obsidian-team",
+            transcriptFilePath: transcriptFile,
+            transcriptOpenUrl:
+              "obsidian://open?file=Meeting%20Transcripts%2FTeam%2FAlpha%20Sync-transcript.md&vault=Work",
+          }),
           result: `Synced PKM target obsidian-team to ${writtenFile}`,
           status: "completed",
         }),

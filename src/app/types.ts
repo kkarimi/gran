@@ -311,6 +311,7 @@ export interface GranolaAutomationPkmSyncAction {
 }
 
 export interface GranolaPkmTarget {
+  dailyNotesDir?: string;
   filenameTemplate?: string;
   folderSubdirectories?: boolean;
   frontmatter?: boolean;
@@ -321,6 +322,7 @@ export interface GranolaPkmTarget {
   outputDir: string;
   reviewMode?: GranolaPkmTargetReviewMode;
   transcriptsSubdir?: string;
+  vaultName?: string;
 }
 
 export interface GranolaExportTarget {

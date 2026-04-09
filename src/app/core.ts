@@ -1440,8 +1440,13 @@ export class GranolaApp implements GranolaAppApi {
     action: GranolaAutomationPkmSyncAction,
     context: AutomationActionContext,
   ): Promise<{
+    dailyNoteFilePath?: string;
+    dailyNoteOpenUrl?: string;
     filePath: string;
+    noteOpenUrl?: string;
     targetId: string;
+    transcriptFilePath?: string;
+    transcriptOpenUrl?: string;
   }> {
     if (!context.artefact) {
       throw new Error(`automation PKM sync action ${action.id} requires an artefact`);
@@ -1463,8 +1468,13 @@ export class GranolaApp implements GranolaAppApi {
     });
 
     return {
+      dailyNoteFilePath: result.dailyNoteFilePath,
+      dailyNoteOpenUrl: result.dailyNoteOpenUrl,
       filePath: result.filePath,
+      noteOpenUrl: result.noteOpenUrl,
       targetId: target.id,
+      transcriptFilePath: result.transcriptFilePath,
+      transcriptOpenUrl: result.transcriptOpenUrl,
     };
   }
 

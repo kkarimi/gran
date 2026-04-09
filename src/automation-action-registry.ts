@@ -462,9 +462,14 @@ function createPkmDefinition(): GranolaAutomationActionDefinition {
         context.handlers,
         (result) => ({
           meta: {
+            ...(result.dailyNoteFilePath ? { dailyNoteFilePath: result.dailyNoteFilePath } : {}),
+            ...(result.dailyNoteOpenUrl ? { dailyNoteOpenUrl: result.dailyNoteOpenUrl } : {}),
             ...(run.meta ? cloneStructured(run.meta) : {}),
             filePath: result.filePath,
+            ...(result.noteOpenUrl ? { noteOpenUrl: result.noteOpenUrl } : {}),
             targetId: result.targetId,
+            ...(result.transcriptFilePath ? { transcriptFilePath: result.transcriptFilePath } : {}),
+            ...(result.transcriptOpenUrl ? { transcriptOpenUrl: result.transcriptOpenUrl } : {}),
           },
           result: `Synced PKM target ${result.targetId} to ${result.filePath}`,
         }),

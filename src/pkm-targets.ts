@@ -33,6 +33,7 @@ function normaliseTarget(value: unknown): GranolaPkmTarget | undefined {
   }
 
   return {
+    dailyNotesDir: stringValue(record.dailyNotesDir).trim() || undefined,
     filenameTemplate: stringValue(record.filenameTemplate).trim() || undefined,
     folderSubdirectories:
       typeof record.folderSubdirectories === "boolean" ? record.folderSubdirectories : undefined,
@@ -50,6 +51,7 @@ function normaliseTarget(value: unknown): GranolaPkmTarget | undefined {
         : defaultPkmTargetReviewMode(kind),
     transcriptsSubdir:
       stringValue(record.transcriptsSubdir).trim() || defaultPkmTargetTranscriptsSubdir(kind),
+    vaultName: stringValue(record.vaultName).trim() || undefined,
   };
 }
 

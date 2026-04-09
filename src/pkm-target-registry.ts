@@ -25,6 +25,11 @@ export interface GranolaPkmPublishIdentity {
   preferredStem: string;
 }
 
+export interface GranolaObsidianTargetRuntime {
+  dailyNotesDir?: string;
+  vaultName: string;
+}
+
 export interface GranolaPkmPublishIdentityInput {
   actionId?: string;
   artifactKind: string;
@@ -113,6 +118,19 @@ export function defaultPkmTargetNotesSubdir(kind: GranolaPkmTargetKind): string 
 
 export function defaultPkmTargetTranscriptsSubdir(kind: GranolaPkmTargetKind): string {
   return resolveGranolaPkmTargetDefinition(kind).defaultTranscriptsSubdir;
+}
+
+export function resolveObsidianTargetRuntime(
+  target: Pick<GranolaPkmTarget, "dailyNotesDir" | "name" | "outputDir" | "vaultName">,
+): GranolaObsidianTargetRuntime {
+  const outputDir = target.outputDir.trim().replace(/[\\/]+$/, "");
+  const inferredVaultName =
+    outputDir.split(/[\\/]/).filter(Boolean).at(-1)?.trim() || target.name?.trim() || "Obsidian";
+
+  return {
+    dailyNotesDir: target.dailyNotesDir?.trim() || undefined,
+    vaultName: target.vaultName?.trim() || inferredVaultName,
+  };
 }
 
 export function buildGranolaPkmPublishIdentity(

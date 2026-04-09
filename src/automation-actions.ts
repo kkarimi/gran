@@ -108,8 +108,13 @@ export interface AutomationActionExportResult {
 }
 
 export interface AutomationActionPkmResult {
+  dailyNoteFilePath?: string;
+  dailyNoteOpenUrl?: string;
   filePath: string;
+  noteOpenUrl?: string;
   targetId: string;
+  transcriptFilePath?: string;
+  transcriptOpenUrl?: string;
 }
 
 export interface AutomationActionSlackResult {

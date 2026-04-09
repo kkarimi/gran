@@ -7,6 +7,7 @@ import type {
   GranolaPkmTarget,
 } from "./app/index.ts";
 import { syncManagedExports } from "./export-state.ts";
+import { buildObsidianOpenFileUri } from "./obsidian-uri.ts";
 import {
   buildPkmAutomationArtefactProjection,
   buildPkmMeetingContextFromDocument,
@@ -17,6 +18,7 @@ import {
   defaultPkmTargetFrontmatterEnabled,
   defaultPkmTargetNotesSubdir,
   defaultPkmTargetTranscriptsSubdir,
+  resolveObsidianTargetRuntime,
 } from "./pkm-target-registry.ts";
 import { latestDocumentTimestamp, quoteYamlString, sanitiseFilename } from "./utils.ts";
 
@@ -278,9 +280,13 @@ export async function syncMarkdownVaultTarget(options: {
   match: GranolaAutomationMatch;
   target: GranolaPkmTarget;
 }): Promise<{
+  dailyNoteFilePath?: string;
   filePath: string;
+  noteOpenUrl?: string;
   transcriptFilePath?: string;
+  transcriptOpenUrl?: string;
   written: number;
+  dailyNoteOpenUrl?: string;
 }> {
   const meeting = buildPkmMeetingContextFromDocument(options.bundle.source.document);
   const folderName = meeting.folders[0]?.name || options.match.folders[0]?.name;
@@ -319,6 +325,12 @@ export async function syncMarkdownVaultTarget(options: {
         transcriptRelativeDir,
         `${transcriptIdentity.preferredStem}.md`,
       )
+    : undefined;
+  const obsidianRuntime =
+    options.target.kind === "obsidian" ? resolveObsidianTargetRuntime(options.target) : undefined;
+  const dailyNotesDir = obsidianRuntime?.dailyNotesDir;
+  const dailyNoteFilePath = dailyNotesDir
+    ? join(options.target.outputDir, dailyNotesDir, `${meeting.meetingDate}.md`)
     : undefined;
 
   let written = await syncManagedExports({
@@ -373,9 +385,82 @@ export async function syncMarkdownVaultTarget(options: {
     });
   }
 
+  if (dailyNoteFilePath) {
+    const resolvedDailyNotesDir = dailyNotesDir!;
+    const noteLink = renderLink(
+      "obsidian",
+      options.target.outputDir,
+      dailyNoteFilePath,
+      noteFilePath,
+      meeting.title || meeting.id,
+    );
+    const transcriptLink = transcriptFilePath
+      ? renderLink(
+          "obsidian",
+          options.target.outputDir,
+          dailyNoteFilePath,
+          transcriptFilePath,
+          `${meeting.title || meeting.id} Transcript`,
+        )
+      : undefined;
+    written += await syncManagedExports({
+      items: [
+        {
+          content: [
+            ...(pkmTargetFrontmatterEnabled(options.target)
+              ? [
+                  "---",
+                  `title: ${quoteYamlString(meeting.meetingDate)}`,
+                  'type: "daily-note"',
+                  `date: ${quoteYamlString(meeting.meetingDate)}`,
+                  "---",
+                  "",
+                ]
+              : []),
+            "## Meetings",
+            "",
+            transcriptLink ? `- ${noteLink} · ${transcriptLink}` : `- ${noteLink}`,
+          ].join("\n"),
+          extension: ".md",
+          id: `daily-note:${options.target.id}:${meeting.meetingDate}`,
+          preferredStem: meeting.meetingDate,
+          sourceUpdatedAt: latestDocumentTimestamp(options.bundle.source.document),
+        },
+      ],
+      kind: "notes",
+      outputDir: join(options.target.outputDir, resolvedDailyNotesDir),
+    });
+  }
+
+  const noteOpenUrl =
+    options.target.kind === "obsidian"
+      ? buildObsidianOpenFileUri({
+          filePath: relative(options.target.outputDir, noteFilePath),
+          target: options.target,
+        })
+      : undefined;
+  const transcriptOpenUrl =
+    options.target.kind === "obsidian" && transcriptFilePath
+      ? buildObsidianOpenFileUri({
+          filePath: relative(options.target.outputDir, transcriptFilePath),
+          target: options.target,
+        })
+      : undefined;
+  const dailyNoteOpenUrl =
+    options.target.kind === "obsidian" && dailyNoteFilePath
+      ? buildObsidianOpenFileUri({
+          filePath: relative(options.target.outputDir, dailyNoteFilePath),
+          target: options.target,
+        })
+      : undefined;
+
   return {
+    dailyNoteFilePath,
+    dailyNoteOpenUrl,
     filePath: noteFilePath,
+    noteOpenUrl,
     transcriptFilePath,
+    transcriptOpenUrl,
     written,
   };
 }

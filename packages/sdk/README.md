@@ -83,3 +83,17 @@ await saveGranExportTarget(
   }),
 );
 ```
+
+## Build Obsidian Open URLs
+
+```ts
+import { buildObsidianOpenFileUri } from "@kkarimi/gran-sdk";
+
+const noteUrl = buildObsidianOpenFileUri({
+  filePath: "Meetings/Team/Launch Review-notes.md",
+  target: {
+    outputDir: "/Users/you/Documents/Obsidian",
+    vaultName: "Work",
+  },
+});
+```

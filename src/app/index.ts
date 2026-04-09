@@ -7,14 +7,18 @@ export {
   buildPkmNoteArtifact,
   buildPkmTranscriptArtifact,
 } from "../pkm-artifacts.ts";
+export { buildObsidianOpenFileUri, buildObsidianSearchUri } from "../obsidian-uri.ts";
 export {
   buildGranolaPkmPublishIdentity,
   createDefaultGranolaPkmTargetRegistry,
   createGranolaPkmTargetRegistry,
   defaultPkmTargetFrontmatterEnabled,
+  defaultPkmTargetNotesSubdir,
   defaultPkmTargetReviewMode,
+  defaultPkmTargetTranscriptsSubdir,
   listGranolaPkmTargetDefinitions,
   parseGranolaPkmTargetKind,
+  resolveObsidianTargetRuntime,
   resolveGranolaPkmTargetDefinition,
 } from "../pkm-target-registry.ts";
 export type {
@@ -37,6 +41,7 @@ export type {
   GranPkmTranscriptArtifact,
 } from "../pkm-artifacts.ts";
 export type {
+  GranolaObsidianTargetRuntime,
   GranolaPkmPublishIdentity,
   GranolaPkmPublishIdentityInput,
   GranolaPkmTargetDefinition,

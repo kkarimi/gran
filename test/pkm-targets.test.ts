@@ -13,10 +13,12 @@ describe("pkm targets", () => {
 
     await store.writeTargets([
       {
+        dailyNotesDir: "Daily",
         folderSubdirectories: true,
         id: "obsidian-team",
         kind: "obsidian",
         outputDir: "/tmp/vault/team",
+        vaultName: "Work",
       },
       {
         frontmatter: false,
@@ -29,12 +31,14 @@ describe("pkm targets", () => {
 
     expect(await store.readTargets()).toEqual([
       expect.objectContaining({
+        dailyNotesDir: "Daily",
         folderSubdirectories: true,
         id: "obsidian-team",
         kind: "obsidian",
         notesSubdir: "Meetings",
         reviewMode: "recommended",
         transcriptsSubdir: "Meeting Transcripts",
+        vaultName: "Work",
       }),
       expect.objectContaining({
         frontmatter: false,
