@@ -79,6 +79,11 @@ export async function handleAutomationRoute(context: GranolaServerRouteContext):
     return true;
   }
 
+  if (method === "GET" && path === granolaTransportPaths.automationPkmTargets) {
+    sendJson(response, await app.listPkmTargets(), { headers: originHeaders });
+    return true;
+  }
+
   if (method === "GET" && path === granolaTransportPaths.processingIssues) {
     sendJson(
       response,
@@ -111,6 +116,27 @@ export async function handleAutomationRoute(context: GranolaServerRouteContext):
             ? options.model.trim()
             : undefined,
         provider: parseAgentProviderKind(options.provider),
+      }),
+      { headers: originHeaders },
+    );
+    return true;
+  }
+
+  if (
+    method === "GET" &&
+    path.endsWith("/publish-preview") &&
+    path.startsWith(`${granolaTransportPaths.automationArtefacts}/`)
+  ) {
+    const id = decodeURIComponent(
+      path.slice(
+        `${granolaTransportPaths.automationArtefacts}/`.length,
+        -"/publish-preview".length,
+      ),
+    );
+    sendJson(
+      response,
+      await app.previewAutomationArtefactPublish(id, {
+        targetId: url.searchParams.get("targetId")?.trim() || undefined,
       }),
       { headers: originHeaders },
     );
@@ -153,6 +179,7 @@ export async function handleAutomationRoute(context: GranolaServerRouteContext):
       response,
       await app.resolveAutomationArtefact(id, decision, {
         note: typeof body.note === "string" ? body.note : undefined,
+        targetId: typeof body.targetId === "string" ? body.targetId : undefined,
       }),
       { headers: originHeaders },
     );

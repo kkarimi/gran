@@ -9,7 +9,7 @@ import type {
 } from "./app/index.ts";
 import type { GranolaToolkitSessionStoreKind } from "./persistence/layout.ts";
 
-export const GRANOLA_TRANSPORT_PROTOCOL_VERSION = 4;
+export const GRANOLA_TRANSPORT_PROTOCOL_VERSION = 5;
 
 export type GranolaServerRuntimeMode = "background-service" | "server" | "web-workspace";
 
@@ -34,6 +34,7 @@ export interface GranolaServerInfo {
     configFile?: string;
     exportTargetsFile?: string;
     notesOutputDir?: string;
+    pkmTargetsFile?: string;
     pluginsFile?: string;
     supabaseFile?: string;
     transcriptCacheFile?: string;
@@ -60,6 +61,7 @@ export interface GranolaServerInfo {
     meetingIndex?: GranolaLocalPathInfo;
     exportTargets?: GranolaLocalPathInfo;
     pluginSettings?: GranolaLocalPathInfo;
+    pkmTargets?: GranolaLocalPathInfo;
     serviceLog?: GranolaLocalPathInfo;
     session?: GranolaLocalPathInfo;
     syncEvents?: GranolaLocalPathInfo;
@@ -74,6 +76,7 @@ export interface GranolaServerInfo {
     exportTargetsFile?: string;
     meetingIndex: boolean;
     meetingIndexFile?: string;
+    pkmTargetsFile?: string;
     searchIndexFile?: string;
     sessionStore: GranolaToolkitSessionStoreKind;
     sessionFile?: string;
@@ -109,6 +112,7 @@ export const granolaTransportPaths = {
   automationHarnessExplain: "/automation/harnesses/explain",
   automationMatches: "/automation/matches",
   automationArtefacts: "/automation/artefacts",
+  automationPkmTargets: "/automation/pkm-targets",
   automationRules: "/automation/rules",
   automationRuns: "/automation/runs",
   events: "/events",
@@ -257,6 +261,15 @@ export function granolaAutomationArtefactDecisionPath(
   decision: "approve" | "reject",
 ): string {
   return `${granolaAutomationArtefactPath(id)}/${decision}`;
+}
+
+export function granolaAutomationArtefactPublishPreviewPath(
+  id: string,
+  options: { targetId?: string } = {},
+): string {
+  return appendSearchParams(`${granolaAutomationArtefactPath(id)}/publish-preview`, {
+    targetId: options.targetId,
+  });
 }
 
 export function granolaAutomationArtefactUpdatePath(id: string): string {

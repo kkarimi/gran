@@ -59,6 +59,7 @@ import type {
   GranolaAutomationEvaluationResult,
   GranolaAutomationMatch,
   GranolaAutomationMatchesResult,
+  GranolaAutomationPkmSyncAction,
   GranolaAutomationRule,
   GranolaAutomationRulesResult,
   GranolaAutomationRunsResult,
@@ -891,7 +892,7 @@ export class GranolaAutomationService {
 
   private async runPostApprovalActions(
     artefact: GranolaAutomationArtefact,
-    options: { decision: "approve" | "reject"; note?: string },
+    options: { decision: "approve" | "reject"; note?: string; targetId?: string },
   ): Promise<GranolaAutomationActionRun[]> {
     if (options.decision !== "approve") {
       return [];
@@ -914,6 +915,18 @@ export class GranolaAutomationService {
       sourceActionId: artefact.actionId,
       trigger: "approval",
     });
+    const linkedPkmTargetIds = actions
+      .filter(
+        (action): action is GranolaAutomationPkmSyncAction =>
+          action.kind === "pkm-sync" && Boolean(action.targetId),
+      )
+      .map((action) => action.targetId);
+    if (options.targetId && linkedPkmTargetIds.length === 0) {
+      throw new Error("No linked PKM publish target is configured for this artefact");
+    }
+    if (options.targetId && !linkedPkmTargetIds.includes(options.targetId)) {
+      throw new Error(`linked PKM publish target not found: ${options.targetId}`);
+    }
     if (actions.length === 0) {
       return [];
     }
@@ -922,6 +935,10 @@ export class GranolaAutomationService {
     const runs: GranolaAutomationActionRun[] = [];
 
     for (const action of actions) {
+      if (action.kind === "pkm-sync" && options.targetId && action.targetId !== options.targetId) {
+        continue;
+      }
+
       const runId = buildAutomationApprovalActionRunId(artefact, action.id);
       if (existingRunIds.has(runId)) {
         continue;
@@ -956,7 +973,7 @@ export class GranolaAutomationService {
   async resolveAutomationArtefact(
     id: string,
     decision: "approve" | "reject",
-    options: { note?: string } = {},
+    options: { note?: string; targetId?: string } = {},
   ): Promise<GranolaAutomationArtefact> {
     const current = await this.readAutomationArtefactById(id);
     if (!current) {
@@ -984,6 +1001,7 @@ export class GranolaAutomationService {
       await this.runPostApprovalActions(replaced, {
         decision,
         note: options.note,
+        targetId: options.targetId,
       });
     }
 

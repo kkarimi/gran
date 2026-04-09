@@ -393,12 +393,72 @@ export function useReviewController({
     }
   };
 
+  const clearAutomationArtefactPublishPreview = () => {
+    setState("automationArtefactPublishPreview", null);
+    setState("automationArtefactPublishPreviewError", "");
+    setState("automationArtefactPublishPreviewLoading", false);
+    setState("selectedPkmTargetId", null);
+  };
+
+  const loadPkmTargets = async () => {
+    const client = clientAccessor();
+    if (!client) {
+      return;
+    }
+
+    try {
+      const result = await client.listPkmTargets();
+      setState("pkmTargets", result.targets);
+      if (
+        state.selectedPkmTargetId &&
+        !result.targets.some((target) => target.id === state.selectedPkmTargetId)
+      ) {
+        setState("selectedPkmTargetId", null);
+      }
+    } catch (error) {
+      setState("detailError", error instanceof Error ? error.message : String(error));
+      setState("pkmTargets", []);
+    }
+  };
+
+  const loadAutomationArtefactPublishPreview = async (
+    options: { artefactId?: string | null; targetId?: string | null } = {},
+  ) => {
+    const client = clientAccessor();
+    const artefactId = options.artefactId ?? state.selectedAutomationArtefactId;
+    if (!client || !artefactId) {
+      clearAutomationArtefactPublishPreview();
+      return;
+    }
+
+    setState("automationArtefactPublishPreviewLoading", true);
+    setState("automationArtefactPublishPreviewError", "");
+    try {
+      const result = await client.previewAutomationArtefactPublish(artefactId, {
+        targetId: options.targetId ?? state.selectedPkmTargetId ?? undefined,
+      });
+      setState("automationArtefactPublishPreview", result);
+      setState("selectedPkmTargetId", result.selectedTargetId ?? null);
+    } catch (error) {
+      clearAutomationArtefactPublishPreview();
+      setState(
+        "automationArtefactPublishPreviewError",
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      setState("automationArtefactPublishPreviewLoading", false);
+    }
+  };
+
   const applySelectedArtefactDrafts = (artefact: GranolaAutomationArtefact | null) => {
     setState("selectedAutomationArtefactId", artefact?.id ?? null);
     setState("automationArtefactDraftTitle", artefact?.structured.title ?? "");
     setState("automationArtefactDraftSummary", artefact?.structured.summary ?? "");
     setState("automationArtefactDraftMarkdown", artefact?.structured.markdown ?? "");
     setState("reviewNote", "");
+    if (!artefact) {
+      clearAutomationArtefactPublishPreview();
+    }
   };
 
   const syncSelectedArtefact = (
@@ -423,6 +483,7 @@ export function useReviewController({
       artefacts[0];
 
     applySelectedArtefactDrafts(preferred ?? null);
+    return preferred ?? null;
   };
 
   const loadAutomationArtefacts = async (
@@ -440,14 +501,19 @@ export function useReviewController({
       setState("automationArtefactError", "");
       const result = await client.listAutomationArtefacts({ limit: 30 });
       setState("automationArtefacts", result.artefacts);
-      syncSelectedArtefact(result.artefacts, {
+      const preferred = syncSelectedArtefact(result.artefacts, {
         preferredId: options.preferredId ?? state.selectedAutomationArtefactId,
         preferredMeetingId: options.preferredMeetingId ?? state.selectedMeetingId,
+      });
+      await loadAutomationArtefactPublishPreview({
+        artefactId: preferred?.id ?? null,
+        targetId: state.selectedPkmTargetId,
       });
     } catch (error) {
       setState("automationArtefactError", error instanceof Error ? error.message : String(error));
       setState("automationArtefacts", []);
       syncSelectedArtefact([]);
+      clearAutomationArtefactPublishPreview();
     }
   };
 
@@ -499,6 +565,14 @@ export function useReviewController({
   const selectedReviewArtefact = () => {
     const item = selectedReviewInboxItem();
     return item?.kind === "artefact" ? item.artefact : selectedAutomationArtefact();
+  };
+
+  const selectAutomationArtefactPublishTarget = async (targetId: string | null) => {
+    setState("selectedPkmTargetId", targetId);
+    await loadAutomationArtefactPublishPreview({
+      artefactId: state.selectedAutomationArtefactId,
+      targetId,
+    });
   };
 
   const resolveAutomationRun = async (id: string, decision: "approve" | "reject") => {
@@ -556,6 +630,10 @@ export function useReviewController({
         (await client.getAutomationArtefact(id));
       setState("selectedReviewInboxKey", `artefact:${artefact.id}`);
       applySelectedArtefactDrafts(artefact);
+      await loadAutomationArtefactPublishPreview({
+        artefactId: artefact.id,
+        targetId: state.selectedPkmTargetId,
+      });
       if (artefact.meetingId !== state.selectedMeetingId && options.loadMeeting) {
         await options.loadMeeting(artefact.meetingId);
       }
@@ -604,6 +682,7 @@ export function useReviewController({
         decision,
         {
           note: state.reviewNote || undefined,
+          targetId: state.selectedPkmTargetId || undefined,
         },
       );
       await loadAutomationArtefacts({
@@ -659,6 +738,8 @@ export function useReviewController({
         return;
       }
 
+      clearAutomationArtefactPublishPreview();
+
       if (item.meetingId && item.meetingId !== state.selectedMeetingId) {
         await options.loadMeeting(item.meetingId);
       }
@@ -671,6 +752,8 @@ export function useReviewController({
   return {
     applySelectedArtefactDrafts,
     loadAutomationArtefacts,
+    loadAutomationArtefactPublishPreview,
+    loadPkmTargets,
     loadAutomationRules,
     loadAutomationRuns,
     loadProcessingIssues,
@@ -682,6 +765,7 @@ export function useReviewController({
     rerunAutomationArtefact,
     saveAutomationArtefact,
     selectAutomationArtefact,
+    selectAutomationArtefactPublishTarget,
     selectReviewInboxItem,
     selectedAutomationArtefact,
     selectedReviewArtefact,

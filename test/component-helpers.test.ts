@@ -155,7 +155,7 @@ describe("web meeting helpers", () => {
           syncState: true,
         },
         product: "gran",
-        protocolVersion: 4,
+        protocolVersion: 5,
         runtime: {
           mode: "background-service",
           startedAt: "2026-04-07T12:34:56.000Z",
@@ -193,7 +193,7 @@ describe("web meeting helpers", () => {
           syncState: true,
         },
         product: "gran",
-        protocolVersion: 4,
+        protocolVersion: 5,
         runtime: {
           mode: "background-service",
           startedAt: "2026-04-07T12:34:56.000Z",

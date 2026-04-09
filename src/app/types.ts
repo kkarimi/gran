@@ -516,6 +516,10 @@ export interface GranolaExportTargetsResult {
   targets: GranolaExportTarget[];
 }
 
+export interface GranolaPkmTargetsResult {
+  targets: GranolaPkmTarget[];
+}
+
 export interface GranolaAppExportRunState {
   format: string;
   itemCount: number;
@@ -667,6 +671,23 @@ export interface GranolaAutomationArtefactsResult {
   artefacts: GranolaAutomationArtefact[];
 }
 
+export interface GranolaPkmPublishPreview {
+  dailyNoteFilePath?: string;
+  dailyNoteOpenUrl?: string;
+  noteFilePath: string;
+  noteOpenUrl?: string;
+  transcriptFilePath?: string;
+  transcriptOpenUrl?: string;
+}
+
+export interface GranolaAutomationArtefactPublishPreviewResult {
+  artefactId: string;
+  message?: string;
+  preview?: GranolaPkmPublishPreview;
+  selectedTargetId?: string;
+  targets: GranolaPkmTarget[];
+}
+
 export interface GranolaAgentHarnessesResult {
   harnesses: GranolaAgentHarness[];
 }
@@ -792,10 +813,15 @@ export interface GranolaAppApi {
   loginAuth(options?: { apiKey?: string; supabasePath?: string }): Promise<GranolaAppAuthState>;
   logoutAuth(): Promise<GranolaAppAuthState>;
   recoverProcessingIssue(id: string): Promise<GranolaProcessingRecoveryResult>;
+  listPkmTargets(): Promise<GranolaPkmTargetsResult>;
+  previewAutomationArtefactPublish(
+    id: string,
+    options?: { targetId?: string },
+  ): Promise<GranolaAutomationArtefactPublishPreviewResult>;
   resolveAutomationArtefact(
     id: string,
     decision: "approve" | "reject",
-    options?: { note?: string },
+    options?: { note?: string; targetId?: string },
   ): Promise<GranolaAutomationArtefact>;
   resolveAutomationRun(
     id: string,

@@ -18,7 +18,11 @@ import {
   type GranolaAutomationAgentRunner,
 } from "../agents.ts";
 import type { GranolaAgentProviderRegistry } from "../agent-provider-registry.ts";
-import { automationActionName, type AutomationActionContext } from "../automation-actions.ts";
+import {
+  automationActionName,
+  enabledAutomationActions,
+  type AutomationActionContext,
+} from "../automation-actions.ts";
 import type { GranolaAutomationActionRegistry } from "../automation-action-registry.ts";
 import {
   buildAutomationDeliveryPayload,
@@ -78,7 +82,7 @@ import {
   type MeetingIndexStore,
 } from "../meeting-index.ts";
 import { createDefaultPkmTargetStore, type PkmTargetStore } from "../pkm-targets.ts";
-import { syncMarkdownVaultTarget } from "../pkm-vault.ts";
+import { previewMarkdownVaultTarget, syncMarkdownVaultTarget } from "../pkm-vault.ts";
 import {
   resolveGranolaIntelligencePreset,
   type GranolaIntelligencePreset,
@@ -118,6 +122,7 @@ import { writeTextFile } from "../utils.ts";
 import type {
   GranolaAppApi,
   GranolaAutomationArtefact,
+  GranolaAutomationArtefactPublishPreviewResult,
   GranolaAutomationArtefactKind,
   GranolaAutomationArtefactsResult,
   GranolaAutomationCommandAction,
@@ -164,6 +169,7 @@ import type {
   GranolaFolderListOptions,
   GranolaFolderListResult,
   GranolaPkmTarget,
+  GranolaPkmTargetsResult,
   GranolaProcessingIssue,
   GranolaProcessingIssuesResult,
   GranolaProcessingIssueSeverity,
@@ -918,6 +924,57 @@ export class GranolaApp implements GranolaAppApi {
     return await this.#automation.getAutomationArtefact(id);
   }
 
+  async listPkmTargets(): Promise<GranolaPkmTargetsResult> {
+    this.assertAutomationPluginEnabled();
+    return {
+      targets: await this.readPkmTargets(),
+    };
+  }
+
+  async previewAutomationArtefactPublish(
+    id: string,
+    options: { targetId?: string } = {},
+  ): Promise<GranolaAutomationArtefactPublishPreviewResult> {
+    this.assertAutomationPluginEnabled();
+    const artefact = await this.#automation.getAutomationArtefact(id);
+    const targets = await this.resolveArtefactPkmTargets(artefact);
+    if (targets.length === 0) {
+      return {
+        artefactId: artefact.id,
+        message: "No linked PKM publish target is configured for this artefact.",
+        targets: [],
+      };
+    }
+
+    const selectedTarget =
+      (options.targetId
+        ? targets.find((candidate) => candidate.id === options.targetId)
+        : undefined) ?? targets[0];
+    if (!selectedTarget) {
+      throw new Error(`linked PKM target not found for artefact: ${id}`);
+    }
+
+    const match = (await this.#automation.listAutomationMatches({ limit: 1_000 })).matches.find(
+      (candidate) => candidate.id === artefact.matchId,
+    );
+    if (!match) {
+      throw new Error(`automation match not found for artefact: ${id}`);
+    }
+
+    const bundle = await this.readMeetingBundleById(artefact.meetingId);
+    return {
+      artefactId: artefact.id,
+      preview: previewMarkdownVaultTarget({
+        artefact,
+        bundle,
+        match,
+        target: selectedTarget,
+      }),
+      selectedTargetId: selectedTarget.id,
+      targets,
+    };
+  }
+
   async listProcessingIssues(
     options: {
       limit?: number;
@@ -965,7 +1022,7 @@ export class GranolaApp implements GranolaAppApi {
   async resolveAutomationArtefact(
     id: string,
     decision: "approve" | "reject",
-    options: { note?: string } = {},
+    options: { note?: string; targetId?: string } = {},
   ): Promise<GranolaAutomationArtefact> {
     this.assertAutomationPluginEnabled();
     return await this.#automation.resolveAutomationArtefact(id, decision, options);
@@ -1432,6 +1489,38 @@ export class GranolaApp implements GranolaAppApi {
     }
 
     return (await this.deps.pkmTargetStore.readTargets()).map((target) => ({ ...target }));
+  }
+
+  private async resolveArtefactPkmTargets(
+    artefact: GranolaAutomationArtefact,
+  ): Promise<GranolaPkmTarget[]> {
+    const rule = (await this.#automation.listAutomationRules()).rules.find(
+      (candidate) => candidate.id === artefact.ruleId,
+    );
+    if (!rule) {
+      return [];
+    }
+
+    const linkedTargetIds = enabledAutomationActions(rule, {
+      registry: this.deps.automationActionRegistry,
+      sourceActionId: artefact.actionId,
+      trigger: "approval",
+    })
+      .filter(
+        (action): action is GranolaAutomationPkmSyncAction =>
+          action.kind === "pkm-sync" && Boolean(action.targetId),
+      )
+      .map((action) => action.targetId);
+
+    if (linkedTargetIds.length === 0) {
+      return [];
+    }
+
+    const targetsById = new Map((await this.readPkmTargets()).map((target) => [target.id, target]));
+    return [...new Set(linkedTargetIds)]
+      .map((targetId) => targetsById.get(targetId))
+      .filter((target): target is GranolaPkmTarget => Boolean(target))
+      .map((target) => ({ ...target }));
   }
 
   private async runAutomationPkmSync(

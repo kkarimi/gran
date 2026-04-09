@@ -711,6 +711,7 @@ function createWorkspaceHarness(
     inspectSync: vi.fn(async () => state.sync),
     listAgentHarnesses: vi.fn(async () => ({ harnesses: [] })),
     listExportTargets: vi.fn(async () => ({ targets: [] })),
+    listPkmTargets: vi.fn(async () => ({ targets: [] })),
     getAutomationArtefact: vi.fn(async (id: string) => ({
       actionId: "pipeline-notes",
       actionName: "Pipeline notes",
@@ -811,6 +812,11 @@ function createWorkspaceHarness(
     listSyncEvents: vi.fn(async () => ({ events: [] })),
     loginAuth: vi.fn(async () => state.auth),
     logoutAuth: vi.fn(async () => state.auth),
+    previewAutomationArtefactPublish: vi.fn(async (id: string) => ({
+      artefactId: id,
+      message: "No linked PKM publish target is configured for this artefact.",
+      targets: [],
+    })),
     recoverProcessingIssue,
     refreshAuth: vi.fn(async () => state.auth),
     resolveAutomationArtefact,

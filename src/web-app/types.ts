@@ -4,6 +4,7 @@ import type {
   GranolaAgentHarnessMatchExplanation,
   GranolaAutomationActionRun,
   GranolaAutomationArtefact,
+  GranolaAutomationArtefactPublishPreviewResult,
   GranolaAutomationArtefactKind,
   GranolaAutomationEvaluationRun,
   GranolaAutomationRule,
@@ -11,6 +12,7 @@ import type {
   GranolaExportTarget,
   GranolaMeetingBundle,
   GranolaMeetingSort,
+  GranolaPkmTarget,
   GranolaSyncEventKind,
   MeetingRecord,
   MeetingSummaryRecord,
@@ -37,6 +39,9 @@ export interface GranolaWebAppState {
   automationArtefactDraftSummary: string;
   automationArtefactDraftTitle: string;
   automationArtefactError: string;
+  automationArtefactPublishPreview: GranolaAutomationArtefactPublishPreviewResult | null;
+  automationArtefactPublishPreviewError: string;
+  automationArtefactPublishPreviewLoading: boolean;
   automationArtefacts: GranolaAutomationArtefact[];
   automationRules: GranolaAutomationRule[];
   automationRuns: GranolaAutomationActionRun[];
@@ -66,6 +71,7 @@ export interface GranolaWebAppState {
   preferredProvider: GranolaAgentProviderKind;
   processingIssueError: string;
   processingIssues: import("../app/index.ts").GranolaProcessingIssue[];
+  pkmTargets: GranolaPkmTarget[];
   recentMeetings: WebWorkspacePreferences["recentMeetings"];
   reviewNote: string;
   savedFilters: WebWorkspacePreferences["savedFilters"];
@@ -78,6 +84,7 @@ export interface GranolaWebAppState {
   selectedMeeting: MeetingRecord | null;
   selectedMeetingBundle: GranolaMeetingBundle | null;
   selectedMeetingId: string | null;
+  selectedPkmTargetId: string | null;
   selectedReviewInboxKey: string | null;
   serverInfo: GranolaServerInfo | null;
   serverLocked: boolean;

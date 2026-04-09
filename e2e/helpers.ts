@@ -13,6 +13,7 @@ import { MemoryAgentHarnessStore } from "../src/agent-harnesses.ts";
 import { GranolaApp } from "../src/app/core.ts";
 import type { GranolaAppAuthState } from "../src/app/index.ts";
 import { MemoryAutomationRuleStore } from "../src/automation-rules.ts";
+import { MemoryPkmTargetStore } from "../src/pkm-targets.ts";
 import { startGranolaServer } from "../src/server/http.ts";
 import { MemorySyncEventStore } from "../src/sync-events.ts";
 import type { CacheData, GranolaDocument, GranolaFolder } from "../src/types.ts";
@@ -378,6 +379,13 @@ export async function startToolkitWebServer(
                       kind: "notes",
                     },
                   },
+                  {
+                    id: "team-notes-publish",
+                    kind: "pkm-sync",
+                    sourceActionId: "team-notes-pipeline",
+                    targetId: "team-vault",
+                    trigger: "approval",
+                  },
                 ],
                 id: "team-notes-on-transcript",
                 name: "Review team notes when a transcript is ready",
@@ -415,6 +423,21 @@ export async function startToolkitWebServer(
         };
       },
       now: () => new Date("2024-03-01T12:00:00Z"),
+      pkmTargetStore: new MemoryPkmTargetStore(
+        scenario === "cold-start"
+          ? []
+          : [
+              {
+                dailyNotesDir: "Daily",
+                folderSubdirectories: true,
+                id: "team-vault",
+                kind: "obsidian",
+                name: "Team Vault",
+                outputDir: join(outputRoot, "vault"),
+                vaultName: "Work",
+              },
+            ],
+      ),
       syncEventStore: new MemorySyncEventStore(),
     },
     { surface: "web" },

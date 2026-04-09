@@ -4,10 +4,12 @@ import { afterEach, describe, expect, test } from "vite-plus/test";
 
 import { MemoryAgentHarnessStore } from "../src/agent-harnesses.ts";
 import { GranolaApp } from "../src/app/core.ts";
+import { MemoryAutomationArtefactStore } from "../src/automation-artefacts.ts";
 import { MemoryAutomationMatchStore } from "../src/automation-matches.ts";
 import { MemoryAutomationRunStore } from "../src/automation-runs.ts";
 import { MemoryAutomationRuleStore } from "../src/automation-rules.ts";
 import { MemoryExportTargetStore } from "../src/export-targets.ts";
+import { MemoryPkmTargetStore } from "../src/pkm-targets.ts";
 import type { GranolaAppStateEvent } from "../src/app/index.ts";
 import { MemorySyncEventStore } from "../src/sync-events.ts";
 import { createGranolaServerClient } from "../src/server/client.ts";
@@ -71,6 +73,20 @@ const folders: GranolaFolder[] = [
     workspaceId: "workspace-1",
   },
 ];
+
+function enableAutomationConfig() {
+  return {
+    enabled: {
+      automation: true,
+      "markdown-viewer": true,
+    },
+    settingsFile: "/tmp/plugins.json",
+    sources: {
+      automation: "config" as const,
+      "markdown-viewer": "default" as const,
+    },
+  };
+}
 
 function createTestApp(options: { withCacheFile?: boolean } = {}): {
   app: GranolaApp;
@@ -592,6 +608,228 @@ describe("GranolaServerClient", () => {
         ],
       }),
     );
+  });
+
+  test("exposes PKM publish previews and target-aware approval through the attached server", async () => {
+    const docsDir = "/tmp/gran-server-client-pkm-docs";
+    const obsidianDir = "/tmp/gran-server-client-pkm-obsidian";
+    const automationArtefactStore = new MemoryAutomationArtefactStore();
+    const automationMatchStore = new MemoryAutomationMatchStore();
+    await automationArtefactStore.writeArtefacts([
+      {
+        actionId: "team-notes-pipeline",
+        actionName: "Team notes",
+        attempts: [],
+        createdAt: "2024-03-01T12:00:00.000Z",
+        eventId: "sync-1",
+        history: [
+          {
+            action: "generated",
+            at: "2024-03-01T12:00:00.000Z",
+          },
+        ],
+        id: "notes:sync-1:team-notes-pipeline",
+        kind: "notes",
+        matchId: "sync-1:team-transcript",
+        meetingId: "doc-alpha-1111",
+        model: "gpt-5-codex",
+        parseMode: "json",
+        prompt: "Write team notes",
+        provider: "codex",
+        rawOutput: "{}",
+        ruleId: "team-transcript",
+        ruleName: "Team transcript ready",
+        runId: "sync-1:team-transcript:team-notes-pipeline",
+        status: "generated",
+        structured: {
+          actionItems: [],
+          decisions: [],
+          followUps: [],
+          highlights: [],
+          markdown: "# Team Notes\n\nReady for PKM review.",
+          sections: [],
+          summary: "Ready for PKM review",
+          title: "Team Notes",
+        },
+        updatedAt: "2024-03-01T12:00:00.000Z",
+      },
+    ]);
+    await automationMatchStore.appendMatches([
+      {
+        eventId: "sync-1",
+        eventKind: "transcript.ready",
+        folders: [
+          {
+            createdAt: "2024-01-01T08:00:00Z",
+            documentCount: 1,
+            id: "folder-team-1111",
+            isFavourite: true,
+            name: "Team",
+            updatedAt: "2024-01-04T10:00:00Z",
+          },
+        ],
+        id: "sync-1:team-transcript",
+        matchedAt: "2024-03-01T12:00:00.000Z",
+        meetingId: "doc-alpha-1111",
+        ruleId: "team-transcript",
+        ruleName: "Team transcript ready",
+        tags: ["team", "alpha"],
+        title: "Alpha Sync",
+        transcriptLoaded: true,
+      },
+    ]);
+
+    const app = new GranolaApp(
+      {
+        automation: {
+          artefactsFile: "/tmp/automation-artefacts.json",
+          pkmTargetsFile: "/tmp/pkm-targets.json",
+          rulesFile: "/tmp/automation-rules.json",
+        },
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        plugins: enableAutomationConfig(),
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile: "",
+          output: "/tmp/transcripts",
+        },
+      },
+      {
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        automationArtefactStore,
+        automationMatchStore,
+        automationRunStore: new MemoryAutomationRunStore(),
+        automationRuleStore: new MemoryAutomationRuleStore([
+          {
+            actions: [
+              {
+                approvalMode: "manual",
+                id: "team-notes-pipeline",
+                kind: "agent",
+                pipeline: {
+                  kind: "notes",
+                },
+                prompt: "Write team notes",
+              },
+              {
+                id: "team-docs-sync",
+                kind: "pkm-sync",
+                sourceActionId: "team-notes-pipeline",
+                targetId: "team-docs",
+                trigger: "approval",
+              },
+              {
+                id: "team-vault-sync",
+                kind: "pkm-sync",
+                sourceActionId: "team-notes-pipeline",
+                targetId: "team-vault",
+                trigger: "approval",
+              },
+            ],
+            id: "team-transcript",
+            name: "Team transcript ready",
+            when: {
+              eventKinds: ["transcript.ready"],
+              folderNames: ["Team"],
+              transcriptLoaded: true,
+            },
+          },
+        ]),
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+        pkmTargetStore: new MemoryPkmTargetStore([
+          {
+            folderSubdirectories: true,
+            id: "team-docs",
+            kind: "docs-folder",
+            name: "Team Docs",
+            outputDir: docsDir,
+          },
+          {
+            dailyNotesDir: "Daily",
+            folderSubdirectories: true,
+            id: "team-vault",
+            kind: "obsidian",
+            name: "Team Vault",
+            outputDir: obsidianDir,
+            vaultName: "Work",
+          },
+        ]),
+      },
+      { surface: "server" },
+    );
+
+    const server = await startGranolaServer(app);
+    closeServer = async () => await server.close();
+
+    const client = await createGranolaServerClient(server.url);
+    closeClient = async () => await client.close();
+
+    await expect(client.listPkmTargets()).resolves.toEqual({
+      targets: expect.arrayContaining([
+        expect.objectContaining({ id: "team-docs" }),
+        expect.objectContaining({ id: "team-vault" }),
+      ]),
+    });
+
+    const artefact = (await client.listAutomationArtefacts({ limit: 10 })).artefacts[0];
+    expect(artefact).toBeDefined();
+
+    await expect(
+      client.previewAutomationArtefactPublish(artefact!.id, {
+        targetId: "team-vault",
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        artefactId: artefact!.id,
+        selectedTargetId: "team-vault",
+        targets: expect.arrayContaining([
+          expect.objectContaining({ id: "team-docs" }),
+          expect.objectContaining({ id: "team-vault" }),
+        ]),
+        preview: expect.objectContaining({
+          dailyNoteFilePath: `${obsidianDir}/Daily/2024-01-01.md`,
+          noteFilePath: `${obsidianDir}/Meetings/Team/Alpha Sync-notes.md`,
+        }),
+      }),
+    );
+
+    await expect(
+      client.resolveAutomationArtefact(artefact!.id, "approve", {
+        note: "Ship to docs",
+        targetId: "team-docs",
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: "approved",
+      }),
+    );
+
+    const runs = await client.listAutomationRuns({ limit: 10 });
+    expect(runs.runs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionId: "team-docs-sync",
+          artefactIds: [artefact!.id],
+          status: "completed",
+        }),
+      ]),
+    );
+    expect(runs.runs.map((run) => run.actionId)).not.toContain("team-vault-sync");
   });
 
   test("supports password-protected attach flows", async () => {

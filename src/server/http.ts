@@ -120,6 +120,7 @@ export async function startGranolaServer(
     dataDirectory: await describeLocalPath(persistenceLayout.dataDirectory, "directory"),
     exportTargets: await describeLocalPath(app.config.exports?.targetsFile || undefined, "file"),
     meetingIndex: await describeLocalPath(persistenceLayout.meetingIndexFile, "file"),
+    pkmTargets: await describeLocalPath(app.config.automation?.pkmTargetsFile || undefined, "file"),
     pluginSettings: await describeLocalPath(
       app.config.plugins?.settingsFile || persistenceLayout.pluginsFile,
       "file",
@@ -137,6 +138,7 @@ export async function startGranolaServer(
       configFile: app.config.configFileUsed || undefined,
       exportTargetsFile: app.config.exports?.targetsFile || undefined,
       notesOutputDir: app.config.notes.output || undefined,
+      pkmTargetsFile: app.config.automation?.pkmTargetsFile || undefined,
       pluginsFile: app.config.plugins?.settingsFile || undefined,
       supabaseFile: app.config.supabase || undefined,
       transcriptCacheFile: app.config.transcripts.cacheFile || undefined,
@@ -164,6 +166,7 @@ export async function startGranolaServer(
       exportTargetsFile: persistenceLayout.exportTargetsFile,
       meetingIndex: true,
       meetingIndexFile: persistenceLayout.meetingIndexFile,
+      pkmTargetsFile: persistenceLayout.pkmTargetsFile,
       searchIndexFile: persistenceLayout.searchIndexFile,
       sessionStore: persistenceLayout.sessionStoreKind,
       sessionFile: persistenceLayout.sessionFile,

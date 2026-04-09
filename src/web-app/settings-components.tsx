@@ -545,6 +545,17 @@ export function DiagnosticsPanel(props: {
         title: "Export target profiles",
       },
       {
+        detail: "PKM publish targets used by review-first automation and vault publishing.",
+        fallbackPath:
+          props.appState?.config.automation?.pkmTargetsFile ||
+          props.serverInfo?.config.pkmTargetsFile,
+        file: props.serverInfo?.files?.pkmTargets,
+        label: "PKM targets",
+        missingDetail:
+          "This file will be created when you first save a PKM target for review-first publishing.",
+        title: "PKM target profiles",
+      },
+      {
         detail: "Loaded when automation rules are enabled.",
         fallbackPath:
           props.appState?.config.automation?.rulesFile ||

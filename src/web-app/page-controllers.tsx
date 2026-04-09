@@ -8,6 +8,7 @@ import type {
   GranolaAgentHarnessMatchExplanation,
   GranolaAutomationActionRun,
   GranolaAutomationArtefact,
+  GranolaAutomationArtefactPublishPreviewResult,
   GranolaAutomationArtefactKind,
   GranolaAutomationEvaluationRun,
   GranolaAppAuthMode,
@@ -280,6 +281,9 @@ export function ReviewPageController(props: {
   artefactDraftSummary: string;
   artefactDraftTitle: string;
   artefactError: string;
+  artefactPublishPreview: GranolaAutomationArtefactPublishPreviewResult | null;
+  artefactPublishPreviewError: string;
+  artefactPublishPreviewLoading: boolean;
   markdownViewerEnabled: boolean;
   onApproveArtefact: () => void;
   onApproveRun: (runId: string) => void;
@@ -293,11 +297,13 @@ export function ReviewPageController(props: {
   onRejectRun: (runId: string) => void;
   onRerunArtefact: () => void;
   onReviewNoteChange: (value: string) => void;
+  onSelectPublishTarget: (targetId: string | null) => void;
   onSaveArtefact: () => void;
   onSelectItem: (key: string) => void;
   reviewItems: ReviewItems;
   reviewNote: string;
   reviewSummary: ReviewSummary;
+  selectedPkmTargetId: string | null;
   selectedArtefact: GranolaAutomationArtefact | null;
   selectedBundle: GranolaMeetingBundle | null;
   selectedIssue: import("../app/index.ts").GranolaProcessingIssue | null;
@@ -351,6 +357,9 @@ export function ReviewPageController(props: {
                 draftSummary={props.artefactDraftSummary}
                 draftTitle={props.artefactDraftTitle}
                 error={props.artefactError}
+                publishPreview={props.artefactPublishPreview}
+                publishPreviewError={props.artefactPublishPreviewError}
+                publishPreviewLoading={props.artefactPublishPreviewLoading}
                 markdownViewerEnabled={props.markdownViewerEnabled}
                 onApprove={() => props.onApproveArtefact()}
                 onDraftMarkdownChange={(value) => props.onDraftMarkdownChange(value)}
@@ -359,8 +368,10 @@ export function ReviewPageController(props: {
                 onReject={() => props.onRejectArtefact()}
                 onRerun={() => props.onRerunArtefact()}
                 onReviewNoteChange={(value) => props.onReviewNoteChange(value)}
+                onSelectPublishTarget={(targetId) => props.onSelectPublishTarget(targetId)}
                 onSave={() => props.onSaveArtefact()}
                 reviewNote={props.reviewNote}
+                selectedPublishTargetId={props.selectedPkmTargetId}
               />
             </Match>
             <Match when={true}>

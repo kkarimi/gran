@@ -2155,6 +2155,194 @@ describe("GranolaApp", () => {
     );
   });
 
+  test("previews linked PKM targets and only syncs the selected target on approval", async () => {
+    const obsidianDir = await mkdtemp(join(tmpdir(), "granola-pkm-obsidian-"));
+    const docsDir = await mkdtemp(join(tmpdir(), "granola-pkm-docs-"));
+    const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-cache-")), "cache.json");
+    await writeFile(cacheFile, "{}\n", "utf8");
+
+    const app = new GranolaApp(
+      enableAutomation({
+        agents: {
+          codexCommand: "codex",
+          defaultProvider: "codex",
+          dryRun: false,
+          harnessesFile: "/tmp/agent-harnesses.json",
+          maxRetries: 1,
+          openaiBaseUrl: "https://api.openai.com/v1",
+          openrouterBaseUrl: "https://openrouter.ai/api/v1",
+          timeoutMs: 30_000,
+        },
+        automation: {
+          artefactsFile: "/tmp/automation-artefacts.json",
+          pkmTargetsFile: "/tmp/pkm-targets.json",
+          rulesFile: "/tmp/automation-rules.json",
+        },
+        debug: false,
+        notes: {
+          output: "/tmp/notes",
+          timeoutMs: 120_000,
+        },
+        supabase: "/tmp/supabase.json",
+        transcripts: {
+          cacheFile,
+          output: "/tmp/transcripts",
+        },
+      }),
+      {
+        agentRunner: {
+          run: async (
+            request: GranolaAutomationAgentRequest,
+          ): Promise<GranolaAutomationAgentResult> => ({
+            dryRun: false,
+            model: "gpt-5-codex",
+            output: JSON.stringify({
+              markdown: "# Reviewed PKM Notes\n\nReady to publish.",
+              summary: "Ready to publish",
+              title: "Reviewed PKM Notes",
+            }),
+            prompt: request.prompt,
+            provider: "codex",
+          }),
+        },
+        auth: {
+          mode: "supabase-file",
+          refreshAvailable: false,
+          storedSessionAvailable: false,
+          supabaseAvailable: true,
+          supabasePath: "/tmp/supabase.json",
+        },
+        automationArtefactStore: new MemoryAutomationArtefactStore(),
+        automationMatchStore: new MemoryAutomationMatchStore(),
+        automationRuleStore: new MemoryAutomationRuleStore([
+          {
+            actions: [
+              {
+                approvalMode: "manual",
+                id: "pipeline-notes",
+                kind: "agent",
+                pipeline: {
+                  kind: "notes",
+                },
+                prompt: "Write vault-ready notes",
+              },
+              {
+                id: "obsidian-sync",
+                kind: "pkm-sync",
+                sourceActionId: "pipeline-notes",
+                targetId: "obsidian-team",
+                trigger: "approval",
+              },
+              {
+                id: "docs-sync",
+                kind: "pkm-sync",
+                sourceActionId: "pipeline-notes",
+                targetId: "docs-team",
+                trigger: "approval",
+              },
+            ],
+            id: "team-transcript",
+            name: "Team transcript ready",
+            when: {
+              eventKinds: ["transcript.ready"],
+              folderNames: ["Team"],
+              tags: ["team"],
+              transcriptLoaded: true,
+            },
+          },
+        ]),
+        automationRunStore: new MemoryAutomationRunStore(),
+        cacheLoader: async () => cacheData,
+        granolaClient: {
+          listDocuments: async () => documents,
+          listFolders: async () => folders,
+        },
+        now: () => new Date("2024-03-01T12:00:00Z"),
+        pkmTargetStore: new MemoryPkmTargetStore([
+          {
+            dailyNotesDir: "Daily",
+            folderSubdirectories: true,
+            id: "obsidian-team",
+            kind: "obsidian",
+            name: "Team Vault",
+            outputDir: obsidianDir,
+            vaultName: "Work",
+          },
+          {
+            folderSubdirectories: true,
+            id: "docs-team",
+            kind: "docs-folder",
+            name: "Team Docs",
+            outputDir: docsDir,
+          },
+        ]),
+      },
+      { surface: "server" },
+    );
+
+    await app.sync();
+
+    await expect(app.listPkmTargets()).resolves.toEqual({
+      targets: expect.arrayContaining([
+        expect.objectContaining({
+          id: "obsidian-team",
+        }),
+        expect.objectContaining({
+          id: "docs-team",
+        }),
+      ]),
+    });
+
+    const artefact = (await app.listAutomationArtefacts({ kind: "notes", limit: 10 })).artefacts[0];
+    expect(artefact).toBeDefined();
+
+    const preview = await app.previewAutomationArtefactPublish(artefact!.id, {
+      targetId: "docs-team",
+    });
+    expect(preview).toEqual(
+      expect.objectContaining({
+        artefactId: artefact!.id,
+        selectedTargetId: "docs-team",
+        targets: expect.arrayContaining([
+          expect.objectContaining({ id: "docs-team", name: "Team Docs" }),
+          expect.objectContaining({ id: "obsidian-team", name: "Team Vault" }),
+        ]),
+      }),
+    );
+    expect(preview.preview).toEqual(
+      expect.objectContaining({
+        noteFilePath: join(docsDir, "Meetings", "Team", "Alpha Sync-notes.md"),
+        transcriptFilePath: join(docsDir, "Transcripts", "Team", "Alpha Sync-transcript.md"),
+      }),
+    );
+
+    const approved = await app.resolveAutomationArtefact(artefact!.id, "approve", {
+      note: "Publish to docs only",
+      targetId: "docs-team",
+    });
+    expect(approved.status).toBe("approved");
+
+    const docsNoteFile = join(docsDir, "Meetings", "Team", "Alpha Sync-notes.md");
+    const docsTranscriptFile = join(docsDir, "Transcripts", "Team", "Alpha Sync-transcript.md");
+    const obsidianNoteFile = join(obsidianDir, "Meetings", "Team", "Alpha Sync-notes.md");
+
+    expect(await readFile(docsNoteFile, "utf8")).toContain("# Reviewed PKM Notes");
+    expect(await readFile(docsTranscriptFile, "utf8")).toContain("## Transcript");
+    await expect(readFile(obsidianNoteFile, "utf8")).rejects.toThrow();
+
+    const runs = await app.listAutomationRuns({ limit: 10 });
+    expect(runs.runs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionId: "docs-sync",
+          artefactIds: [artefact!.id],
+          status: "completed",
+        }),
+      ]),
+    );
+    expect(runs.runs.map((run) => run.actionId)).not.toContain("obsidian-sync");
+  });
+
   test("detects failed processing issues and recovers them", async () => {
     const runAgent = vi.fn(
       async (): Promise<GranolaAutomationAgentResult> => ({

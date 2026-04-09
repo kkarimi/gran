@@ -81,6 +81,9 @@ export function App() {
     automationArtefactDraftSummary: "",
     automationArtefactDraftTitle: "",
     automationArtefactError: "",
+    automationArtefactPublishPreview: null,
+    automationArtefactPublishPreviewError: "",
+    automationArtefactPublishPreviewLoading: false,
     automationArtefacts: [],
     automationRules: [],
     appState: null,
@@ -106,6 +109,7 @@ export function App() {
     meetingSource: "live",
     meetings: [],
     meetingsLoading: false,
+    pkmTargets: [],
     processingIssueError: "",
     processingIssues: [],
     preferredProvider: "openrouter",
@@ -120,6 +124,7 @@ export function App() {
     selectedMeetingBundle: null,
     selectedMeetingId: startup.meetingId || null,
     selectedMeeting: null,
+    selectedPkmTargetId: null,
     selectedReviewInboxKey: null,
     searchSubmitted: false,
     reviewNote: "",
@@ -197,6 +202,7 @@ export function App() {
     await Promise.all([
       reviewController.loadAutomationRuns(),
       reviewController.loadAutomationArtefacts(),
+      reviewController.loadPkmTargets(),
       reviewController.loadProcessingIssues(),
     ]);
   };
@@ -350,6 +356,7 @@ export function App() {
       refreshTasks.push(
         loadAutomationCapabilityState({
           loadAutomationArtefacts: reviewController.loadAutomationArtefacts,
+          loadPkmTargets: reviewController.loadPkmTargets,
           loadAutomationRules: reviewController.loadAutomationRules,
           loadAutomationRuns: reviewController.loadAutomationRuns,
           loadHarnesses: harnessController.loadHarnesses,
@@ -572,6 +579,7 @@ export function App() {
       if (pluginExposesAutomationCapability(nextPlugin) && enabled) {
         await loadAutomationCapabilityState({
           loadAutomationArtefacts: reviewController.loadAutomationArtefacts,
+          loadPkmTargets: reviewController.loadPkmTargets,
           loadAutomationRules: reviewController.loadAutomationRules,
           loadAutomationRuns: reviewController.loadAutomationRuns,
           loadHarnesses: harnessController.loadHarnesses,
@@ -907,6 +915,9 @@ export function App() {
                   artefactDraftSummary={state.automationArtefactDraftSummary}
                   artefactDraftTitle={state.automationArtefactDraftTitle}
                   artefactError={state.automationArtefactError}
+                  artefactPublishPreview={state.automationArtefactPublishPreview}
+                  artefactPublishPreviewError={state.automationArtefactPublishPreviewError}
+                  artefactPublishPreviewLoading={state.automationArtefactPublishPreviewLoading}
                   markdownViewerEnabled={markdownViewerEnabled()}
                   onApproveArtefact={() => {
                     void reviewController.resolveAutomationArtefact("approve");
@@ -944,6 +955,9 @@ export function App() {
                   onReviewNoteChange={(value) => {
                     setState("reviewNote", value);
                   }}
+                  onSelectPublishTarget={(targetId) => {
+                    void reviewController.selectAutomationArtefactPublishTarget(targetId);
+                  }}
                   onSaveArtefact={() => {
                     void reviewController.saveAutomationArtefact();
                   }}
@@ -955,6 +969,7 @@ export function App() {
                   reviewItems={reviewController.reviewInboxItems()}
                   reviewNote={state.reviewNote}
                   reviewSummary={reviewController.reviewInboxSummary()}
+                  selectedPkmTargetId={state.selectedPkmTargetId}
                   selectedArtefact={reviewController.selectedReviewArtefact()}
                   selectedBundle={state.selectedMeetingBundle}
                   selectedIssue={reviewController.selectedReviewIssue()}

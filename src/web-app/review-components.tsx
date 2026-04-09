@@ -5,6 +5,7 @@ import { For, Show, type JSX } from "solid-js";
 import type {
   GranolaAutomationActionRun,
   GranolaAutomationArtefact,
+  GranolaAutomationArtefactPublishPreviewResult,
   GranolaMeetingBundle,
   GranolaProcessingIssue,
 } from "../app/index.ts";
@@ -51,8 +52,61 @@ interface ArtefactReviewPanelProps {
   onReject: () => void;
   onRerun: () => void;
   onReviewNoteChange: (value: string) => void;
+  onSelectPublishTarget: (targetId: string | null) => void;
   onSave: () => void;
+  publishPreview: GranolaAutomationArtefactPublishPreviewResult | null;
+  publishPreviewError?: string;
+  publishPreviewLoading: boolean;
   reviewNote: string;
+  selectedPublishTargetId: string | null;
+}
+
+function artefactAttemptSummary(artefact: GranolaAutomationArtefact): string {
+  if (artefact.attempts.length === 0) {
+    return "No attempt metadata recorded";
+  }
+
+  return artefact.attempts
+    .map((attempt) => {
+      const parts = [attempt.provider, attempt.model, attempt.harnessId].filter(Boolean);
+      return parts.length > 0 ? parts.join(" · ") : "Attempt";
+    })
+    .join(" / ");
+}
+
+function publishPreviewEntries(preview: GranolaAutomationArtefactPublishPreviewResult | null) {
+  if (!preview?.preview) {
+    return [];
+  }
+
+  return [
+    {
+      key: "note",
+      label: "Meeting note",
+      openUrl: preview.preview.noteOpenUrl,
+      path: preview.preview.noteFilePath,
+    },
+    ...(preview.preview.transcriptFilePath
+      ? [
+          {
+            key: "transcript",
+            label: "Transcript",
+            openUrl: preview.preview.transcriptOpenUrl,
+            path: preview.preview.transcriptFilePath,
+          },
+        ]
+      : []),
+    ...(preview.preview.dailyNoteFilePath
+      ? [
+          {
+            key: "daily-note",
+            label: "Daily note",
+            openUrl: preview.preview.dailyNoteOpenUrl,
+            path: preview.preview.dailyNoteFilePath,
+          },
+        ]
+      : []),
+  ];
 }
 
 export function AutomationRunsPanel(props: AutomationRunsPanelProps): JSX.Element {
@@ -448,6 +502,80 @@ export function ArtefactReviewPanel(props: ArtefactReviewPanelProps): JSX.Elemen
                 </section>
                 <section class="detail-section">
                   <h2>Candidate</h2>
+                  <section class="detail-section detail-section--subsection">
+                    <h3>Publish target</h3>
+                    <Show
+                      when={props.publishPreview?.targets.length}
+                      fallback={
+                        <p class="section-note">
+                          {props.publishPreviewError ||
+                            props.publishPreview?.message ||
+                            "No linked PKM publish target is configured for this artefact yet."}
+                        </p>
+                      }
+                    >
+                      <div class="publish-target-panel">
+                        <label class="field-row">
+                          <span class="field-label">Target</span>
+                          <select
+                            class="field-input field-input--plain"
+                            onInput={(event) => {
+                              props.onSelectPublishTarget(event.currentTarget.value || null);
+                            }}
+                            value={
+                              props.selectedPublishTargetId ||
+                              props.publishPreview?.selectedTargetId ||
+                              ""
+                            }
+                          >
+                            <For each={props.publishPreview?.targets ?? []}>
+                              {(target) => (
+                                <option value={target.id}>{target.name ?? target.id}</option>
+                              )}
+                            </For>
+                          </select>
+                        </label>
+                        <Show when={props.publishPreviewLoading}>
+                          <p class="section-note">Loading publish preview…</p>
+                        </Show>
+                        <Show when={!props.publishPreviewLoading && props.publishPreview?.preview}>
+                          <div class="publish-preview-list">
+                            <For each={publishPreviewEntries(props.publishPreview)}>
+                              {(item) => (
+                                <div class="publish-preview-row">
+                                  <div>
+                                    <strong>{item.label}</strong>
+                                    <div class="publish-preview-row__path">{item.path}</div>
+                                  </div>
+                                  <Show when={item.openUrl}>
+                                    {(openUrl) => (
+                                      <a
+                                        class="mini-button"
+                                        href={openUrl()}
+                                        rel="noreferrer"
+                                        target="_blank"
+                                      >
+                                        Open
+                                      </a>
+                                    )}
+                                  </Show>
+                                </div>
+                              )}
+                            </For>
+                          </div>
+                        </Show>
+                      </div>
+                    </Show>
+                  </section>
+                  <section class="detail-section detail-section--subsection">
+                    <h3>Provenance</h3>
+                    <div class="detail-meta">
+                      <div class="detail-chip">{`Rule: ${artefact().ruleName}`}</div>
+                      <div class="detail-chip">{`Source action: ${artefact().actionName}`}</div>
+                      <div class="detail-chip">{`Provider: ${artefact().provider}/${artefact().model}`}</div>
+                    </div>
+                    <p class="section-note">{artefactAttemptSummary(artefact())}</p>
+                  </section>
                   <label class="field-row">
                     <span class="field-label">Title</span>
                     <input

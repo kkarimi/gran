@@ -1935,6 +1935,45 @@ select {
   margin-top: 18px;
 }
 
+.detail-section--subsection {
+  margin-bottom: 18px;
+}
+
+.publish-target-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.publish-preview-list {
+  display: grid;
+  gap: 10px;
+}
+
+.publish-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.publish-preview-row strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.publish-preview-row__path {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
 .empty {
   margin: 24px;
   padding: 24px;

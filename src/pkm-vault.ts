@@ -5,6 +5,7 @@ import type {
   GranolaAutomationMatch,
   GranolaMeetingBundle,
   GranolaPkmTarget,
+  GranolaPkmPublishPreview,
 } from "./app/index.ts";
 import { syncManagedExports } from "./export-state.ts";
 import { buildObsidianOpenFileUri } from "./obsidian-uri.ts";
@@ -274,20 +275,30 @@ function renderMarkdownVaultTranscript(options: {
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
-export async function syncMarkdownVaultTarget(options: {
+interface MarkdownVaultTargetPlanItem {
+  content: string;
+  filePath: string;
+  id: string;
+  openUrl?: string;
+  outputDir: string;
+  preferredStem: string;
+  relativeDir?: string;
+  sourceUpdatedAt: string;
+}
+
+interface MarkdownVaultTargetPlan {
+  dailyNote?: MarkdownVaultTargetPlanItem;
+  note: MarkdownVaultTargetPlanItem;
+  preview: GranolaPkmPublishPreview;
+  transcript?: MarkdownVaultTargetPlanItem;
+}
+
+function buildMarkdownVaultTargetPlan(options: {
   artefact: GranolaAutomationArtefact;
   bundle: GranolaMeetingBundle;
   match: GranolaAutomationMatch;
   target: GranolaPkmTarget;
-}): Promise<{
-  dailyNoteFilePath?: string;
-  filePath: string;
-  noteOpenUrl?: string;
-  transcriptFilePath?: string;
-  transcriptOpenUrl?: string;
-  written: number;
-  dailyNoteOpenUrl?: string;
-}> {
+}): MarkdownVaultTargetPlan {
   const meeting = buildPkmMeetingContextFromDocument(options.bundle.source.document);
   const folderName = meeting.folders[0]?.name || options.match.folders[0]?.name;
   const folderNames = uniqueStrings([
@@ -333,105 +344,6 @@ export async function syncMarkdownVaultTarget(options: {
     ? join(options.target.outputDir, dailyNotesDir, `${meeting.meetingDate}.md`)
     : undefined;
 
-  let written = await syncManagedExports({
-    items: [
-      {
-        content: renderMarkdownVaultNote({
-          artefact: options.artefact,
-          folderNames,
-          meetingId: meeting.id,
-          noteFilePath,
-          publishIdentityKey: noteIdentity.key,
-          rootDir: options.target.outputDir,
-          tags,
-          target: options.target,
-          transcriptFilePath,
-        }),
-        extension: ".md",
-        id: noteIdentity.key,
-        preferredStem: noteIdentity.preferredStem,
-        relativeDir: noteRelativeDir,
-        sourceUpdatedAt: options.artefact.updatedAt,
-      },
-    ],
-    kind: "notes",
-    outputDir: options.target.outputDir,
-  });
-
-  if (options.bundle.meeting.transcript && transcriptFilePath) {
-    written += await syncManagedExports({
-      items: [
-        {
-          content: renderMarkdownVaultTranscript({
-            bundle: options.bundle,
-            folderNames,
-            meetingId: meeting.id,
-            noteFilePath,
-            publishIdentityKey: transcriptIdentity.key,
-            rootDir: options.target.outputDir,
-            tags,
-            target: options.target,
-            transcriptFilePath,
-          }),
-          extension: ".md",
-          id: transcriptIdentity.key,
-          preferredStem: transcriptIdentity.preferredStem,
-          relativeDir: transcriptRelativeDir,
-          sourceUpdatedAt: latestDocumentTimestamp(options.bundle.source.document),
-        },
-      ],
-      kind: "transcripts",
-      outputDir: options.target.outputDir,
-    });
-  }
-
-  if (dailyNoteFilePath) {
-    const resolvedDailyNotesDir = dailyNotesDir!;
-    const noteLink = renderLink(
-      "obsidian",
-      options.target.outputDir,
-      dailyNoteFilePath,
-      noteFilePath,
-      meeting.title || meeting.id,
-    );
-    const transcriptLink = transcriptFilePath
-      ? renderLink(
-          "obsidian",
-          options.target.outputDir,
-          dailyNoteFilePath,
-          transcriptFilePath,
-          `${meeting.title || meeting.id} Transcript`,
-        )
-      : undefined;
-    written += await syncManagedExports({
-      items: [
-        {
-          content: [
-            ...(pkmTargetFrontmatterEnabled(options.target)
-              ? [
-                  "---",
-                  `title: ${quoteYamlString(meeting.meetingDate)}`,
-                  'type: "daily-note"',
-                  `date: ${quoteYamlString(meeting.meetingDate)}`,
-                  "---",
-                  "",
-                ]
-              : []),
-            "## Meetings",
-            "",
-            transcriptLink ? `- ${noteLink} · ${transcriptLink}` : `- ${noteLink}`,
-          ].join("\n"),
-          extension: ".md",
-          id: `daily-note:${options.target.id}:${meeting.meetingDate}`,
-          preferredStem: meeting.meetingDate,
-          sourceUpdatedAt: latestDocumentTimestamp(options.bundle.source.document),
-        },
-      ],
-      kind: "notes",
-      outputDir: join(options.target.outputDir, resolvedDailyNotesDir),
-    });
-  }
-
   const noteOpenUrl =
     options.target.kind === "obsidian"
       ? buildObsidianOpenFileUri({
@@ -454,13 +366,174 @@ export async function syncMarkdownVaultTarget(options: {
         })
       : undefined;
 
-  return {
-    dailyNoteFilePath,
-    dailyNoteOpenUrl,
+  const note: MarkdownVaultTargetPlanItem = {
+    content: renderMarkdownVaultNote({
+      artefact: options.artefact,
+      folderNames,
+      meetingId: meeting.id,
+      noteFilePath,
+      publishIdentityKey: noteIdentity.key,
+      rootDir: options.target.outputDir,
+      tags,
+      target: options.target,
+      transcriptFilePath,
+    }),
     filePath: noteFilePath,
-    noteOpenUrl,
-    transcriptFilePath,
-    transcriptOpenUrl,
+    id: noteIdentity.key,
+    openUrl: noteOpenUrl,
+    outputDir: options.target.outputDir,
+    preferredStem: noteIdentity.preferredStem,
+    relativeDir: noteRelativeDir,
+    sourceUpdatedAt: options.artefact.updatedAt,
+  };
+
+  const transcript =
+    options.bundle.meeting.transcript && transcriptFilePath
+      ? {
+          content: renderMarkdownVaultTranscript({
+            bundle: options.bundle,
+            folderNames,
+            meetingId: meeting.id,
+            noteFilePath,
+            publishIdentityKey: transcriptIdentity.key,
+            rootDir: options.target.outputDir,
+            tags,
+            target: options.target,
+            transcriptFilePath,
+          }),
+          filePath: transcriptFilePath,
+          id: transcriptIdentity.key,
+          openUrl: transcriptOpenUrl,
+          outputDir: options.target.outputDir,
+          preferredStem: transcriptIdentity.preferredStem,
+          relativeDir: transcriptRelativeDir,
+          sourceUpdatedAt: latestDocumentTimestamp(options.bundle.source.document),
+        }
+      : undefined;
+
+  const dailyNote =
+    dailyNoteFilePath && dailyNotesDir
+      ? {
+          content: [
+            ...(pkmTargetFrontmatterEnabled(options.target)
+              ? [
+                  "---",
+                  `title: ${quoteYamlString(meeting.meetingDate)}`,
+                  'type: "daily-note"',
+                  `date: ${quoteYamlString(meeting.meetingDate)}`,
+                  "---",
+                  "",
+                ]
+              : []),
+            "## Meetings",
+            "",
+            transcriptFilePath
+              ? `- ${renderLink("obsidian", options.target.outputDir, dailyNoteFilePath, noteFilePath, meeting.title || meeting.id)} · ${renderLink("obsidian", options.target.outputDir, dailyNoteFilePath, transcriptFilePath, `${meeting.title || meeting.id} Transcript`)}`
+              : `- ${renderLink("obsidian", options.target.outputDir, dailyNoteFilePath, noteFilePath, meeting.title || meeting.id)}`,
+          ].join("\n"),
+          filePath: dailyNoteFilePath,
+          id: `daily-note:${options.target.id}:${meeting.meetingDate}`,
+          openUrl: dailyNoteOpenUrl,
+          outputDir: join(options.target.outputDir, dailyNotesDir),
+          preferredStem: meeting.meetingDate,
+          sourceUpdatedAt: latestDocumentTimestamp(options.bundle.source.document),
+        }
+      : undefined;
+
+  return {
+    dailyNote,
+    note,
+    preview: {
+      dailyNoteFilePath,
+      dailyNoteOpenUrl,
+      noteFilePath,
+      noteOpenUrl,
+      transcriptFilePath,
+      transcriptOpenUrl,
+    },
+    transcript,
+  };
+}
+
+export function previewMarkdownVaultTarget(options: {
+  artefact: GranolaAutomationArtefact;
+  bundle: GranolaMeetingBundle;
+  match: GranolaAutomationMatch;
+  target: GranolaPkmTarget;
+}): GranolaPkmPublishPreview {
+  return buildMarkdownVaultTargetPlan(options).preview;
+}
+
+export async function syncMarkdownVaultTarget(options: {
+  artefact: GranolaAutomationArtefact;
+  bundle: GranolaMeetingBundle;
+  match: GranolaAutomationMatch;
+  target: GranolaPkmTarget;
+}): Promise<{
+  dailyNoteFilePath?: string;
+  filePath: string;
+  noteOpenUrl?: string;
+  transcriptFilePath?: string;
+  transcriptOpenUrl?: string;
+  written: number;
+  dailyNoteOpenUrl?: string;
+}> {
+  const plan = buildMarkdownVaultTargetPlan(options);
+  let written = await syncManagedExports({
+    items: [
+      {
+        content: plan.note.content,
+        extension: ".md",
+        id: plan.note.id,
+        preferredStem: plan.note.preferredStem,
+        relativeDir: plan.note.relativeDir,
+        sourceUpdatedAt: plan.note.sourceUpdatedAt,
+      },
+    ],
+    kind: "notes",
+    outputDir: plan.note.outputDir,
+  });
+
+  if (plan.transcript) {
+    written += await syncManagedExports({
+      items: [
+        {
+          content: plan.transcript.content,
+          extension: ".md",
+          id: plan.transcript.id,
+          preferredStem: plan.transcript.preferredStem,
+          relativeDir: plan.transcript.relativeDir,
+          sourceUpdatedAt: plan.transcript.sourceUpdatedAt,
+        },
+      ],
+      kind: "transcripts",
+      outputDir: plan.transcript.outputDir,
+    });
+  }
+
+  if (plan.dailyNote) {
+    written += await syncManagedExports({
+      items: [
+        {
+          content: plan.dailyNote.content,
+          extension: ".md",
+          id: plan.dailyNote.id,
+          preferredStem: plan.dailyNote.preferredStem,
+          sourceUpdatedAt: plan.dailyNote.sourceUpdatedAt,
+        },
+      ],
+      kind: "notes",
+      outputDir: plan.dailyNote.outputDir,
+    });
+  }
+
+  return {
+    dailyNoteFilePath: plan.preview.dailyNoteFilePath,
+    dailyNoteOpenUrl: plan.preview.dailyNoteOpenUrl,
+    filePath: plan.preview.noteFilePath,
+    noteOpenUrl: plan.preview.noteOpenUrl,
+    transcriptFilePath: plan.preview.transcriptFilePath,
+    transcriptOpenUrl: plan.preview.transcriptOpenUrl,
     written,
   };
 }

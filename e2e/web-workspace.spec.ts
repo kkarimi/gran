@@ -138,6 +138,20 @@ test.describe("toolkit web workspace", () => {
       .getByRole("button", { name: /Review/i })
       .click();
     await expect(page.getByText("Review Inbox")).toBeVisible();
+    await page
+      .locator(".jobs-list")
+      .getByRole("button", { name: /Team Notes/i })
+      .first()
+      .click();
+    await expect(page.getByRole("heading", { name: "Artefact Review" })).toBeVisible();
+    await expect(page.getByText("Publish target")).toBeVisible();
+    await expect(page.getByRole("combobox")).toHaveValue("team-vault");
+    await expect(page.locator(".publish-preview-list")).toContainText("Meeting note");
+    await expect(page.locator(".publish-preview-list")).toContainText(
+      "Meetings/Team/Alpha Sync-notes.md",
+    );
+    await expect(page.locator(".publish-preview-list")).toContainText("Daily/2024-01-01.md");
+    await expect(page.getByRole("link", { name: "Open" }).first()).toBeVisible();
   });
 
   test("configures and tests automation from Settings -> Plugins while keeping the selected meeting", async ({

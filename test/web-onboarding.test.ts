@@ -59,7 +59,7 @@ describe("web onboarding", () => {
         syncStateFile: "/tmp/sync-state.json",
       },
       product: "gran",
-      protocolVersion: 4,
+      protocolVersion: 5,
       runtime: {
         mode: "background-service",
         startedAt: "2026-04-05T10:00:00.000Z",

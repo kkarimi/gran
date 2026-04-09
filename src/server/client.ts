@@ -3,6 +3,7 @@ import type {
   GranolaAgentHarnessesResult,
   GranolaAgentHarnessExplanationsResult,
   GranolaAutomationArtefact,
+  GranolaAutomationArtefactPublishPreviewResult,
   GranolaAutomationArtefactKind,
   GranolaAutomationArtefactStatus,
   GranolaAutomationArtefactUpdate,
@@ -36,6 +37,7 @@ import type {
   GranolaNotesExportResult,
   GranolaProcessingIssueSeverity,
   GranolaProcessingRecoveryResult,
+  GranolaPkmTargetsResult,
   GranolaAutomationRunsResult,
   GranolaTranscriptsExportResult,
   NoteOutputFormat,
@@ -44,10 +46,12 @@ import type {
 import {
   granolaAutomationHarnessExplainPath,
   granolaAutomationArtefactDecisionPath,
+  granolaAutomationArtefactPublishPreviewPath,
   granolaAutomationArtefactPath,
   granolaAutomationArtefactRerunPath,
   granolaAutomationArtefactUpdatePath,
   granolaAutomationArtefactsPath,
+  granolaTransportPaths,
   granolaAutomationRunDecisionPath,
   granolaAutomationRunsPath,
   granolaExportJobRerunPath,
@@ -61,7 +65,6 @@ import {
   granolaPluginPath,
   granolaProcessingIssueRecoverPath,
   granolaProcessingIssuesPath,
-  granolaTransportPaths,
   granolaExportTargetsPath,
   GRANOLA_TRANSPORT_PROTOCOL_VERSION,
   type GranolaServerInfo,
@@ -318,6 +321,17 @@ export class GranolaServerClient implements GranolaAppApi {
     return await this.requestJson(granolaAutomationArtefactPath(id));
   }
 
+  async listPkmTargets(): Promise<GranolaPkmTargetsResult> {
+    return await this.requestJson(granolaTransportPaths.automationPkmTargets);
+  }
+
+  async previewAutomationArtefactPublish(
+    id: string,
+    options: { targetId?: string } = {},
+  ): Promise<GranolaAutomationArtefactPublishPreviewResult> {
+    return await this.requestJson(granolaAutomationArtefactPublishPreviewPath(id, options));
+  }
+
   async listAutomationRules(): Promise<import("../app/index.ts").GranolaAutomationRulesResult> {
     return await this.requestJson(granolaTransportPaths.automationRules);
   }
@@ -366,7 +380,7 @@ export class GranolaServerClient implements GranolaAppApi {
   async resolveAutomationArtefact(
     id: string,
     decision: "approve" | "reject",
-    options: { note?: string } = {},
+    options: { note?: string; targetId?: string } = {},
   ): Promise<GranolaAutomationArtefact> {
     return await this.requestJson(granolaAutomationArtefactDecisionPath(id, decision), {
       body: JSON.stringify(options),

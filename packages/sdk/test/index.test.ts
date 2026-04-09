@@ -207,7 +207,7 @@ describe("gran-sdk", () => {
                 syncState: true,
               },
               product: "gran",
-              protocolVersion: 4,
+              protocolVersion: 5,
               runtime: {
                 mode: "background-service",
                 startedAt: "2026-04-08T10:00:00.000Z",
