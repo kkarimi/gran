@@ -1,7 +1,14 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Bot, Globe, RefreshCw } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, Code2, Globe, RefreshCw } from "lucide-react";
 
 const surfaces = [
+  {
+    title: "Start from a real workflow",
+    description:
+      "Open the practical paths first: local workspace, Obsidian publishing, review-first notes, and terminal-first use.",
+    href: "/docs/workflows",
+    icon: BookOpen,
+  },
   {
     title: "Sync and own your archive",
     description:
@@ -22,6 +29,13 @@ const surfaces = [
       "Use the same local meeting state from the CLI, browser workspace, terminal UI, and attached clients.",
     href: "/docs/getting-started",
     icon: Globe,
+  },
+  {
+    title: "Build with the SDK",
+    description:
+      "Reuse Gran's local-first runtime, exports, and service connection model directly from Node and TypeScript.",
+    href: "/docs/sdk",
+    icon: Code2,
   },
 ];
 
@@ -52,10 +66,10 @@ export default function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/docs"
+              href="/docs/workflows"
               className="inline-flex items-center gap-2 rounded-full border border-fd-border px-5 py-3 text-sm font-medium text-fd-foreground transition hover:bg-fd-accent"
             >
-              Browse docs
+              Workflows and examples
               <BookOpen className="h-4 w-4" />
             </Link>
           </div>
@@ -88,7 +102,7 @@ export default function HomePage() {
         </aside>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {surfaces.map(({ title, description, href, icon: Icon }) => (
           <Link
             key={href}

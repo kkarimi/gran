@@ -77,7 +77,7 @@ By default that writes:
 
 You can also use `includeNotes: false` or `includeTranscripts: false` when you only want one side.
 
-## Save Named Export Targets
+## Save Knowledge Base Profiles
 
 ```ts
 import { createGranExportTarget, createGranSdk, saveGranExportTarget } from "@kkarimi/gran-sdk";
@@ -97,8 +97,8 @@ await saveGranExportTarget(
 );
 ```
 
-The helper fills in sensible defaults for bundle-folder and Obsidian-friendly targets, so user code
-does not need to know the internal default subdirectory or format rules.
+The helper fills in sensible defaults for folder and Obsidian-friendly knowledge-base profiles, so
+user code does not need to know the internal default subdirectory or format rules.
 
 ## Build Obsidian Open URLs
 
