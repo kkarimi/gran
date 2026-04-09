@@ -31,7 +31,7 @@
   },
   "scripts": {
     "build": "vp pack",
-    "check": "vp check",
+    "check": "rm -rf dist && vp check",
     "test": "vp test",
     "typecheck": "vp exec tsc --noEmit"
   }
