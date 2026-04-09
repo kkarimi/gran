@@ -178,6 +178,25 @@ export class GranolaTuiWorkspace implements Component {
     return selectedIndex >= 0 ? selectedIndex + 1 : 0;
   }
 
+  private recentMeetings(): MeetingSummaryRecord[] {
+    return this.#recentMeetingIds
+      .map((meetingId) => this.#meetings.find((meeting) => meeting.id === meetingId))
+      .filter((meeting): meeting is MeetingSummaryRecord => meeting !== undefined);
+  }
+
+  private normaliseSelectedRecentIndex(): number {
+    const recentMeetings = this.recentMeetings();
+    if (recentMeetings.length === 0) {
+      return -1;
+    }
+
+    const selectedIndex = this.#selectedMeetingId
+      ? recentMeetings.findIndex((meeting) => meeting.id === this.#selectedMeetingId)
+      : -1;
+
+    return selectedIndex >= 0 ? selectedIndex : 0;
+  }
+
   private ensureMeetingVisible(meeting: MeetingSummaryRecord): void {
     const existingIndex = this.#meetings.findIndex((item) => item.id === meeting.id);
     if (existingIndex >= 0) {
@@ -349,7 +368,11 @@ export class GranolaTuiWorkspace implements Component {
 
   private async loadMeeting(
     meetingId: string,
-    options: { ensureMeetingVisible?: boolean; resolveQuery?: boolean } = {},
+    options: {
+      ensureMeetingVisible?: boolean;
+      recordRecent?: boolean;
+      resolveQuery?: boolean;
+    } = {},
   ): Promise<void> {
     const token = ++this.#detailToken;
     this.#loadingDetail = true;
@@ -368,10 +391,12 @@ export class GranolaTuiWorkspace implements Component {
 
       this.#selectedMeeting = bundle;
       this.#selectedMeetingId = bundle.source.document.id;
-      this.#recentMeetingIds = [
-        bundle.source.document.id,
-        ...this.#recentMeetingIds.filter((candidate) => candidate !== bundle.source.document.id),
-      ].slice(0, 5);
+      if (options.recordRecent !== false) {
+        this.#recentMeetingIds = [
+          bundle.source.document.id,
+          ...this.#recentMeetingIds.filter((candidate) => candidate !== bundle.source.document.id),
+        ].slice(0, 5);
+      }
       if (options.ensureMeetingVisible) {
         this.ensureMeetingVisible(bundle.meeting.meeting);
       }
@@ -436,6 +461,24 @@ export class GranolaTuiWorkspace implements Component {
     await this.loadMeeting(nextMeeting.id);
   }
 
+  private async moveRecentSelection(delta: number): Promise<void> {
+    const recentMeetings = this.recentMeetings();
+    if (recentMeetings.length === 0) {
+      return;
+    }
+
+    const currentIndex = this.normaliseSelectedRecentIndex();
+    const nextIndex = Math.max(0, Math.min(recentMeetings.length - 1, currentIndex + delta));
+    const nextMeeting = recentMeetings[nextIndex];
+    if (!nextMeeting || nextMeeting.id === this.#selectedMeetingId) {
+      return;
+    }
+
+    await this.loadMeeting(nextMeeting.id, {
+      recordRecent: false,
+    });
+  }
+
   private async moveFolderSelection(delta: number): Promise<void> {
     const total = this.#folders.length + 1;
     const currentIndex = this.normaliseSelectedFolderIndex();
@@ -476,6 +519,11 @@ export class GranolaTuiWorkspace implements Component {
   private async moveSelection(delta: number): Promise<void> {
     if (this.#activePane === "folders") {
       await this.moveFolderSelection(delta);
+      return;
+    }
+
+    if (this.#activePane === "recent") {
+      await this.moveRecentSelection(delta);
       return;
     }
 

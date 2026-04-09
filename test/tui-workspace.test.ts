@@ -949,6 +949,32 @@ describe("GranolaTuiWorkspace", () => {
     expect(harness.workspace.render(100).join("\n")).toContain("Bravo Review");
   });
 
+  test("cycles into a recent-only list without reshuffling recent meetings", async () => {
+    const harness = createWorkspaceHarness();
+
+    await harness.workspace.initialise();
+    harness.workspace.handleInput("/");
+
+    const palette = harness.host.overlayComponent;
+    expect(palette).toBeInstanceOf(GranolaTuiQuickOpenPalette);
+    if (!(palette instanceof GranolaTuiQuickOpenPalette)) {
+      throw new Error("expected quick-open palette overlay");
+    }
+
+    palette.handleInput("b");
+    palette.handleInput("\n");
+    await harness.flush();
+
+    harness.workspace.handleInput("\t");
+    harness.workspace.handleInput("\t");
+    harness.workspace.handleInput("j");
+    await harness.waitFor(() => harness.getMeeting.mock.lastCall?.[0] === "doc-alpha-1111");
+
+    const rendered = harness.workspace.render(100).join("\n");
+    expect(rendered).toContain("Recent");
+    expect(rendered).toContain("Opened Alpha Sync");
+  });
+
   test("uses quick open query resolution when no local match exists", async () => {
     const harness = createWorkspaceHarness();
 

@@ -158,15 +158,6 @@ describe("web onboarding", () => {
 
     const derived = deriveOnboardingState({
       appState,
-      automationRuleCount: 1,
-      harnesses: [
-        {
-          id: starterHarnessId,
-          name: "Starter Meeting Notes",
-          prompt: "Write notes.",
-          provider: "openrouter",
-        },
-      ],
       meetingsLoadedCount: 2,
       serverInfo,
     });
@@ -175,12 +166,11 @@ describe("web onboarding", () => {
     expect(derived.complete).toBe(true);
     expect(derived.connected).toBe(true);
     expect(derived.synced).toBe(true);
-    expect(derived.pipelineReady).toBe(true);
     expect(derived.serviceDetail).toBe("Background service active · sync every minute.");
-    expect(derived.stepCards.map((step) => step.complete)).toEqual([true, true, true]);
+    expect(derived.stepCards.map((step) => step.complete)).toEqual([true, true]);
   });
 
-  test("treats automation as optional until the plugin is enabled", () => {
+  test("treats onboarding as complete once auth and first sync are ready", () => {
     const appState = {
       auth: {
         apiKeyAvailable: true,
@@ -271,21 +261,21 @@ describe("web onboarding", () => {
 
     const derived = deriveOnboardingState({
       appState,
-      automationRuleCount: 0,
-      harnesses: [],
       meetingsLoadedCount: 2,
       serverInfo: null,
     });
 
     expect(derived.complete).toBe(true);
-    expect(derived.pipelineReady).toBe(true);
-    expect(derived.stepCards[2]).toEqual(
+    expect(derived.stepCards).toEqual([
       expect.objectContaining({
         complete: true,
-        cta: undefined,
-        title: "Automation Plugin",
+        title: "Connect Granola",
       }),
-    );
+      expect.objectContaining({
+        complete: true,
+        title: "Import Meetings",
+      }),
+    ]);
   });
 
   test("builds a starter pipeline around the chosen provider", () => {

@@ -90,6 +90,27 @@ function normaliseSelectedFolderIndex(
   return selectedIndex >= 0 ? selectedIndex + 1 : 0;
 }
 
+function resolveRecentMeetings(view: GranolaTuiWorkspaceViewModel): MeetingSummaryRecord[] {
+  return view.recentMeetingIds
+    .map((meetingId) => view.meetings.find((meeting) => meeting.id === meetingId))
+    .filter((meeting): meeting is MeetingSummaryRecord => meeting !== undefined);
+}
+
+function normaliseSelectedRecentIndex(
+  recentMeetings: MeetingSummaryRecord[],
+  selectedMeetingId?: string,
+): number {
+  if (recentMeetings.length === 0) {
+    return -1;
+  }
+
+  const selectedIndex = selectedMeetingId
+    ? recentMeetings.findIndex((meeting) => meeting.id === selectedMeetingId)
+    : -1;
+
+  return selectedIndex >= 0 ? selectedIndex : 0;
+}
+
 export function resolveWorkspaceLayout(width: number): {
   detailWidth: number;
   listWidth: number;
@@ -159,155 +180,160 @@ function renderListPane(
 ): string[] {
   const lines: string[] = [];
   const innerWidth = Math.max(1, width - 2);
-  const recentMeetings = view.recentMeetingIds
-    .map((meetingId) => view.meetings.find((meeting) => meeting.id === meetingId))
-    .filter((meeting): meeting is MeetingSummaryRecord => meeting !== undefined);
-  const folderEntries = [
-    {
-      id: undefined,
-      label: "All meetings",
-      meta: view.folders.length > 0 ? `${view.folders.length} folders` : "global scope",
-    },
-    ...view.folders.map((folder) => ({
-      id: folder.id,
-      label: `${folder.isFavourite ? "★ " : ""}${folder.name || folder.id}`,
-      meta: `${folder.documentCount} meetings`,
-    })),
-  ];
-  const availableRows = Math.max(2, height - 3);
-  const folderWindowSize = Math.min(
-    Math.max(3, Math.min(8, Math.floor(availableRows * 0.35))),
-    Math.max(1, availableRows - 1),
-  );
-  const recentWindowSize =
-    recentMeetings.length > 0 ? Math.min(Math.max(2, recentMeetings.length), 3) : 0;
-  const meetingWindowSize = Math.max(1, availableRows - folderWindowSize - recentWindowSize);
+  const listBodyHeight = Math.max(1, height - 1);
 
-  const folderHeader = `${
-    view.activePane === "folders"
-      ? granolaTuiTheme.accent("Folders")
-      : granolaTuiTheme.strong("Folders")
-  } ${granolaTuiTheme.dim(`(${view.folders.length})`)}`;
-  lines.push(padLine(folderHeader, innerWidth));
+  if (view.activePane === "folders") {
+    const folderEntries = [
+      {
+        id: undefined,
+        label: "All meetings",
+        meta: view.folders.length > 0 ? `${view.folders.length} folders` : "global scope",
+      },
+      ...view.folders.map((folder) => ({
+        id: folder.id,
+        label: `${folder.isFavourite ? "★ " : ""}${folder.name || folder.id}`,
+        meta: `${folder.documentCount} meetings`,
+      })),
+    ];
 
-  if (view.folderError) {
     lines.push(
-      ...wrapBlock(granolaTuiTheme.error(view.folderError), innerWidth).slice(0, folderWindowSize),
-    );
-    while (lines.length < 1 + folderWindowSize) {
-      lines.push(" ".repeat(innerWidth));
-    }
-  } else {
-    const selectedFolderIndex = normaliseSelectedFolderIndex(view.folders, view.selectedFolderId);
-    const folderStartIndex = Math.max(
-      0,
-      Math.min(
-        selectedFolderIndex - Math.floor(folderWindowSize / 2),
-        folderEntries.length - folderWindowSize,
+      padLine(
+        `${granolaTuiTheme.accent("Folders")} ${granolaTuiTheme.dim(`(${view.folders.length})`)}`,
+        innerWidth,
       ),
     );
-    const visibleFolders = folderEntries.slice(
-      folderStartIndex,
-      folderStartIndex + folderWindowSize,
-    );
 
-    for (const [offset, folder] of visibleFolders.entries()) {
-      const actualIndex = folderStartIndex + offset;
-      const selected = actualIndex === selectedFolderIndex;
-      const prefix = selected ? "> " : "  ";
-      const maxLabelWidth = Math.max(
-        6,
-        innerWidth - visibleWidth(prefix) - visibleWidth(folder.meta) - 1,
-      );
-      const label = truncateToWidth(folder.label, maxLabelWidth, "");
-      const labelBlock = `${prefix}${label}`;
-      const gap = " ".repeat(
-        Math.max(1, innerWidth - visibleWidth(labelBlock) - visibleWidth(folder.meta)),
-      );
-      const line = `${labelBlock}${gap}${granolaTuiTheme.dim(folder.meta)}`;
+    if (view.folderError) {
       lines.push(
-        selected ? padLine(granolaTuiTheme.selected(line), innerWidth) : padLine(line, innerWidth),
+        ...wrapBlock(granolaTuiTheme.error(view.folderError), innerWidth).slice(0, listBodyHeight),
       );
-    }
-
-    while (lines.length < 1 + folderWindowSize) {
-      lines.push(" ".repeat(innerWidth));
-    }
-  }
-
-  lines.push(padLine(granolaTuiTheme.dim(""), innerWidth));
-
-  if (recentWindowSize > 0) {
-    lines.push(padLine(granolaTuiTheme.strong("Recent"), innerWidth));
-    for (const meeting of recentMeetings.slice(0, recentWindowSize)) {
-      const prefix = meeting.id === view.selectedMeetingId ? "> " : "  ";
-      const dateLabel = meeting.updatedAt.slice(0, 10);
-      const maxTitleWidth = Math.max(6, innerWidth - visibleWidth(prefix) - dateLabel.length - 1);
-      const title = truncateToWidth(meeting.title || meeting.id, maxTitleWidth, "");
-      const titleBlock = `${prefix}${title}`;
-      const gap = " ".repeat(
-        Math.max(1, innerWidth - visibleWidth(titleBlock) - visibleWidth(dateLabel)),
+    } else {
+      const selectedIndex = normaliseSelectedFolderIndex(view.folders, view.selectedFolderId);
+      const startIndex = Math.max(
+        0,
+        Math.min(
+          selectedIndex - Math.floor(listBodyHeight / 2),
+          folderEntries.length - listBodyHeight,
+        ),
       );
-      lines.push(padLine(`${titleBlock}${gap}${granolaTuiTheme.dim(dateLabel)}`, innerWidth));
+      const visibleFolders = folderEntries.slice(startIndex, startIndex + listBodyHeight);
+
+      for (const [offset, folder] of visibleFolders.entries()) {
+        const actualIndex = startIndex + offset;
+        const selected = actualIndex === selectedIndex;
+        const prefix = selected ? "> " : "  ";
+        const maxLabelWidth = Math.max(
+          6,
+          innerWidth - visibleWidth(prefix) - visibleWidth(folder.meta) - 1,
+        );
+        const label = truncateToWidth(folder.label, maxLabelWidth, "");
+        const labelBlock = `${prefix}${label}`;
+        const gap = " ".repeat(
+          Math.max(1, innerWidth - visibleWidth(labelBlock) - visibleWidth(folder.meta)),
+        );
+        const line = `${labelBlock}${gap}${granolaTuiTheme.dim(folder.meta)}`;
+        lines.push(
+          selected
+            ? padLine(granolaTuiTheme.selected(line), innerWidth)
+            : padLine(line, innerWidth),
+        );
+      }
     }
-    lines.push(padLine(granolaTuiTheme.dim(""), innerWidth));
-  }
-
-  const meetingsHeader = `${
-    view.activePane === "meetings"
-      ? granolaTuiTheme.accent("Meetings")
-      : granolaTuiTheme.strong("Meetings")
-  } ${granolaTuiTheme.dim(`(${view.meetings.length})`)}`;
-  lines.push(padLine(meetingsHeader, innerWidth));
-
-  if (view.listError) {
+  } else if (view.activePane === "recent") {
+    const recentMeetings = resolveRecentMeetings(view);
     lines.push(
-      ...wrapBlock(granolaTuiTheme.error(view.listError), innerWidth).slice(0, meetingWindowSize),
+      padLine(
+        `${granolaTuiTheme.accent("Recent")} ${granolaTuiTheme.dim(`(${recentMeetings.length})`)}`,
+        innerWidth,
+      ),
     );
-    while (lines.length < height) {
-      lines.push(" ".repeat(innerWidth));
+
+    if (recentMeetings.length === 0) {
+      lines.push(
+        ...wrapBlock(
+          "No recent meetings in this scope yet. Open a meeting and it will show up here.",
+          innerWidth,
+        ).slice(0, listBodyHeight),
+      );
+    } else {
+      const selectedIndex = normaliseSelectedRecentIndex(recentMeetings, view.selectedMeetingId);
+      const startIndex = Math.max(
+        0,
+        Math.min(
+          selectedIndex - Math.floor(listBodyHeight / 2),
+          recentMeetings.length - listBodyHeight,
+        ),
+      );
+      const visibleMeetings = recentMeetings.slice(startIndex, startIndex + listBodyHeight);
+
+      for (const [offset, meeting] of visibleMeetings.entries()) {
+        const actualIndex = startIndex + offset;
+        const selected = actualIndex === selectedIndex;
+        const dateLabel = meeting.updatedAt.slice(0, 10);
+        const prefix = selected ? "> " : "  ";
+        const maxTitleWidth = Math.max(6, innerWidth - visibleWidth(prefix) - dateLabel.length - 1);
+        const title = truncateToWidth(meeting.title || meeting.id, maxTitleWidth, "");
+        const titleBlock = `${prefix}${title}`;
+        const gap = " ".repeat(
+          Math.max(1, innerWidth - visibleWidth(titleBlock) - visibleWidth(dateLabel)),
+        );
+        const line = `${titleBlock}${gap}${granolaTuiTheme.dim(dateLabel)}`;
+        lines.push(
+          selected
+            ? padLine(granolaTuiTheme.selected(line), innerWidth)
+            : padLine(line, innerWidth),
+        );
+      }
     }
-    return lines;
-  }
-
-  if (view.meetings.length === 0) {
-    const emptyMessage = view.appState.auth.lastError
-      ? "Auth needs attention. Press a to fix credentials."
-      : view.appState.sync.lastCompletedAt
-        ? "No meetings in this scope. Press / to quick open or Tab to change panes."
-        : "No meetings yet. Press r to sync, or a to configure auth.";
-    lines.push(...wrapBlock(emptyMessage, innerWidth).slice(0, meetingWindowSize));
-    while (lines.length < height) {
-      lines.push(" ".repeat(innerWidth));
-    }
-    return lines;
-  }
-
-  const selectedIndex = normaliseSelectedIndex(view.meetings, view.selectedMeetingId);
-  const startIndex = Math.max(
-    0,
-    Math.min(
-      selectedIndex - Math.floor(meetingWindowSize / 2),
-      view.meetings.length - meetingWindowSize,
-    ),
-  );
-  const visibleMeetings = view.meetings.slice(startIndex, startIndex + meetingWindowSize);
-
-  for (const [offset, meeting] of visibleMeetings.entries()) {
-    const actualIndex = startIndex + offset;
-    const selected = actualIndex === selectedIndex;
-    const dateLabel = meeting.updatedAt.slice(0, 10);
-    const prefix = selected ? "> " : "  ";
-    const maxTitleWidth = Math.max(6, innerWidth - visibleWidth(prefix) - dateLabel.length - 1);
-    const title = truncateToWidth(meeting.title || meeting.id, maxTitleWidth, "");
-    const titleBlock = `${prefix}${title}`;
-    const gap = " ".repeat(
-      Math.max(1, innerWidth - visibleWidth(titleBlock) - visibleWidth(dateLabel)),
-    );
-    const line = `${titleBlock}${gap}${granolaTuiTheme.dim(dateLabel)}`;
+  } else {
     lines.push(
-      selected ? padLine(granolaTuiTheme.selected(line), innerWidth) : padLine(line, innerWidth),
+      padLine(
+        `${granolaTuiTheme.accent("Meetings")} ${granolaTuiTheme.dim(`(${view.meetings.length})`)}`,
+        innerWidth,
+      ),
     );
+
+    if (view.listError) {
+      lines.push(
+        ...wrapBlock(granolaTuiTheme.error(view.listError), innerWidth).slice(0, listBodyHeight),
+      );
+    } else if (view.meetings.length === 0) {
+      const emptyMessage = view.appState.auth.lastError
+        ? "Auth needs attention. Press a to fix credentials."
+        : view.appState.sync.lastCompletedAt
+          ? "No meetings in this scope. Press / to quick open or Tab to change views."
+          : "No meetings yet. Press r to sync, or a to configure auth.";
+      lines.push(...wrapBlock(emptyMessage, innerWidth).slice(0, listBodyHeight));
+    } else {
+      const selectedIndex = normaliseSelectedIndex(view.meetings, view.selectedMeetingId);
+      const startIndex = Math.max(
+        0,
+        Math.min(
+          selectedIndex - Math.floor(listBodyHeight / 2),
+          view.meetings.length - listBodyHeight,
+        ),
+      );
+      const visibleMeetings = view.meetings.slice(startIndex, startIndex + listBodyHeight);
+
+      for (const [offset, meeting] of visibleMeetings.entries()) {
+        const actualIndex = startIndex + offset;
+        const selected = actualIndex === selectedIndex;
+        const dateLabel = meeting.updatedAt.slice(0, 10);
+        const prefix = selected ? "> " : "  ";
+        const maxTitleWidth = Math.max(6, innerWidth - visibleWidth(prefix) - dateLabel.length - 1);
+        const title = truncateToWidth(meeting.title || meeting.id, maxTitleWidth, "");
+        const titleBlock = `${prefix}${title}`;
+        const gap = " ".repeat(
+          Math.max(1, innerWidth - visibleWidth(titleBlock) - visibleWidth(dateLabel)),
+        );
+        const line = `${titleBlock}${gap}${granolaTuiTheme.dim(dateLabel)}`;
+        lines.push(
+          selected
+            ? padLine(granolaTuiTheme.selected(line), innerWidth)
+            : padLine(line, innerWidth),
+        );
+      }
+    }
   }
 
   while (lines.length < height) {
@@ -392,7 +418,7 @@ export function renderWorkspace(
   const footerStatus = padLine(toneText(view.statusTone, view.statusMessage), width);
   const footerHints = padLine(
     granolaTuiTheme.dim(
-      "h/l or Tab pane  j/k move  Enter open  / palette  a auth  u automation  r sync  1-4 tabs  PgUp/PgDn scroll  q quit",
+      "h folders  Tab cycle views  l meetings  j/k move  Enter open  / palette  a auth  u automation  r sync  1-4 tabs  PgUp/PgDn scroll  q quit",
     ),
     width,
   );

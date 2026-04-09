@@ -213,7 +213,7 @@ test.describe("toolkit web workspace", () => {
 
       await expect(
         page.getByRole("heading", {
-          name: "Set up Gran 👵🏻 in three steps.",
+          name: "Set up Gran 👵🏻 in two steps.",
         }),
       ).toBeVisible();
       await expect(page.getByText("Background service active")).toBeVisible();
@@ -231,7 +231,7 @@ test.describe("toolkit web workspace", () => {
 
       await expect(
         page.getByRole("heading", {
-          name: "Set up Gran 👵🏻 in three steps.",
+          name: "Set up Gran 👵🏻 in two steps.",
         }),
       ).toHaveCount(0, {
         timeout: 30_000,

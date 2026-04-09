@@ -492,8 +492,6 @@ export function App() {
   const onboardingState = () =>
     deriveOnboardingState({
       appState: state.appState,
-      automationRuleCount: state.automationRules.length,
-      harnesses: state.harnesses,
       meetingsLoadedCount: state.meetings.length,
       serverInfo: state.serverInfo,
     });
@@ -629,9 +627,6 @@ export function App() {
                 onApiKeyDraftChange={(value) => {
                   setState("apiKeyDraft", value);
                 }}
-                onCreateStarterPipeline={() => {
-                  void harnessController.createStarterPipeline(refreshAll);
-                }}
                 onImportDesktopSession={() => {
                   void clientController.importDesktopSession();
                 }}
@@ -641,10 +636,6 @@ export function App() {
                 onSaveApiKey={() => {
                   void clientController.saveApiKey();
                 }}
-                onSelectProvider={(provider) => {
-                  setState("preferredProvider", provider);
-                }}
-                preferredProvider={state.preferredProvider}
                 state={onboardingState()}
               />
             ) : null}

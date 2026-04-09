@@ -20,6 +20,18 @@ interface GranolaTuiWorkspaceInputActions {
   setActivePane: (pane: GranolaTuiFocusPane) => void;
 }
 
+function nextPane(pane: GranolaTuiFocusPane): GranolaTuiFocusPane {
+  switch (pane) {
+    case "folders":
+      return "recent";
+    case "recent":
+      return "meetings";
+    case "meetings":
+    default:
+      return "folders";
+  }
+}
+
 export function handleWorkspaceInput(
   data: string,
   actions: GranolaTuiWorkspaceInputActions,
@@ -55,7 +67,7 @@ export function handleWorkspaceInput(
   }
 
   if (matchesKey(data, "tab")) {
-    actions.setActivePane(actions.activePane === "folders" ? "meetings" : "folders");
+    actions.setActivePane(nextPane(actions.activePane));
     actions.requestRender();
     return true;
   }

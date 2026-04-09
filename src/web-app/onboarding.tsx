@@ -9,8 +9,7 @@ import type {
   GranolaAppState,
   GranolaAutomationRule,
 } from "../app/index.ts";
-import { isPluginCapabilityEnabled } from "../app/plugin-state.ts";
-import { defaultGranolaAgentModel, granolaAgentProviderLabel } from "../agent-defaults.ts";
+import { defaultGranolaAgentModel } from "../agent-defaults.ts";
 import type { GranolaServerInfo } from "../transport.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
 
@@ -23,7 +22,7 @@ interface OnboardingStepCard {
   complete: boolean;
   cta?: string;
   detail?: string;
-  id: "agent" | "connect" | "import";
+  id: "connect" | "import";
   title: string;
 }
 
@@ -31,7 +30,6 @@ export interface GranolaOnboardingState {
   activeStepId: OnboardingStepCard["id"] | null;
   complete: boolean;
   connected: boolean;
-  pipelineReady: boolean;
   serviceDetail: string;
   serviceWarning?: string;
   stepCards: OnboardingStepCard[];
@@ -45,43 +43,10 @@ export interface OnboardingPanelProps {
   folders: FolderSummaryRecord[];
   meetingsLoadedCount: number;
   onApiKeyDraftChange: (value: string) => void;
-  onCreateStarterPipeline: () => void;
   onImportDesktopSession: () => void;
   onRunSync: () => void;
   onSaveApiKey: () => void;
-  onSelectProvider: (provider: GranolaAgentProviderKind) => void;
-  preferredProvider: GranolaAgentProviderKind;
   state: GranolaOnboardingState;
-}
-
-const providerOptions: Array<{
-  description: string;
-  provider: GranolaAgentProviderKind;
-}> = [
-  {
-    description: "Use the local Codex CLI and your ChatGPT subscription.",
-    provider: "codex",
-  },
-  {
-    description: "Use an OPENROUTER_API_KEY and route to your preferred model.",
-    provider: "openrouter",
-  },
-  {
-    description: "Use an OPENAI_API_KEY with direct OpenAI access.",
-    provider: "openai",
-  },
-];
-
-function providerSetupHint(provider: GranolaAgentProviderKind): string {
-  switch (provider) {
-    case "codex":
-      return "Codex uses your local `codex` CLI. Make sure `codex exec` works in this workspace before you rely on it for automation.";
-    case "openai":
-      return "OpenAI requires `OPENAI_API_KEY` or `GRAN_OPENAI_API_KEY` (legacy: `GRANOLA_OPENAI_API_KEY`) in the environment where the toolkit is running.";
-    case "openrouter":
-    default:
-      return "OpenRouter requires `OPENROUTER_API_KEY` or `GRAN_OPENROUTER_API_KEY` (legacy: `GRANOLA_OPENROUTER_API_KEY`) in the environment where the toolkit is running.";
-  }
 }
 
 function suggestedFolderLabel(folders: FolderSummaryRecord[]): string | undefined {
@@ -147,17 +112,12 @@ function describeService(serverInfo?: GranolaServerInfo | null): {
 
 export function deriveOnboardingState(input: {
   appState?: GranolaAppState | null;
-  automationRuleCount: number;
-  harnesses: GranolaAgentHarness[];
   meetingsLoadedCount: number;
   serverInfo?: GranolaServerInfo | null;
 }): GranolaOnboardingState {
   const auth = input.appState?.auth;
-  const automationEnabled = isPluginCapabilityEnabled(input.appState?.plugins, "automation");
   const connected = Boolean(auth?.apiKeyAvailable || auth?.storedSessionAvailable);
   const synced = Boolean(input.appState?.sync.lastCompletedAt);
-  const pipelineReady =
-    !automationEnabled || (input.harnesses.length > 0 && input.automationRuleCount > 0);
   const syncedMeetingCount = input.appState?.documents.count ?? input.meetingsLoadedCount;
   const service = describeService(input.serverInfo);
 
@@ -182,28 +142,13 @@ export function deriveOnboardingState(input: {
       id: "import",
       title: "Import Meetings",
     },
-    {
-      body: automationEnabled
-        ? "Choose the AI agent you want to use by default, then seed a starter reviewable notes pipeline."
-        : "Automation is optional. Enable it later from Settings -> Automation when you want agent-driven meeting pipelines.",
-      complete: pipelineReady,
-      cta: automationEnabled && !pipelineReady ? "Create starter pipeline" : undefined,
-      detail: pipelineReady
-        ? automationEnabled
-          ? "Starter harnesses and automation rules are ready."
-          : "You can keep using Gran 👵🏻 without enabling automation yet."
-        : "The starter pipeline generates reviewable meeting notes on transcript-ready events.",
-      id: "agent",
-      title: automationEnabled ? "Choose An Agent" : "Automation Plugin",
-    },
   ];
   const activeStepId = stepCards.find((step) => !step.complete)?.id ?? null;
 
   return {
     activeStepId,
-    complete: connected && synced && pipelineReady,
+    complete: connected && synced,
     connected,
-    pipelineReady,
     serviceDetail: service.detail,
     serviceWarning: service.warning,
     stepCards,
@@ -289,11 +234,10 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
       <div class="onboarding-panel__hero">
         <div>
           <p class="onboarding-panel__eyebrow">First-Run Setup</p>
-          <h2>Set up Gran 👵🏻 in three steps.</h2>
+          <h2>Set up Gran 👵🏻 in two steps.</h2>
           <p>
-            Add your Granola API key, import your meetings, and choose the agent that should draft
-            reviewable notes. The goal is to reach one useful default without dropping you into
-            every advanced panel on day one.
+            Add your Granola API key and import your meetings. Automation, publishing, and agent
+            setup can wait until the workspace is already useful.
           </p>
         </div>
         <div class="onboarding-panel__summary">
@@ -382,43 +326,6 @@ export function OnboardingPanel(props: OnboardingPanelProps): JSX.Element {
                     type="button"
                   >
                     Import meetings now
-                  </button>
-                </div>
-              </Show>
-
-              <Show when={step.id === "agent" && props.state.activeStepId === "agent"}>
-                <div class="onboarding-step__body">
-                  <div class="onboarding-providers">
-                    <For each={providerOptions}>
-                      {(option) => (
-                        <button
-                          class="onboarding-provider"
-                          data-selected={props.preferredProvider === option.provider}
-                          onClick={() => {
-                            props.onSelectProvider(option.provider);
-                          }}
-                          type="button"
-                        >
-                          <span class="onboarding-provider__title">
-                            {granolaAgentProviderLabel(option.provider)}
-                          </span>
-                          <span class="onboarding-provider__body">{option.description}</span>
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                  <div class="auth-card__meta">
-                    Starter pipeline: transcript-ready meetings will generate reviewable notes with{" "}
-                    {granolaAgentProviderLabel(props.preferredProvider)}.
-                  </div>
-                  <div class="auth-card__meta">{providerSetupHint(props.preferredProvider)}</div>
-                  <button
-                    class="button button--primary"
-                    disabled={!props.state.synced}
-                    onClick={props.onCreateStarterPipeline}
-                    type="button"
-                  >
-                    Create starter pipeline
                   </button>
                 </div>
               </Show>
