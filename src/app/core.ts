@@ -18,11 +18,7 @@ import {
   type GranolaAutomationAgentRunner,
 } from "../agents.ts";
 import type { GranolaAgentProviderRegistry } from "../agent-provider-registry.ts";
-import {
-  automationActionName,
-  enabledAutomationActions,
-  type AutomationActionContext,
-} from "../automation-actions.ts";
+import { automationActionName, type AutomationActionContext } from "../automation-actions.ts";
 import type { GranolaAutomationActionRegistry } from "../automation-action-registry.ts";
 import {
   buildAutomationDeliveryPayload,
@@ -117,21 +113,6 @@ import type {
   TranscriptOutputFormat,
 } from "../types.ts";
 import { writeTextFile } from "../utils.ts";
-import {
-  buildGranolaAutomationKnowledgeBaseBundle,
-  buildGranolaYazdKnowledgeBaseRef,
-  legacyPkmPreviewFromYazdKnowledgeBasePreview,
-  legacyPkmSyncResultFromYazdKnowledgeBasePublishResult,
-  previewGranolaYazdKnowledgeBasePublish,
-  publishGranolaYazdKnowledgeBase,
-} from "../yazd-knowledge-bases.ts";
-import {
-  buildGranolaYazdArtifactBundle,
-  buildGranolaYazdSourceChange,
-  buildGranolaYazdSourceFetchResult,
-  buildGranolaYazdSourceInfo,
-  buildGranolaYazdSourceItemSummary,
-} from "../yazd-source.ts";
 
 import type {
   GranolaAppApi,
@@ -188,7 +169,6 @@ import type {
   GranolaAppSurface,
   GranolaFolderListOptions,
   GranolaFolderListResult,
-  GranolaPkmTarget,
   GranolaPkmTargetsResult,
   GranolaProcessingIssue,
   GranolaProcessingIssuesResult,
@@ -222,6 +202,7 @@ import type { GranolaExporterRegistry } from "./export-registry.ts";
 import { GranolaIndexService } from "./index-service.ts";
 import { GranolaAutomationService } from "./automation-service.ts";
 import { scopedCacheDataForMeeting } from "./meeting-read-model.ts";
+import { GranolaYazdService } from "./yazd-service.ts";
 
 interface GranolaAppDependencies {
   agentHarnessStore?: AgentHarnessStore;
@@ -563,6 +544,7 @@ export class GranolaApp implements GranolaAppApi {
   #listeners = new Set<(event: GranolaAppStateEvent) => void>();
   readonly #pluginRegistry: GranolaPluginRegistry;
   readonly #state: GranolaAppState;
+  readonly #yazd: GranolaYazdService;
 
   constructor(
     readonly config: AppConfig,
@@ -715,6 +697,15 @@ export class GranolaApp implements GranolaAppApi {
       readMeetingBundleById: async (id, options) => await this.readMeetingBundleById(id, options),
       state: this.#state,
     });
+    this.#yazd = new GranolaYazdService({
+      automationActionRegistry: deps.automationActionRegistry,
+      getAutomationArtefact: async (id) => await this.#automation.getAutomationArtefact(id),
+      listAutomationRules: async () => await this.#automation.listAutomationRules(),
+      listMeetings: async (options) => await this.listMeetings(options),
+      listSyncEvents: async (options) => await this.listSyncEvents(options),
+      pkmTargetStore: deps.pkmTargetStore,
+      readMeetingBundleById: async (id, options) => await this.readMeetingBundleById(id, options),
+    });
     this.#state.index.filePath = defaultMeetingIndexFilePath();
     this.#state.sync = {
       ...this.#state.sync,
@@ -842,65 +833,27 @@ export class GranolaApp implements GranolaAppApi {
   }
 
   async inspectYazdSource(): Promise<GranolaYazdSourceInfo> {
-    return buildGranolaYazdSourceInfo();
+    return await this.#yazd.inspectSource();
   }
 
   async listYazdSourceItems(
     options: GranolaYazdSourceListOptions = {},
   ): Promise<GranolaYazdSourceListResult> {
-    const result = await this.listMeetings({
-      folderId: options.folderId,
-      limit: options.limit,
-      preferIndex: true,
-      search: options.search,
-      updatedFrom: options.since,
-    });
-
-    return {
-      items: result.meetings.map((meeting) => buildGranolaYazdSourceItemSummary(meeting)),
-      nextCursor: undefined,
-      source: result.source,
-    };
+    return await this.#yazd.listSourceItems(options);
   }
 
   async fetchYazdSourceItem(id: string): Promise<GranolaYazdSourceFetchResult> {
-    const bundle = await this.readMeetingBundleById(id, { requireCache: true }).catch(
-      async () => await this.readMeetingBundleById(id),
-    );
-    return buildGranolaYazdSourceFetchResult(bundle);
+    return await this.#yazd.fetchSourceItem(id);
   }
 
   async buildYazdSourceArtifacts(id: string): Promise<GranolaYazdArtifactBundle> {
-    const bundle = await this.readMeetingBundleById(id, { requireCache: true }).catch(
-      async () => await this.readMeetingBundleById(id),
-    );
-    return buildGranolaYazdArtifactBundle(bundle);
+    return await this.#yazd.buildSourceArtifacts(id);
   }
 
   async listYazdSourceChanges(
     options: { cursor?: string; limit?: number; since?: string } = {},
   ): Promise<GranolaYazdSourceChangesResult> {
-    const cursor = options.cursor?.trim() || undefined;
-    const sinceTimestamp = options.since?.trim() ? Date.parse(options.since) : undefined;
-    const events = (await this.listSyncEvents({ limit: options.limit ?? 50 })).events.filter(
-      (event) => {
-        if (cursor && event.id === cursor) {
-          return false;
-        }
-
-        if (sinceTimestamp == null || Number.isNaN(sinceTimestamp)) {
-          return true;
-        }
-
-        const occurredAt = Date.parse(event.occurredAt);
-        return Number.isNaN(occurredAt) ? true : occurredAt >= sinceTimestamp;
-      },
-    );
-
-    return {
-      changes: events.map((event) => buildGranolaYazdSourceChange(event)),
-      nextCursor: undefined,
-    };
+    return await this.#yazd.listSourceChanges(options);
   }
 
   async listPlugins(): Promise<GranolaAppPluginsResult> {
@@ -1008,9 +961,7 @@ export class GranolaApp implements GranolaAppApi {
 
   async listPkmTargets(): Promise<GranolaPkmTargetsResult> {
     this.assertAutomationPluginEnabled();
-    return {
-      targets: await this.readPkmTargets(),
-    };
+    return await this.#yazd.listKnowledgeBases();
   }
 
   async previewAutomationArtefactPublish(
@@ -1018,38 +969,7 @@ export class GranolaApp implements GranolaAppApi {
     options: { targetId?: string } = {},
   ): Promise<GranolaAutomationArtefactPublishPreviewResult> {
     this.assertAutomationPluginEnabled();
-    const artefact = await this.#automation.getAutomationArtefact(id);
-    const targets = await this.resolveArtefactPkmTargets(artefact);
-    if (targets.length === 0) {
-      return {
-        artefactId: artefact.id,
-        message: "No linked knowledge base is configured for this artefact.",
-        targets: [],
-      };
-    }
-
-    const selectedTarget =
-      (options.targetId
-        ? targets.find((candidate) => candidate.id === options.targetId)
-        : undefined) ?? targets[0];
-    if (!selectedTarget) {
-      throw new Error(`linked knowledge base not found for artefact: ${id}`);
-    }
-    const bundle = await this.readMeetingBundleById(artefact.meetingId);
-    return {
-      artefactId: artefact.id,
-      preview: legacyPkmPreviewFromYazdKnowledgeBasePreview(
-        await previewGranolaYazdKnowledgeBasePublish({
-          bundle: buildGranolaAutomationKnowledgeBaseBundle({
-            artefact,
-            bundle,
-          }),
-          knowledgeBase: buildGranolaYazdKnowledgeBaseRef(selectedTarget),
-        }),
-      ),
-      selectedTargetId: selectedTarget.id,
-      targets,
-    };
+    return await this.#yazd.previewAutomationArtefactPublish(id, options);
   }
 
   async listProcessingIssues(
@@ -1560,46 +1480,6 @@ export class GranolaApp implements GranolaAppApi {
     };
   }
 
-  private async readPkmTargets(): Promise<GranolaPkmTarget[]> {
-    if (!this.deps.pkmTargetStore) {
-      return [];
-    }
-
-    return (await this.deps.pkmTargetStore.readTargets()).map((target) => ({ ...target }));
-  }
-
-  private async resolveArtefactPkmTargets(
-    artefact: GranolaAutomationArtefact,
-  ): Promise<GranolaPkmTarget[]> {
-    const rule = (await this.#automation.listAutomationRules()).rules.find(
-      (candidate) => candidate.id === artefact.ruleId,
-    );
-    if (!rule) {
-      return [];
-    }
-
-    const linkedTargetIds = enabledAutomationActions(rule, {
-      registry: this.deps.automationActionRegistry,
-      sourceActionId: artefact.actionId,
-      trigger: "approval",
-    })
-      .filter(
-        (action): action is GranolaAutomationPkmSyncAction =>
-          action.kind === "pkm-sync" && Boolean(action.targetId),
-      )
-      .map((action) => action.targetId);
-
-    if (linkedTargetIds.length === 0) {
-      return [];
-    }
-
-    const targetsById = new Map((await this.readPkmTargets()).map((target) => [target.id, target]));
-    return [...new Set(linkedTargetIds)]
-      .map((targetId) => targetsById.get(targetId))
-      .filter((target): target is GranolaPkmTarget => Boolean(target))
-      .map((target) => ({ ...target }));
-  }
-
   private async runAutomationPkmSync(
     match: GranolaAutomationMatch,
     rule: GranolaAutomationRule,
@@ -1617,31 +1497,15 @@ export class GranolaApp implements GranolaAppApi {
     if (!context.artefact) {
       throw new Error(`automation knowledge-base sync action ${action.id} requires an artefact`);
     }
-
-    const target = (await this.readPkmTargets()).find(
-      (candidate) => candidate.id === action.targetId,
-    );
-    if (!target) {
-      throw new Error(`automation knowledge base not found: ${action.targetId}`);
-    }
-
-    const bundle = await this.readMeetingBundleById(match.meetingId);
-    const result = legacyPkmSyncResultFromYazdKnowledgeBasePublishResult(
-      await publishGranolaYazdKnowledgeBase({
-        bundle: buildGranolaAutomationKnowledgeBaseBundle({
-          artefact: context.artefact,
-          bundle,
-        }),
-        knowledgeBase: buildGranolaYazdKnowledgeBaseRef(target),
-      }),
-    );
+    void rule;
+    const result = await this.#yazd.runAutomationPkmSync(match.meetingId, action, context.artefact);
 
     return {
       dailyNoteFilePath: result.dailyNoteFilePath,
       dailyNoteOpenUrl: result.dailyNoteOpenUrl,
       filePath: result.filePath,
       noteOpenUrl: result.noteOpenUrl,
-      targetId: target.id,
+      targetId: result.targetId,
       transcriptFilePath: result.transcriptFilePath,
       transcriptOpenUrl: result.transcriptOpenUrl,
     };
