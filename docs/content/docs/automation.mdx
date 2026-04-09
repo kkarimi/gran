@@ -188,7 +188,7 @@ artefact from the source pipeline action and receive the approved artefact in th
 Approval-triggered actions are how you send reviewed notes into the rest of your stack:
 
 - `write-file` writes approved markdown, text, or JSON payloads to a local directory
-- `pkm-sync` writes approved markdown into named PKM targets such as Obsidian vault folders
+- `pkm-sync` writes approved markdown into saved knowledge bases such as Obsidian vaults or folder archives
 - `command` receives the same review payload on stdin for arbitrary local tooling
 - `webhook` posts either JSON or rendered text/markdown bodies to any HTTP endpoint
 - `slack-message` posts a simple text payload to an incoming Slack webhook
@@ -330,10 +330,10 @@ directory. You can also point them at a project-local file:
 }
 ```
 
-PKM targets live in `pkm-targets.json` under the shared toolkit data directory by default. Override
+Review publishing profiles live in `pkm-targets.json` under the shared toolkit data directory by default. Override
 that with `GRAN_PKM_TARGETS_FILE` or `"pkm-targets-file": "..."` in `.gran.json`.
 
-Example PKM targets:
+Example review publishing profiles:
 
 ```json
 {
@@ -356,15 +356,15 @@ Example PKM targets:
 }
 ```
 
-`pkm-sync` resolves one of those named targets and writes the approved markdown into it with a
-stable file name. Obsidian targets default to:
+`pkm-sync` resolves one of those saved profiles and writes the approved markdown into it with a
+stable file name. Obsidian publishing defaults to:
 
 - notes in `Meetings`
 - transcripts in `Meeting Transcripts`
 - Obsidian wikilinks between notes, transcripts, and optional daily notes
 - `obsidian://` open URLs when `vaultName` is available
 
-`docs-folder` targets keep the same idempotent publishing model without Obsidian-specific links,
+`docs-folder` profiles keep the same idempotent publishing model without Obsidian-specific links,
 and can disable frontmatter if you want cleaner plain Markdown files.
 
 ## Commands

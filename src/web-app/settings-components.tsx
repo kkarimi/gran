@@ -8,11 +8,17 @@ import type {
   GranolaAppPluginState,
   GranolaAppState,
   GranolaExportTarget,
+  GranolaExportTargetKind,
   GranolaAppSyncRun,
 } from "../app/index.ts";
 import { pluginStateStatusDetail } from "../app/plugin-state.ts";
 import { granolaAgentProviderLabel } from "../agent-defaults.ts";
 import { granolaAuthModeLabel, granolaAuthRecommendation } from "../auth-summary.ts";
+import {
+  defaultExportTargetNotesSubdir,
+  defaultExportTargetTranscriptsSubdir,
+  resolveGranolaExportTargetDefinition,
+} from "../export-target-registry.ts";
 import type { GranolaLocalPathInfo, GranolaServerInfo } from "../transport.ts";
 import type { GranolaAgentProviderKind } from "../types.ts";
 import { describeAuthStatus, describeSyncStatus } from "../web/client-state.ts";
@@ -44,14 +50,17 @@ interface AuthPanelProps {
   preferredProvider: GranolaAgentProviderKind;
 }
 
-interface ExportJobsPanelProps {
+interface KnowledgeBasesPanelProps {
+  defaultArchiveSummary: string;
   currentScopeLabel: string;
   exportDestinationSummary: string;
   exportMode: GranolaWebExportMode;
   jobs: GranolaAppExportJobState[];
   onExportModeChange: (mode: GranolaWebExportMode) => void;
+  onRemoveKnowledgeBase: (id: string) => void;
   onRerun: (id: string) => void;
   onRunExport: () => void;
+  onSaveKnowledgeBase: (target: GranolaExportTarget) => void;
   onSelectTarget: (id: string | null) => void;
   selectedTargetId: string | null;
   targets: GranolaExportTarget[];
@@ -60,6 +69,16 @@ interface ExportJobsPanelProps {
 interface PluginsPanelProps {
   onTogglePlugin: (id: string, enabled: boolean) => void;
   plugins: GranolaAppPluginState[];
+}
+
+interface KnowledgeBaseDraft {
+  dailyNotesDir: string;
+  id: string;
+  kind: GranolaExportTargetKind;
+  name: string;
+  notesSubdir: string;
+  outputDir: string;
+  transcriptsSubdir: string;
 }
 
 function CopyPathButton(props: { value?: string; variant?: "icon" | "text" }): JSX.Element {
@@ -197,6 +216,52 @@ function DiagnosticsFileRow(props: {
       </div>
     </article>
   );
+}
+
+function slugifyKnowledgeBaseId(value: string): string {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "knowledge-base";
+}
+
+function createKnowledgeBaseDraft(
+  kind: GranolaExportTargetKind,
+  target?: GranolaExportTarget,
+): KnowledgeBaseDraft {
+  return {
+    dailyNotesDir: target?.dailyNotesDir ?? "",
+    id: target?.id ?? "",
+    kind,
+    name: target?.name ?? "",
+    notesSubdir: target?.notesSubdir ?? defaultExportTargetNotesSubdir(kind),
+    outputDir: target?.outputDir ?? "",
+    transcriptsSubdir: target?.transcriptsSubdir ?? defaultExportTargetTranscriptsSubdir(kind),
+  };
+}
+
+function knowledgeBaseKindLabel(kind: GranolaExportTargetKind): string {
+  return resolveGranolaExportTargetDefinition(kind).label;
+}
+
+function buildKnowledgeBaseDraftTarget(draft: KnowledgeBaseDraft): GranolaExportTarget {
+  const name = draft.name.trim();
+  const outputDir = draft.outputDir.trim();
+  return {
+    dailyNotesDir:
+      draft.kind === "obsidian-vault" && draft.dailyNotesDir.trim()
+        ? draft.dailyNotesDir.trim()
+        : undefined,
+    id: draft.id.trim() || slugifyKnowledgeBaseId(name || outputDir),
+    kind: draft.kind,
+    name: name || undefined,
+    notesSubdir: draft.notesSubdir.trim() || defaultExportTargetNotesSubdir(draft.kind),
+    outputDir,
+    transcriptsSubdir:
+      draft.transcriptsSubdir.trim() || defaultExportTargetTranscriptsSubdir(draft.kind),
+  };
 }
 
 function syncRunOccurredAt(run: GranolaAppSyncRun): string {
@@ -447,7 +512,7 @@ export function DiagnosticsPanel(props: {
       {
         detail: props.appState?.config.configFileUsed
           ? "Custom config file currently in use."
-          : "No custom config file found. Change values from the Connection, Automation, and Publishing tabs, or add a .gran.json later.",
+          : "No custom config file found. Change values from the Connection, Automation, and Knowledge bases tabs, or add a .gran.json later.",
         fallbackPath: props.appState?.config.configFileUsed || undefined,
         file: props.serverInfo?.files?.config,
         label: "Config file",
@@ -535,25 +600,24 @@ export function DiagnosticsPanel(props: {
         title: "Plugin settings",
       },
       {
-        detail: "Named export profiles for local archives, vaults, and future integrations.",
+        detail:
+          "Saved knowledge-base profiles for local archives, vaults, and future integrations.",
         fallbackPath:
           props.appState?.config.exports?.targetsFile || props.serverInfo?.config.exportTargetsFile,
         file: props.serverInfo?.files?.exportTargets,
-        label: "Export targets",
-        missingDetail:
-          "This file will be created when you first save a named export target/profile.",
-        title: "Export target profiles",
+        label: "Knowledge bases",
+        missingDetail: "This file will be created when you first save a knowledge base profile.",
+        title: "Knowledge base profiles",
       },
       {
-        detail: "PKM publish targets used by review-first automation and vault publishing.",
+        detail: "Review publishing profiles used by automation before anything is written out.",
         fallbackPath:
           props.appState?.config.automation?.pkmTargetsFile ||
           props.serverInfo?.config.pkmTargetsFile,
         file: props.serverInfo?.files?.pkmTargets,
-        label: "PKM targets",
-        missingDetail:
-          "This file will be created when you first save a PKM target for review-first publishing.",
-        title: "PKM target profiles",
+        label: "Review publishing",
+        missingDetail: "This file will be created when you first save a review publishing profile.",
+        title: "Review publishing profiles",
       },
       {
         detail: "Loaded when automation rules are enabled.",
@@ -1044,45 +1108,312 @@ export function PluginsPanel(props: PluginsPanelProps): JSX.Element {
   );
 }
 
-export function ExportJobsPanel(props: ExportJobsPanelProps): JSX.Element {
+export function KnowledgeBasesPanel(props: KnowledgeBasesPanelProps): JSX.Element {
+  const [editingId, setEditingId] = createSignal<string | null>(null);
+  const [draftError, setDraftError] = createSignal("");
+  const [draft, setDraft] = createSignal<KnowledgeBaseDraft>(
+    createKnowledgeBaseDraft("obsidian-vault"),
+  );
+  const selectedKnowledgeBase = () =>
+    props.targets.find((candidate) => candidate.id === props.selectedTargetId) ?? null;
+
+  const resetDraft = (kind: GranolaExportTargetKind = "obsidian-vault") => {
+    setEditingId(null);
+    setDraftError("");
+    setDraft(createKnowledgeBaseDraft(kind));
+  };
+
+  const editKnowledgeBase = (target: GranolaExportTarget) => {
+    setEditingId(target.id);
+    setDraftError("");
+    setDraft(createKnowledgeBaseDraft(target.kind, target));
+  };
+
+  const saveKnowledgeBase = async () => {
+    const nextDraft = draft();
+    if (!nextDraft.outputDir.trim()) {
+      setDraftError("Choose a folder or vault path first.");
+      return;
+    }
+
+    setDraftError("");
+    props.onSaveKnowledgeBase(buildKnowledgeBaseDraftTarget(nextDraft));
+    resetDraft(nextDraft.kind);
+  };
+
   return (
     <>
       <section class="auth-panel">
         <div class="auth-panel__head">
-          <h3>Publishing</h3>
+          <h3>Knowledge bases</h3>
           <p>
-            Send notes and transcripts together to your local archive or a named PKM target without
-            splitting the workflow into separate commands.
+            Choose where Gran should publish notes and transcripts. Obsidian vaults are first class,
+            and plain folders still work when you just want files you own.
           </p>
         </div>
         <div class="auth-panel__body">
           <div class="auth-card-grid auth-card-grid--three">
             <article class="auth-card">
-              <span class="status-label">Scope</span>
-              <strong>{props.currentScopeLabel}</strong>
-              <span class="auth-card__meta">
-                The bundled export uses the current folder scope when one is selected.
-              </span>
-            </article>
-            <article class="auth-card">
-              <span class="status-label">Target</span>
-              <strong>{props.selectedTargetId || "Default local archive"}</strong>
+              <span class="status-label">Current destination</span>
+              <strong>{selectedKnowledgeBase()?.name ?? "Default local archive"}</strong>
               <span class="auth-card__meta">{props.exportDestinationSummary}</span>
             </article>
             <article class="auth-card">
-              <span class="status-label">Contents</span>
-              <strong>
-                {props.exportMode === "both"
-                  ? "Notes + transcripts"
-                  : props.exportMode === "notes"
-                    ? "Notes only"
-                    : "Transcripts only"}
-              </strong>
+              <span class="status-label">Default local archive</span>
+              <strong>Folder-based export</strong>
+              <span class="auth-card__meta">{props.defaultArchiveSummary}</span>
+            </article>
+            <article class="auth-card">
+              <span class="status-label">Current scope</span>
+              <strong>{props.currentScopeLabel}</strong>
               <span class="auth-card__meta">
-                Change this only when you want a narrower one-off export.
+                Bundled export keeps the current folder scope when one is selected.
               </span>
             </article>
           </div>
+          <section class="knowledge-base-shell">
+            <div class="knowledge-base-list">
+              <button
+                class="job-card job-card--button"
+                data-selected={!props.selectedTargetId ? "true" : undefined}
+                onClick={() => props.onSelectTarget(null)}
+                type="button"
+              >
+                <div class="job-card__head">
+                  <div>
+                    <div class="job-card__title">Default local archive</div>
+                    <div class="job-card__meta">{props.defaultArchiveSummary}</div>
+                  </div>
+                  <div
+                    class="job-card__status"
+                    data-status={!props.selectedTargetId ? "approved" : "completed"}
+                  >
+                    {!props.selectedTargetId ? "Active" : "Available"}
+                  </div>
+                </div>
+              </button>
+              <Show
+                when={props.targets.length > 0}
+                fallback={<div class="job-empty">No knowledge bases saved yet.</div>}
+              >
+                <For each={props.targets}>
+                  {(target) => (
+                    <article class="job-card">
+                      <div class="job-card__head">
+                        <div>
+                          <div class="job-card__title">{target.name ?? target.id}</div>
+                          <div class="job-card__meta">
+                            {knowledgeBaseKindLabel(target.kind)} · {target.outputDir}
+                          </div>
+                        </div>
+                        <div
+                          class="job-card__status"
+                          data-status={
+                            props.selectedTargetId === target.id ? "approved" : "completed"
+                          }
+                        >
+                          {props.selectedTargetId === target.id ? "Active" : "Saved"}
+                        </div>
+                      </div>
+                      <div class="job-card__meta">
+                        Notes: {target.notesSubdir || defaultExportTargetNotesSubdir(target.kind)} ·
+                        Transcripts:{" "}
+                        {target.transcriptsSubdir ||
+                          defaultExportTargetTranscriptsSubdir(target.kind)}
+                      </div>
+                      <Show when={target.kind === "obsidian-vault" && target.dailyNotesDir}>
+                        {(dailyNotesDir) => (
+                          <div class="job-card__meta">Daily notes: {dailyNotesDir()}</div>
+                        )}
+                      </Show>
+                      <div class="job-card__actions">
+                        <Show when={props.selectedTargetId !== target.id}>
+                          <button
+                            class="button button--secondary"
+                            onClick={() => props.onSelectTarget(target.id)}
+                            type="button"
+                          >
+                            Use for exports
+                          </button>
+                        </Show>
+                        <button
+                          class="button button--secondary"
+                          onClick={() => editKnowledgeBase(target)}
+                          type="button"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          class="button button--secondary"
+                          onClick={() => props.onRemoveKnowledgeBase(target.id)}
+                          type="button"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </article>
+                  )}
+                </For>
+              </Show>
+            </div>
+            <section class="auth-card auth-card--hero knowledge-base-editor">
+              <div class="auth-section-head">
+                <h4>{editingId() ? "Edit knowledge base" : "Add knowledge base"}</h4>
+                <p>
+                  Start with an Obsidian vault, or point Gran at a plain folder when you just want a
+                  durable local archive.
+                </p>
+              </div>
+              <div class="toolbar-actions">
+                <button
+                  class="button button--secondary"
+                  onClick={() => resetDraft("obsidian-vault")}
+                  type="button"
+                >
+                  New Obsidian vault
+                </button>
+                <button
+                  class="button button--secondary"
+                  onClick={() => resetDraft("bundle-folder")}
+                  type="button"
+                >
+                  New folder
+                </button>
+              </div>
+              <div class="field-row">
+                <label>
+                  <span class="field-label">Type</span>
+                  <select
+                    class="select"
+                    onChange={(event) => {
+                      const kind = event.currentTarget.value as GranolaExportTargetKind;
+                      setDraft((current) => ({
+                        ...createKnowledgeBaseDraft(kind, {
+                          ...buildKnowledgeBaseDraftTarget(current),
+                          kind,
+                        }),
+                        id: current.id,
+                        name: current.name,
+                        outputDir: current.outputDir,
+                      }));
+                    }}
+                    value={draft().kind}
+                  >
+                    <option value="obsidian-vault">Obsidian vault</option>
+                    <option value="bundle-folder">Folder</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="field-label">Name</span>
+                  <input
+                    class="field-input"
+                    onInput={(event) => {
+                      setDraft((current) => ({ ...current, name: event.currentTarget.value }));
+                    }}
+                    placeholder={draft().kind === "obsidian-vault" ? "Work vault" : "Team archive"}
+                    type="text"
+                    value={draft().name}
+                  />
+                </label>
+              </div>
+              <label>
+                <span class="field-label">
+                  {draft().kind === "obsidian-vault" ? "Vault path" : "Folder path"}
+                </span>
+                <input
+                  class="field-input"
+                  onInput={(event) => {
+                    setDraft((current) => ({ ...current, outputDir: event.currentTarget.value }));
+                  }}
+                  placeholder={
+                    draft().kind === "obsidian-vault"
+                      ? "~/Vaults/Work"
+                      : "~/Documents/Meeting Archive"
+                  }
+                  spellcheck={false}
+                  type="text"
+                  value={draft().outputDir}
+                />
+              </label>
+              <div class="field-row">
+                <label>
+                  <span class="field-label">Notes folder</span>
+                  <input
+                    class="field-input"
+                    onInput={(event) => {
+                      setDraft((current) => ({
+                        ...current,
+                        notesSubdir: event.currentTarget.value,
+                      }));
+                    }}
+                    spellcheck={false}
+                    type="text"
+                    value={draft().notesSubdir}
+                  />
+                </label>
+                <label>
+                  <span class="field-label">Transcripts folder</span>
+                  <input
+                    class="field-input"
+                    onInput={(event) => {
+                      setDraft((current) => ({
+                        ...current,
+                        transcriptsSubdir: event.currentTarget.value,
+                      }));
+                    }}
+                    spellcheck={false}
+                    type="text"
+                    value={draft().transcriptsSubdir}
+                  />
+                </label>
+              </div>
+              <Show when={draft().kind === "obsidian-vault"}>
+                <label>
+                  <span class="field-label">Daily notes folder</span>
+                  <input
+                    class="field-input"
+                    onInput={(event) => {
+                      setDraft((current) => ({
+                        ...current,
+                        dailyNotesDir: event.currentTarget.value,
+                      }));
+                    }}
+                    placeholder="Daily"
+                    spellcheck={false}
+                    type="text"
+                    value={draft().dailyNotesDir}
+                  />
+                </label>
+              </Show>
+              <Show when={draftError()}>
+                {(error) => <div class="auth-card__meta auth-card__meta--error">{error()}</div>}
+              </Show>
+              <div class="toolbar-actions">
+                <button
+                  class="button button--primary"
+                  onClick={() => void saveKnowledgeBase()}
+                  type="button"
+                >
+                  {editingId() ? "Save knowledge base" : "Add knowledge base"}
+                </button>
+                <button
+                  class="button button--secondary"
+                  onClick={() => resetDraft(draft().kind)}
+                  type="button"
+                >
+                  Clear
+                </button>
+              </div>
+            </section>
+          </section>
+        </div>
+      </section>
+      <section class="auth-panel">
+        <div class="auth-panel__head">
+          <h3>Export now</h3>
+          <p>Run a bundled export into the current local archive or selected knowledge base.</p>
+        </div>
+        <div class="auth-panel__body">
           <div class="field-row field-row--inline">
             <label>
               <span class="field-label">Destination</span>

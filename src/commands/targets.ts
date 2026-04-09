@@ -1,8 +1,7 @@
+import { basename } from "node:path";
+
 import { type GranolaExportTarget, type GranolaExportTargetKind } from "../app/index.ts";
-import {
-  listGranolaExportTargetDefinitions,
-  parseGranolaExportTargetKind,
-} from "../export-target-registry.ts";
+import { parseGranolaExportTargetKind } from "../export-target-registry.ts";
 import { toJson, toYaml } from "../render.ts";
 
 import { createCommandAppContext } from "./shared.ts";
@@ -11,32 +10,31 @@ import type { CommandDefinition } from "./types.ts";
 type TargetsFormat = "json" | "text" | "yaml";
 
 function targetsHelp(): string {
-  const kinds = listGranolaExportTargetDefinitions()
-    .map((definition) => definition.kind)
-    .join(" or ");
-  return `Gran targets
+  const kinds = ["obsidian-vault", "folder"].join(" or ");
+  return `Gran kb
 
 Usage:
-  gran targets [list|add|remove] [options]
+  gran kb [list|add|remove] [options]
 
 Subcommands:
-  list                Show configured export targets
-  add                 Create or replace an export target
-  remove <id>         Remove one export target
+  list                Show configured knowledge bases
+  add                 Create or replace one knowledge base
+  remove <id|name>    Remove one knowledge base
 
 Options:
   --format <value>           text, json, yaml (default: text)
-  --id <value>               Target id for add/remove
-  --name <value>             Human label for the target
-  --kind <value>             ${kinds} (default: bundle-folder)
-  --output <path>            Root output directory for the target
-  --notes-subdir <path>      Notes subdirectory inside the target root
+  --id <value>               Optional internal id for add/remove
+  --name <value>             Human label for the knowledge base
+  --kind <value>             ${kinds} (default: folder)
+  --output <path>            Root folder or vault path
+  --path <path>              Alias for --output
+  --notes-subdir <path>      Notes subdirectory inside the knowledge base
   --transcripts-subdir <path>
-                            Transcript subdirectory inside the target root
+                            Transcript subdirectory inside the knowledge base
   --notes-format <value>     markdown, json, yaml, raw
   --transcripts-format <value>
                             text, markdown, json, yaml, raw
-  --daily-notes-dir <path>   Optional daily note directory for obsidian-vault targets
+  --daily-notes-dir <path>   Optional daily note directory for Obsidian vaults
   --config <path>            Path to .gran.json
   --debug                    Enable debug logging
   -h, --help                 Show help
@@ -61,13 +59,13 @@ function resolveKind(value: string | boolean | undefined): GranolaExportTargetKi
     return "bundle-folder";
   }
 
+  if (value === "folder") {
+    return "bundle-folder";
+  }
+
   const kind = parseGranolaExportTargetKind(value);
   if (!kind) {
-    throw new Error(
-      `invalid target kind: expected ${listGranolaExportTargetDefinitions()
-        .map((definition) => definition.kind)
-        .join(" or ")}`,
-    );
+    throw new Error("invalid knowledge base kind: expected obsidian-vault or folder");
   }
 
   return kind;
@@ -116,25 +114,34 @@ function renderTargets(targets: GranolaExportTarget[], format: TargetsFormat): s
   }
 
   if (targets.length === 0) {
-    return "No export targets configured\n";
+    return "No knowledge bases configured\n";
   }
 
-  const header = "ID                    KIND             ROOT";
+  const header = "NAME                   KIND             LOCATION";
   const lines = targets.map((target) => {
-    const title = [target.name, target.outputDir].filter(Boolean).join(" · ");
-    return `${target.id.padEnd(21).slice(0, 21)} ${target.kind.padEnd(16).slice(0, 16)} ${title}`;
+    const name = (target.name ?? target.id).padEnd(22).slice(0, 22);
+    const kind = target.kind === "obsidian-vault" ? "obsidian-vault" : "folder";
+    return `${name} ${kind.padEnd(16).slice(0, 16)} ${target.outputDir}`;
   });
 
   return `${[header, ...lines].join("\n")}\n`;
 }
 
-function pickTargetId(
+function slugifyKnowledgeBaseId(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "knowledge-base";
+}
+
+function pickKnowledgeBaseIdentifier(
   commandArgs: string[],
   commandFlags: Record<string, string | boolean | undefined>,
 ): string {
   const id = typeof commandFlags.id === "string" ? commandFlags.id : commandArgs[1];
   if (!id?.trim()) {
-    throw new Error("target id is required");
+    throw new Error("knowledge base id or name is required");
   }
 
   return id.trim();
@@ -143,26 +150,31 @@ function pickTargetId(
 function buildTargetFromFlags(
   commandFlags: Record<string, string | boolean | undefined>,
 ): GranolaExportTarget {
-  const id = typeof commandFlags.id === "string" ? commandFlags.id.trim() : "";
-  const outputDir = typeof commandFlags.output === "string" ? commandFlags.output.trim() : "";
-  if (!id) {
-    throw new Error("target id is required");
-  }
+  const outputDir =
+    typeof commandFlags.output === "string"
+      ? commandFlags.output.trim()
+      : typeof commandFlags.path === "string"
+        ? commandFlags.path.trim()
+        : "";
+  const name =
+    typeof commandFlags.name === "string" && commandFlags.name.trim()
+      ? commandFlags.name.trim()
+      : undefined;
+  const explicitId = typeof commandFlags.id === "string" ? commandFlags.id.trim() : "";
   if (!outputDir) {
-    throw new Error("target output directory is required");
+    throw new Error("knowledge base output directory is required");
   }
+  const generatedId = slugifyKnowledgeBaseId(name || basename(outputDir));
+  const kind = resolveKind(commandFlags.kind);
 
   return {
     dailyNotesDir:
       typeof commandFlags["daily-notes-dir"] === "string" && commandFlags["daily-notes-dir"].trim()
         ? commandFlags["daily-notes-dir"].trim()
         : undefined,
-    id,
-    kind: resolveKind(commandFlags.kind),
-    name:
-      typeof commandFlags.name === "string" && commandFlags.name.trim()
-        ? commandFlags.name.trim()
-        : undefined,
+    id: explicitId || generatedId,
+    kind,
+    name,
     notesFormat: resolveNotesFormat(commandFlags["notes-format"]),
     notesSubdir:
       typeof commandFlags["notes-subdir"] === "string" && commandFlags["notes-subdir"].trim()
@@ -179,7 +191,8 @@ function buildTargetFromFlags(
 }
 
 export const targetsCommand: CommandDefinition = {
-  description: "Manage named export targets",
+  aliases: ["targets"],
+  description: "Manage knowledge base destinations",
   flags: {
     "daily-notes-dir": { type: "string" },
     format: { type: "string" },
@@ -190,11 +203,12 @@ export const targetsCommand: CommandDefinition = {
     "notes-format": { type: "string" },
     "notes-subdir": { type: "string" },
     output: { type: "string" },
+    path: { type: "string" },
     "transcripts-format": { type: "string" },
     "transcripts-subdir": { type: "string" },
   },
   help: targetsHelp,
-  name: "targets",
+  name: "kb",
   async run({ commandArgs, commandFlags, globalFlags }) {
     const subcommand = commandArgs[0] ?? "list";
     const { app } = await createCommandAppContext(commandFlags, globalFlags);
@@ -207,31 +221,37 @@ export const targetsCommand: CommandDefinition = {
         return 0;
       }
       case "add": {
-        const target = buildTargetFromFlags(commandFlags);
+        const knowledgeBase = buildTargetFromFlags(commandFlags);
         const existing = (await app.listExportTargets()).targets;
         const nextTargets = [
-          target,
-          ...existing.filter((candidate) => candidate.id !== target.id),
+          knowledgeBase,
+          ...existing.filter((candidate) => candidate.id !== knowledgeBase.id),
         ].sort((left, right) => left.id.localeCompare(right.id));
         const result = await app.saveExportTargets(nextTargets);
         console.log(
-          `Saved export target ${target.id} -> ${target.outputDir} (${result.targets.length} total)`,
+          `Saved knowledge base ${knowledgeBase.name ?? knowledgeBase.id} -> ${knowledgeBase.outputDir} (${result.targets.length} total)`,
         );
         return 0;
       }
       case "remove": {
-        const id = pickTargetId(commandArgs, commandFlags);
         const existing = (await app.listExportTargets()).targets;
-        const nextTargets = existing.filter((candidate) => candidate.id !== id);
+        const identifier = pickKnowledgeBaseIdentifier(commandArgs, commandFlags);
+        const match = existing.find(
+          (candidate) => candidate.id === identifier || candidate.name === identifier,
+        );
+        if (!match) {
+          throw new Error(`knowledge base not found: ${identifier}`);
+        }
+        const nextTargets = existing.filter((candidate) => candidate.id !== match.id);
         if (nextTargets.length === existing.length) {
-          throw new Error(`export target not found: ${id}`);
+          throw new Error(`knowledge base not found: ${identifier}`);
         }
         await app.saveExportTargets(nextTargets);
-        console.log(`Removed export target ${id}`);
+        console.log(`Removed knowledge base ${match.name ?? match.id}`);
         return 0;
       }
       default:
-        throw new Error("invalid targets command: expected list, add, or remove");
+        throw new Error("invalid kb command: expected list, add, or remove");
     }
   },
 };

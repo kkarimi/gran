@@ -116,8 +116,8 @@ test.describe("toolkit web workspace", () => {
         ),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Disable markdown viewer" })).toBeVisible();
-    await page.locator(".settings-shell").getByRole("button", { name: "Publishing" }).click();
-    await expect(page.getByRole("heading", { name: "Publishing" })).toBeVisible();
+    await page.locator(".settings-shell").getByRole("button", { name: "Knowledge bases" }).click();
+    await expect(page.getByRole("heading", { name: "Knowledge bases" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export archive" })).toBeVisible();
     await expect(page.getByText("All meetings", { exact: true })).toBeVisible();
     await page.locator(".settings-shell").getByRole("button", { name: "Advanced" }).click();

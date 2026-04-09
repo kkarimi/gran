@@ -23,7 +23,8 @@ By default this exports notes and transcripts together.
 
 Options:
   --folder <query>             Export only meetings inside one folder id or name
-  --target <id>                Named export target/profile to use
+  --kb <id>                    Saved knowledge base to use
+  --knowledge-base <id>        Alias for --kb
   --output <path>              Shared output root; writes notes to <path>/notes and transcripts to <path>/transcripts
   --notes-output <path>        Output directory for note files
   --transcripts-output <path>  Output directory for transcript files
@@ -103,19 +104,37 @@ function resolveTargetById(
   return targets.find((candidate) => candidate.id === targetId.trim());
 }
 
+function resolveKnowledgeBaseId(
+  commandFlags: Record<string, string | boolean | undefined>,
+): string | undefined {
+  if (typeof commandFlags.kb === "string" && commandFlags.kb.trim()) {
+    return commandFlags.kb.trim();
+  }
+
+  if (typeof commandFlags["knowledge-base"] === "string" && commandFlags["knowledge-base"].trim()) {
+    return commandFlags["knowledge-base"].trim();
+  }
+
+  if (typeof commandFlags.target === "string" && commandFlags.target.trim()) {
+    return commandFlags.target.trim();
+  }
+
+  return undefined;
+}
+
 function assertCompatibleTargetFlags(options: {
+  knowledgeBaseId?: string;
   notesOutput?: string;
   outputRoot?: string;
-  targetId?: string;
   transcriptsOutput?: string;
 }): void {
-  if (!options.targetId) {
+  if (!options.knowledgeBaseId) {
     return;
   }
 
   if (options.outputRoot || options.notesOutput || options.transcriptsOutput) {
     throw new Error(
-      "cannot combine --target with --output, --notes-output, or --transcripts-output",
+      "cannot combine --kb or --knowledge-base with --output, --notes-output, or --transcripts-output",
     );
   }
 }
@@ -126,6 +145,8 @@ export const exportCommand: CommandDefinition = {
     cache: { type: "string" },
     folder: { type: "string" },
     help: { type: "boolean" },
+    kb: { type: "string" },
+    "knowledge-base": { type: "string" },
     "notes-format": { type: "string" },
     "notes-only": { type: "boolean" },
     "notes-output": { type: "string" },
@@ -161,12 +182,11 @@ export const exportCommand: CommandDefinition = {
         : { mode: "all" },
     );
     const outputRoot = resolveSharedOutputRoot(commandFlags.output);
-    const targetId =
-      typeof commandFlags.target === "string" ? commandFlags.target.trim() : undefined;
+    const targetId = resolveKnowledgeBaseId(commandFlags);
     const configuredTargets = targetId ? (await app.listExportTargets()).targets : [];
     const target = resolveTargetById(configuredTargets, targetId);
     if (targetId && !target) {
-      throw new Error(`export target not found: ${targetId}`);
+      throw new Error(`knowledge base not found: ${targetId}`);
     }
     const noteFormat = resolveNoteFormat(commandFlags["notes-format"]);
     const transcriptFormat = resolveTranscriptFormat(commandFlags["transcripts-format"]);
@@ -183,9 +203,9 @@ export const exportCommand: CommandDefinition = {
           ? join(outputRoot, "transcripts")
           : undefined;
     assertCompatibleTargetFlags({
+      knowledgeBaseId: targetId,
       notesOutput,
       outputRoot,
-      targetId,
       transcriptsOutput,
     });
     const resolvedNoteFormat =
@@ -203,7 +223,7 @@ export const exportCommand: CommandDefinition = {
 
     debug(config.debug, "mode", mode);
     debug(config.debug, "folder", folder?.id ?? "(all)");
-    debug(config.debug, "target", target?.id ?? "(none)");
+    debug(config.debug, "knowledgeBase", target?.id ?? "(none)");
     debug(config.debug, "notesFormat", resolvedNoteFormat);
     debug(config.debug, "transcriptsFormat", resolvedTranscriptFormat);
     debug(config.debug, "notesOutput", notesOutput ?? config.notes.output);

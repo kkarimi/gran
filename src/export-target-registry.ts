@@ -31,7 +31,7 @@ export function createDefaultGranolaExportTargetRegistry(): GranolaExportTargetR
       defaultTranscriptsSubdir: "transcripts",
       description: "A plain local archive with one notes folder and one transcripts folder.",
       kind: "bundle-folder",
-      label: "Bundle folder",
+      label: "Folder",
     })
     .register("obsidian-vault", {
       defaultNotesFormat: "markdown",

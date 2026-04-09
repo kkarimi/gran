@@ -922,10 +922,10 @@ export class GranolaAutomationService {
       )
       .map((action) => action.targetId);
     if (options.targetId && linkedPkmTargetIds.length === 0) {
-      throw new Error("No linked PKM publish target is configured for this artefact");
+      throw new Error("No linked knowledge base is configured for this artefact");
     }
     if (options.targetId && !linkedPkmTargetIds.includes(options.targetId)) {
-      throw new Error(`linked PKM publish target not found: ${options.targetId}`);
+      throw new Error(`linked knowledge base not found: ${options.targetId}`);
     }
     if (actions.length === 0) {
       return [];

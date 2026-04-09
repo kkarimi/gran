@@ -93,9 +93,7 @@ describe("runCli", () => {
     const exitCode = await runCli(["export", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(
-      expect.stringContaining("By default this exports notes and transcripts together."),
-    );
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("--kb <id>"));
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -187,14 +185,25 @@ describe("runCli", () => {
     expect(error).not.toHaveBeenCalled();
   });
 
-  test("shows targets help from the command module", async () => {
+  test("shows knowledge base help from the command module", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const exitCode = await runCli(["kb", "--help"]);
+
+    expect(exitCode).toBe(0);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran kb"));
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  test("keeps targets as a compatibility alias for kb", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const exitCode = await runCli(["targets", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran targets"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Gran kb"));
     expect(error).not.toHaveBeenCalled();
   });
 

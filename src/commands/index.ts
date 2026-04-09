@@ -38,4 +38,9 @@ export const commands = [
   webCommand,
 ];
 
-export const commandMap = new Map(commands.map((command) => [command.name, command]));
+export const commandMap = new Map(
+  commands.flatMap((command) => [
+    [command.name, command] as const,
+    ...(command.aliases ?? []).map((alias) => [alias, command] as const),
+  ]),
+);

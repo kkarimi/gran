@@ -8,6 +8,7 @@ export interface CommandContext {
 }
 
 export interface CommandDefinition {
+  aliases?: string[];
   description: string;
   flags: Record<string, ParseSpec>;
   help(): string;

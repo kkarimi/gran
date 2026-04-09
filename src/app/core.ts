@@ -941,7 +941,7 @@ export class GranolaApp implements GranolaAppApi {
     if (targets.length === 0) {
       return {
         artefactId: artefact.id,
-        message: "No linked PKM publish target is configured for this artefact.",
+        message: "No linked knowledge base is configured for this artefact.",
         targets: [],
       };
     }
@@ -951,7 +951,7 @@ export class GranolaApp implements GranolaAppApi {
         ? targets.find((candidate) => candidate.id === options.targetId)
         : undefined) ?? targets[0];
     if (!selectedTarget) {
-      throw new Error(`linked PKM target not found for artefact: ${id}`);
+      throw new Error(`linked knowledge base not found for artefact: ${id}`);
     }
 
     const match = (await this.#automation.listAutomationMatches({ limit: 1_000 })).matches.find(
@@ -1538,14 +1538,14 @@ export class GranolaApp implements GranolaAppApi {
     transcriptOpenUrl?: string;
   }> {
     if (!context.artefact) {
-      throw new Error(`automation PKM sync action ${action.id} requires an artefact`);
+      throw new Error(`automation knowledge-base sync action ${action.id} requires an artefact`);
     }
 
     const target = (await this.readPkmTargets()).find(
       (candidate) => candidate.id === action.targetId,
     );
     if (!target) {
-      throw new Error(`automation PKM target not found: ${action.targetId}`);
+      throw new Error(`automation knowledge base not found: ${action.targetId}`);
     }
 
     const bundle = await this.readMeetingBundleById(match.meetingId);

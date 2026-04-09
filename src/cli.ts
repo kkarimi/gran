@@ -46,7 +46,7 @@ Global options:
 Examples:
   gran attach http://127.0.0.1:4123
   gran export --folder Team
-  gran targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work
+  gran kb add --name "Work vault" --kind obsidian-vault --output ~/Vaults/Work
   gran folder list
   gran intelligence run decisions --last 5
   gran init --provider openrouter

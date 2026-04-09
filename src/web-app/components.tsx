@@ -31,6 +31,6 @@ export {
 export {
   AuthPanel,
   DiagnosticsPanel,
-  ExportJobsPanel,
+  KnowledgeBasesPanel,
   PluginsPanel,
 } from "./settings-components.tsx";

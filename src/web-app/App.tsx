@@ -255,6 +255,45 @@ export function App() {
       state.appState?.config.transcripts.output || "Configured transcript output";
     return `${notesPath} + ${transcriptsPath}`;
   };
+  const defaultArchiveSummary = () => {
+    const notesPath = state.appState?.config.notes.output || "Configured notes output";
+    const transcriptsPath =
+      state.appState?.config.transcripts.output || "Configured transcript output";
+    return `${notesPath} + ${transcriptsPath}`;
+  };
+
+  const saveKnowledgeBase = async (target: import("../app/index.ts").GranolaExportTarget) => {
+    const client = clientController.clientAccessor();
+    if (!client) {
+      return;
+    }
+
+    const existing = await client.listExportTargets();
+    const nextTargets = [
+      target,
+      ...existing.targets.filter((candidate) => candidate.id !== target.id),
+    ].sort((left, right) => left.id.localeCompare(right.id));
+    const result = await client.saveExportTargets(nextTargets);
+    setState("exportTargets", result.targets);
+    setState("selectedExportTargetId", target.id);
+    setStatus(`Saved knowledge base ${target.name ?? target.id}`, "ok");
+  };
+
+  const removeKnowledgeBase = async (id: string) => {
+    const client = clientController.clientAccessor();
+    if (!client) {
+      return;
+    }
+
+    const existing = await client.listExportTargets();
+    const nextTargets = existing.targets.filter((candidate) => candidate.id !== id);
+    const result = await client.saveExportTargets(nextTargets);
+    setState("exportTargets", result.targets);
+    if (state.selectedExportTargetId === id) {
+      setState("selectedExportTargetId", null);
+    }
+    setStatus("Removed knowledge base", "ok");
+  };
 
   const runBundledExport = async () => {
     const client = clientController.clientAccessor();
@@ -865,6 +904,7 @@ export function App() {
                     preferredProvider={state.preferredProvider}
                     processingIssues={state.processingIssues}
                     currentExportScopeLabel={currentExportScopeLabel()}
+                    defaultArchiveSummary={defaultArchiveSummary()}
                     exportDestinationSummary={exportDestinationSummary()}
                     exportMode={state.exportMode}
                     exportTargets={state.exportTargets}
@@ -874,8 +914,14 @@ export function App() {
                     onRunExport={() => {
                       void runBundledExport();
                     }}
+                    onSaveKnowledgeBase={(target) => {
+                      void saveKnowledgeBase(target);
+                    }}
                     onSelectExportTarget={(id) => {
                       setState("selectedExportTargetId", id);
+                    }}
+                    onRemoveKnowledgeBase={(id) => {
+                      void removeKnowledgeBase(id);
                     }}
                     selectedExportTargetId={state.selectedExportTargetId}
                     selectedHarness={harnessController.selectedHarness()}
@@ -1046,6 +1092,7 @@ export function App() {
                 preferredProvider={state.preferredProvider}
                 processingIssues={state.processingIssues}
                 currentExportScopeLabel={currentExportScopeLabel()}
+                defaultArchiveSummary={defaultArchiveSummary()}
                 exportDestinationSummary={exportDestinationSummary()}
                 exportMode={state.exportMode}
                 exportTargets={state.exportTargets}
@@ -1055,8 +1102,14 @@ export function App() {
                 onRunExport={() => {
                   void runBundledExport();
                 }}
+                onSaveKnowledgeBase={(target) => {
+                  void saveKnowledgeBase(target);
+                }}
                 onSelectExportTarget={(id) => {
                   setState("selectedExportTargetId", id);
+                }}
+                onRemoveKnowledgeBase={(id) => {
+                  void removeKnowledgeBase(id);
                 }}
                 selectedExportTargetId={state.selectedExportTargetId}
                 selectedHarness={harnessController.selectedHarness()}

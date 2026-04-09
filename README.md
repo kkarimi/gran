@@ -27,7 +27,7 @@ and run your own agents against transcripts and notes.
 - `gran web` for a browser workspace
 - `gran tui` / `gran attach` for keyboard-first terminal use
 - `gran export` for bundled note + transcript exports
-- `gran targets` for named vaults, folders, and export profiles
+- `gran kb` for named vaults, folders, and knowledge-base profiles
 - `gran intelligence` for built-in presets like decisions and action items
 - `gran automation` plus harnesses/rules for BYOA review workflows
 - `@kkarimi/gran-sdk` for Node and TypeScript integrations on the same local-first core
@@ -92,8 +92,8 @@ actually use every day.
 
 ```bash
 gran init --provider openrouter
-gran targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work --daily-notes-dir Daily
-gran export --target work-vault
+gran kb add --name "Work vault" --kind obsidian-vault --output ~/Vaults/Work --daily-notes-dir Daily
+gran export --kb work-vault
 ```
 
 Use this when your main goal is to keep notes and transcripts in an Obsidian vault you own.
@@ -120,7 +120,7 @@ run.
 ## Project Setup And Config
 
 `gran init` writes a project-local `.gran.json` for you. That is the normal way to set up a
-project. It also creates `./.gran/` for prompts, rules, and target files. If you want to inspect
+project. It also creates `./.gran/` for prompts, rules, and knowledge-base files. If you want to inspect
 or edit the generated config and companion files directly, see
 [`Auth and configuration`](https://kkarimi.github.io/gran/docs/auth-and-configuration/) in the
 docs.

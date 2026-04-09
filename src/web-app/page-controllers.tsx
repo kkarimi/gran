@@ -32,10 +32,10 @@ import {
   AuthPanel,
   BrowsePromptPanel,
   DiagnosticsPanel,
-  ExportJobsPanel,
   FolderList,
   HomeDashboardPanel,
   IssueReviewPanel,
+  KnowledgeBasesPanel,
   MeetingList,
   PageHeader,
   PluginsPanel,
@@ -397,6 +397,7 @@ export function SettingsPageController(props: {
   currentExportScopeLabel: string;
   onDuplicateHarness: () => void;
   exportDestinationSummary: string;
+  defaultArchiveSummary: string;
   exportMode: GranolaWebExportMode;
   exportTargets: GranolaExportTarget[];
   onImportDesktopSession: () => void;
@@ -413,6 +414,7 @@ export function SettingsPageController(props: {
   onRerunJob: (jobId: string) => void;
   onRunExport: () => void;
   onSaveApiKey: () => void;
+  onSaveKnowledgeBase: (target: GranolaExportTarget) => void;
   onSaveHarnesses: () => void;
   onSelectExportTarget: (id: string | null) => void;
   onSelectHarness: (id: string) => void;
@@ -422,6 +424,7 @@ export function SettingsPageController(props: {
   onTestHarness: () => void;
   onTestKindChange: (kind: GranolaAutomationArtefactKind) => void;
   onUnlock: () => void;
+  onRemoveKnowledgeBase: (id: string) => void;
   password: string;
   preferredProvider: GranolaAgentProviderKind;
   processingIssues: import("../app/index.ts").GranolaProcessingIssue[];
@@ -439,14 +442,14 @@ export function SettingsPageController(props: {
   const settingsTabs: Array<{ id: WebSettingsSection; label: string }> = [
     { id: "auth", label: "Connection" },
     { id: "plugins", label: "Automation" },
-    { id: "exports", label: "Publishing" },
+    { id: "knowledge", label: "Knowledge bases" },
     { id: "diagnostics", label: "Advanced" },
   ];
 
   return (
     <>
       <PageHeader
-        description="Manage how Gran connects, publishes, automates, and stores local state."
+        description="Manage how Gran connects, publishes into knowledge bases, automates, and stores local state."
         eyebrow="Settings"
         title="Settings"
       />
@@ -523,15 +526,18 @@ export function SettingsPageController(props: {
                 testResult={props.harnessTestResult}
               />
             </Match>
-            <Match when={props.settingsTab === "exports"}>
-              <ExportJobsPanel
+            <Match when={props.settingsTab === "knowledge"}>
+              <KnowledgeBasesPanel
                 currentScopeLabel={props.currentExportScopeLabel}
+                defaultArchiveSummary={props.defaultArchiveSummary}
                 exportDestinationSummary={props.exportDestinationSummary}
                 exportMode={props.exportMode}
                 jobs={props.appState?.exports.jobs || []}
                 onExportModeChange={(mode) => props.onExportModeChange(mode)}
+                onRemoveKnowledgeBase={(id) => props.onRemoveKnowledgeBase(id)}
                 onRerun={(jobId) => props.onRerunJob(jobId)}
                 onRunExport={() => props.onRunExport()}
+                onSaveKnowledgeBase={(target) => props.onSaveKnowledgeBase(target)}
                 onSelectTarget={(id) => props.onSelectExportTarget(id)}
                 selectedTargetId={props.selectedExportTargetId}
                 targets={props.exportTargets}

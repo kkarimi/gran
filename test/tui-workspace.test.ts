@@ -818,7 +818,7 @@ function createWorkspaceHarness(
     logoutAuth: vi.fn(async () => state.auth),
     previewAutomationArtefactPublish: vi.fn(async (id: string) => ({
       artefactId: id,
-      message: "No linked PKM publish target is configured for this artefact.",
+      message: "No linked knowledge base is configured for this artefact.",
       targets: [],
     })),
     recoverProcessingIssue,

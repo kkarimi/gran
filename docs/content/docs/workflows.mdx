@@ -26,13 +26,13 @@ What you end up with:
 
 ```bash
 gran init --provider openrouter
-gran targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work --daily-notes-dir Daily
-gran export --target work-vault
+gran kb add --name "Work vault" --kind obsidian-vault --output ~/Vaults/Work --daily-notes-dir Daily
+gran export --kb work-vault
 ```
 
 Use this when Obsidian is your system of record.
 
-Obsidian targets support:
+Obsidian vault publishing supports:
 
 - meeting notes and transcripts in stable subdirectories
 - markdown transcripts
@@ -85,7 +85,7 @@ only one of them.
 npm install @kkarimi/gran-sdk
 ```
 
-Use the SDK when you want the same local-first runtime, PKM targets, and export logic inside Node
+Use the SDK when you want the same local-first runtime, knowledge bases, and export logic inside Node
 or TypeScript code instead of shell commands.
 
 See [`SDK`](/docs/sdk) for examples.

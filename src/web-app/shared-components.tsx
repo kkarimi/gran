@@ -12,7 +12,7 @@ import { reviewSummaryLabel, runtimeLabel } from "./component-helpers.ts";
 
 export type WebStatusTone = "busy" | "error" | "idle" | "ok";
 export type WebMainPage = "folders" | "home" | "meeting" | "review" | "search" | "settings";
-export type WebSettingsSection = "auth" | "diagnostics" | "exports" | "plugins";
+export type WebSettingsSection = "auth" | "diagnostics" | "knowledge" | "plugins";
 
 type WebNavigationPage = Exclude<WebMainPage, "meeting">;
 

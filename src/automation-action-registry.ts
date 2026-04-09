@@ -471,7 +471,7 @@ function createPkmDefinition(): GranolaAutomationActionDefinition {
             ...(result.transcriptFilePath ? { transcriptFilePath: result.transcriptFilePath } : {}),
             ...(result.transcriptOpenUrl ? { transcriptOpenUrl: result.transcriptOpenUrl } : {}),
           },
-          result: `Synced PKM target ${result.targetId} to ${result.filePath}`,
+          result: `Synced knowledge base ${result.targetId} to ${result.filePath}`,
         }),
       );
     },

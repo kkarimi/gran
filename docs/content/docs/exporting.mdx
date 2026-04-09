@@ -1,6 +1,6 @@
 ---
 title: Exporting
-description: Keep Granola notes and transcripts in durable local files you control, with bundled exports, named targets, and stable incremental state.
+description: Keep Granola notes and transcripts in durable local files you control, with bundled exports, saved knowledge bases, and stable incremental state.
 ---
 
 `gran export` is the default archive workflow.
@@ -29,26 +29,26 @@ gran export --transcripts-only
 You can still use `gran notes` or `gran transcripts` when you explicitly want a narrower
 one-off export, but the bundled command should be the normal path.
 
-## Named Export Targets
+## Saved Knowledge Bases
 
-Named targets let you save a reusable destination profile instead of retyping output paths.
+Saved knowledge bases let you save a reusable destination profile instead of retyping output paths.
 
-Current built-in target kinds:
+Current built-in knowledge-base kinds:
 
-- `bundle-folder`
+- `folder`
 - `obsidian-vault`
 
 Examples:
 
 ```bash
-gran targets list
-gran targets add --id work-archive --output ./exports
-gran targets add --id work-vault --kind obsidian-vault --output ~/Vaults/Work --daily-notes-dir Daily
-gran export --target work-vault
-gran targets remove work-archive
+gran kb list
+gran kb add --name "Work archive" --output ./exports
+gran kb add --name "Work vault" --kind obsidian-vault --output ~/Vaults/Work --daily-notes-dir Daily
+gran export --kb work-vault
+gran kb remove "Work archive"
 ```
 
-For Obsidian vault targets, the toolkit defaults to:
+For Obsidian vault knowledge bases, the toolkit defaults to:
 
 - notes in `Meetings`
 - transcripts in `Meeting Transcripts`
@@ -78,7 +78,7 @@ Examples:
 gran export --notes-format json
 gran export --transcripts-format yaml
 gran export --transcripts-format markdown
-gran export --target work-vault --notes-format markdown
+gran export --kb work-vault --notes-format markdown
 ```
 
 ## Folder-Scoped Exports
@@ -90,7 +90,7 @@ Examples:
 
 ```bash
 gran export --folder Team
-gran export --folder Team --target work-vault
+gran export --folder Team --kb work-vault
 ```
 
 ## Export Jobs

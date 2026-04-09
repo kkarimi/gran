@@ -387,7 +387,7 @@ describe("command execution", () => {
     );
   });
 
-  test("export command uses a named target profile when provided", async () => {
+  test("export command uses a saved knowledge base when provided", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const app = {
       exportNotes: vi.fn(async () => ({
@@ -458,7 +458,7 @@ describe("command execution", () => {
     const exitCode = await exportCommand.run(
       makeContext({
         commandFlags: {
-          target: "work-vault",
+          kb: "work-vault",
         },
       }),
     );
@@ -484,7 +484,7 @@ describe("command execution", () => {
     );
   });
 
-  test("targets add saves a named export target", async () => {
+  test("kb add saves a named knowledge base", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const app = {
       getState: () => ({
@@ -508,8 +508,8 @@ describe("command execution", () => {
         commandArgs: ["add"],
         commandFlags: {
           "daily-notes-dir": "Daily",
-          id: "work-vault",
           kind: "obsidian-vault",
+          name: "Work vault",
           "notes-subdir": "Meetings",
           output: "/tmp/vault",
           "transcripts-format": "markdown",
@@ -524,7 +524,7 @@ describe("command execution", () => {
         dailyNotesDir: "Daily",
         id: "work-vault",
         kind: "obsidian-vault",
-        name: undefined,
+        name: "Work vault",
         notesFormat: undefined,
         notesSubdir: "Meetings",
         outputDir: "/tmp/vault",
@@ -532,10 +532,10 @@ describe("command execution", () => {
         transcriptsSubdir: "Meeting Transcripts",
       },
     ]);
-    expect(log).toHaveBeenCalledWith("Saved export target work-vault -> /tmp/vault (1 total)");
+    expect(log).toHaveBeenCalledWith("Saved knowledge base Work vault -> /tmp/vault (1 total)");
   });
 
-  test("targets remove deletes one export target", async () => {
+  test("kb remove deletes one knowledge base by name", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const app = {
       getState: () => ({
@@ -548,11 +548,13 @@ describe("command execution", () => {
           {
             id: "keep",
             kind: "bundle-folder" as const,
+            name: "Archive",
             outputDir: "/tmp/archive",
           },
           {
             id: "remove-me",
             kind: "obsidian-vault" as const,
+            name: "Work vault",
             outputDir: "/tmp/vault",
           },
         ],
@@ -567,7 +569,7 @@ describe("command execution", () => {
 
     const exitCode = await targetsCommand.run(
       makeContext({
-        commandArgs: ["remove", "remove-me"],
+        commandArgs: ["remove", "Work vault"],
       }),
     );
 
@@ -576,10 +578,11 @@ describe("command execution", () => {
       {
         id: "keep",
         kind: "bundle-folder",
+        name: "Archive",
         outputDir: "/tmp/archive",
       },
     ]);
-    expect(log).toHaveBeenCalledWith("Removed export target remove-me");
+    expect(log).toHaveBeenCalledWith("Removed knowledge base Work vault");
   });
 
   test("intelligence run executes a built-in preset over recent meetings", async () => {

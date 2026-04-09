@@ -2148,14 +2148,14 @@ describe("GranolaApp", () => {
             transcriptOpenUrl:
               "obsidian://open?file=Meeting%20Transcripts%2FTeam%2FAlpha%20Sync-transcript.md&vault=Work",
           }),
-          result: `Synced PKM target obsidian-team to ${writtenFile}`,
+          result: `Synced knowledge base obsidian-team to ${writtenFile}`,
           status: "completed",
         }),
       ]),
     );
   });
 
-  test("previews linked PKM targets and only syncs the selected target on approval", async () => {
+  test("previews linked knowledge bases and only syncs the selected destination on approval", async () => {
     const obsidianDir = await mkdtemp(join(tmpdir(), "granola-pkm-obsidian-"));
     const docsDir = await mkdtemp(join(tmpdir(), "granola-pkm-docs-"));
     const cacheFile = join(await mkdtemp(join(tmpdir(), "granola-app-cache-")), "cache.json");
