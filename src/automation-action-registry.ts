@@ -14,6 +14,13 @@ import type {
   GranolaAutomationWebhookAction,
   GranolaAutomationWriteFileAction,
 } from "./app/index.ts";
+import {
+  buildYazdWorkflowRunId,
+  completeYazdWorkflowRun,
+  failYazdWorkflowRun,
+  skipYazdWorkflowRun,
+  yazdWorkflowActionName,
+} from "@kkarimi/yazd-core";
 import { GranolaCapabilityRegistry } from "./registry.ts";
 import type {
   AutomationActionCommandResult,
@@ -54,14 +61,6 @@ function cloneStructured<T>(value: T): T {
   return structuredClone(value);
 }
 
-function actionName(action: GranolaAutomationAction): string {
-  return action.name || action.id;
-}
-
-function buildRunId(match: GranolaAutomationMatch, actionId: string): string {
-  return `${match.id}:${actionId}`;
-}
-
 function baseRun(
   match: GranolaAutomationMatch,
   rule: GranolaAutomationRule,
@@ -76,12 +75,12 @@ function baseRun(
   return {
     actionId: action.id,
     actionKind: action.kind,
-    actionName: actionName(action),
+    actionName: yazdWorkflowActionName(action),
     artefactIds: context.artefact ? [context.artefact.id] : undefined,
     eventId: match.eventId,
     eventKind: match.eventKind,
     folders: match.folders.map((folder) => ({ ...folder })),
-    id: options.runId ?? buildRunId(match, action.id),
+    id: options.runId ?? buildYazdWorkflowRunId(match.id, action.id),
     matchId: match.id,
     matchedAt: match.matchedAt,
     meetingId: match.meetingId,
@@ -107,45 +106,6 @@ function baseRun(
   };
 }
 
-function completedRun(
-  run: GranolaAutomationActionRun,
-  finishedAt: string,
-  patch: Partial<GranolaAutomationActionRun> = {},
-): GranolaAutomationActionRun {
-  return {
-    ...run,
-    ...patch,
-    finishedAt,
-    status: "completed",
-  };
-}
-
-function failedRun(
-  run: GranolaAutomationActionRun,
-  finishedAt: string,
-  error: unknown,
-): GranolaAutomationActionRun {
-  return {
-    ...run,
-    error: error instanceof Error ? error.message : String(error),
-    finishedAt,
-    status: "failed",
-  };
-}
-
-function skippedRun(
-  run: GranolaAutomationActionRun,
-  finishedAt: string,
-  reason: string,
-): GranolaAutomationActionRun {
-  return {
-    ...run,
-    finishedAt,
-    result: reason,
-    status: "skipped",
-  };
-}
-
 async function runHandler<T>(
   run: GranolaAutomationActionRun,
   execute: () => Promise<T>,
@@ -154,9 +114,9 @@ async function runHandler<T>(
 ): Promise<GranolaAutomationActionRun> {
   try {
     const result = await execute();
-    return completedRun(run, handlers.nowIso(), onSuccess(result));
+    return completeYazdWorkflowRun(run, handlers.nowIso(), onSuccess(result));
   } catch (error) {
-    return failedRun(run, handlers.nowIso(), error);
+    return failYazdWorkflowRun(run, handlers.nowIso(), error);
   }
 }
 
@@ -185,7 +145,7 @@ function createAgentDefinition(): GranolaAutomationActionDefinition {
 
       try {
         const result = await context.handlers.runAgent(context.match, context.rule, action, run);
-        return completedRun(run, context.handlers.nowIso(), {
+        return completeYazdWorkflowRun(run, context.handlers.nowIso(), {
           artefactIds: result.artefactIds ? [...result.artefactIds] : undefined,
           meta: {
             attempts: result.attempts,
@@ -201,7 +161,7 @@ function createAgentDefinition(): GranolaAutomationActionDefinition {
           result: result.output ?? (result.dryRun ? "Dry run: provider request not executed" : ""),
         });
       } catch (error) {
-        return failedRun(run, context.handlers.nowIso(), error);
+        return failYazdWorkflowRun(run, context.handlers.nowIso(), error);
       }
     },
     trigger() {
@@ -313,14 +273,14 @@ function createExportNotesDefinition(): GranolaAutomationActionDefinition {
       try {
         const result = await context.handlers.exportNotes(context.match, action);
         if (!result) {
-          return skippedRun(
+          return skipYazdWorkflowRun(
             run,
             context.handlers.nowIso(),
             "Meeting notes were unavailable for export",
           );
         }
 
-        return completedRun(run, context.handlers.nowIso(), {
+        return completeYazdWorkflowRun(run, context.handlers.nowIso(), {
           meta: {
             format: result.format,
             outputDir: result.outputDir,
@@ -330,7 +290,7 @@ function createExportNotesDefinition(): GranolaAutomationActionDefinition {
           result: `Exported notes to ${result.outputDir}`,
         });
       } catch (error) {
-        return failedRun(run, context.handlers.nowIso(), error);
+        return failYazdWorkflowRun(run, context.handlers.nowIso(), error);
       }
     },
     trigger() {
@@ -359,14 +319,14 @@ function createExportTranscriptDefinition(): GranolaAutomationActionDefinition {
       try {
         const result = await context.handlers.exportTranscripts(context.match, action);
         if (!result) {
-          return skippedRun(
+          return skipYazdWorkflowRun(
             run,
             context.handlers.nowIso(),
             "Transcript data was unavailable for export",
           );
         }
 
-        return completedRun(run, context.handlers.nowIso(), {
+        return completeYazdWorkflowRun(run, context.handlers.nowIso(), {
           meta: {
             format: result.format,
             outputDir: result.outputDir,
@@ -376,7 +336,7 @@ function createExportTranscriptDefinition(): GranolaAutomationActionDefinition {
           result: `Exported transcript to ${result.outputDir}`,
         });
       } catch (error) {
-        return failedRun(run, context.handlers.nowIso(), error);
+        return failYazdWorkflowRun(run, context.handlers.nowIso(), error);
       }
     },
     trigger() {
