@@ -1,5 +1,9 @@
 import type {
+  YazdApprovalMode,
   YazdAskUserWorkflowAction,
+  YazdArtefactHistoryAction,
+  YazdArtefactHistoryEntry,
+  YazdArtefactStatus,
   YazdCommandWorkflowAction,
   YazdSlackMessageWorkflowAction,
   YazdTriggeredWorkflowAction,
@@ -52,15 +56,10 @@ export type GranolaExportJobKind = "notes" | "transcripts";
 export type GranolaExportJobStatus = "completed" | "failed" | "running";
 export type GranolaSyncChangeKind = "changed" | "created" | "removed" | "transcript-ready";
 export type GranolaAutomationArtefactKind = "enrichment" | "notes";
-export type GranolaAutomationArtefactHistoryAction =
-  | "approved"
-  | "edited"
-  | "generated"
-  | "rejected"
-  | "rerun";
-export type GranolaAutomationArtefactStatus = "approved" | "generated" | "rejected" | "superseded";
+export type GranolaAutomationArtefactHistoryAction = YazdArtefactHistoryAction;
+export type GranolaAutomationArtefactStatus = YazdArtefactStatus;
 export type GranolaAutomationActionTrigger = YazdWorkflowTrigger;
-export type GranolaAutomationApprovalMode = "auto" | "manual";
+export type GranolaAutomationApprovalMode = YazdApprovalMode;
 export type GranolaProcessingIssueKind =
   | "artefact-stale"
   | "pipeline-failed"
@@ -517,11 +516,7 @@ export interface GranolaAutomationArtefactAttempt {
   provider?: GranolaAgentProviderKind;
 }
 
-export interface GranolaAutomationArtefactHistoryEntry {
-  action: GranolaAutomationArtefactHistoryAction;
-  at: string;
-  note?: string;
-}
+export type GranolaAutomationArtefactHistoryEntry = YazdArtefactHistoryEntry;
 
 export interface GranolaAutomationArtefact {
   actionId: string;
