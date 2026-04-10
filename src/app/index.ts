@@ -1,38 +1,5 @@
 export { GranolaApp, createGranolaApp } from "./core.ts";
 export {
-  GRAN_YAZD_SOURCE_ID,
-  buildGranolaYazdAutomationArtifactBundle,
-  buildGranolaYazdArtifactBundle,
-  buildGranolaYazdSourceChange,
-  buildGranolaYazdSourceFetchResult,
-  buildGranolaYazdSourceInfo,
-  buildGranolaYazdSourceItemSummary,
-} from "../yazd-source.ts";
-export {
-  buildGranolaYazdAgentPrompt,
-  createGranolaYazdAgentPlugin,
-  listGranolaYazdAgentPlugins,
-} from "../yazd-agents.ts";
-export {
-  buildGranolaAutomationKnowledgeBaseBundle,
-  buildGranolaYazdKnowledgeBaseRef,
-  legacyPkmPreviewFromYazdKnowledgeBasePreview,
-  legacyPkmSyncResultFromYazdKnowledgeBasePublishResult,
-  listGranolaYazdKnowledgeBasePluginDefinitions,
-  listGranolaYazdKnowledgeBasePlugins,
-  previewGranolaYazdKnowledgeBasePublish,
-  previewGranolaYazdKnowledgeBasePublishSync,
-  publishGranolaYazdKnowledgeBase,
-  resolveGranolaYazdKnowledgeBasePluginDefinition,
-  resolveGranolaYazdKnowledgeBasePlugin,
-} from "../yazd-knowledge-bases.ts";
-export type { GranolaYazdKnowledgeBasePlugin } from "../yazd-knowledge-bases.ts";
-export type {
-  GranolaYazdKnowledgeBasePluginDefinition,
-  GranolaYazdKnowledgeBasePluginManager,
-  GranolaYazdKnowledgeBasePluginTransport,
-} from "../yazd-kb-plugin-definitions.ts";
-export {
   buildMeetingPkmArtifactBundle,
   buildPkmAutomationArtefactProjection,
   buildPkmEntityArtifactsFromDocument,
@@ -155,15 +122,6 @@ export type {
   GranolaExportRunOptions,
   GranolaExportJobRunResult,
   GranolaAppDocumentsState,
-  GranolaYazdArtifact,
-  GranolaYazdArtifactBundle,
-  GranolaYazdKnowledgeBaseKind,
-  GranolaYazdKnowledgeBasePublishInput,
-  GranolaYazdKnowledgeBasePublishPreview,
-  GranolaYazdKnowledgeBasePublishResult,
-  GranolaYazdKnowledgeBaseRef,
-  GranolaYazdPublishAction,
-  GranolaYazdPublishPlanEntry,
   GranolaAppExportRunState,
   GranolaAppFoldersState,
   GranolaAppIndexState,
@@ -211,12 +169,5 @@ export type {
   GranolaPkmTargetsResult,
   GranolaPkmTargetReviewMode,
   GranolaPkmTargetTransport,
-  GranolaYazdSourceChange,
-  GranolaYazdSourceChangesResult,
-  GranolaYazdSourceFetchResult,
-  GranolaYazdSourceInfo,
-  GranolaYazdSourceItemSummary,
-  GranolaYazdSourceListOptions,
-  GranolaYazdSourceListResult,
   GranolaTranscriptsExportResult,
 } from "./types.ts";

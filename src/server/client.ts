@@ -40,15 +40,17 @@ import type {
   GranolaPkmTargetsResult,
   GranolaAutomationRunsResult,
   GranolaTranscriptsExportResult,
+  NoteOutputFormat,
+  TranscriptOutputFormat,
+} from "../app/index.ts";
+import type {
   GranolaYazdArtifactBundle,
   GranolaYazdSourceChangesResult,
   GranolaYazdSourceFetchResult,
   GranolaYazdSourceInfo,
   GranolaYazdSourceListOptions,
   GranolaYazdSourceListResult,
-  NoteOutputFormat,
-  TranscriptOutputFormat,
-} from "../app/index.ts";
+} from "../app/yazd.ts";
 import {
   granolaAutomationHarnessExplainPath,
   granolaAutomationArtefactDecisionPath,

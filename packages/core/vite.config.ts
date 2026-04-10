@@ -6,6 +6,7 @@ export default defineConfig({
     dts: true,
     entry: {
       index: "src/index.ts",
+      yazd: "src/yazd.ts",
     },
     format: ["esm"],
     outDir: "dist",

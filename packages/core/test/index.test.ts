@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createGranolaYazdAgentPlugin,
   buildObsidianOpenFileUri,
-  listGranolaYazdKnowledgeBasePluginDefinitions,
   listGranolaExportTargetDefinitions,
   loadConfig,
 } from "../src/index.ts";
@@ -30,63 +28,5 @@ describe("@kkarimi/gran-core", () => {
     });
 
     expect(config.notes.output.length).toBeGreaterThan(0);
-  });
-
-  it("exports the Yazd agent bridge", async () => {
-    const plugin = createGranolaYazdAgentPlugin({
-      config: {
-        agents: {
-          codexCommand: "codex",
-          defaultProvider: "codex",
-          dryRun: false,
-          harnessesFile: "/tmp/agent-harnesses.json",
-          maxRetries: 2,
-          openaiBaseUrl: "https://api.openai.com/v1",
-          openrouterBaseUrl: "https://openrouter.ai/api/v1",
-          timeoutMs: 30_000,
-        },
-        debug: false,
-        notes: {
-          output: "/tmp/notes",
-          timeoutMs: 120_000,
-        },
-        transcripts: {
-          cacheFile: "/tmp/cache.json",
-          output: "/tmp/transcripts",
-        },
-      },
-      provider: "codex",
-      runner: {
-        async run() {
-          return {
-            dryRun: false,
-            model: "gpt-5-codex",
-            output: "ok",
-            prompt: "ignored",
-            provider: "codex",
-          };
-        },
-      },
-    });
-
-    const result = await plugin.run({ prompt: "Summarise this meeting." });
-    expect(result.text).toBe("ok");
-  });
-
-  it("exports the Yazd knowledge-base plugin definitions", () => {
-    const definitions = listGranolaYazdKnowledgeBasePluginDefinitions();
-
-    expect(definitions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "gran-markdown-vault",
-          managedBy: "gran",
-        }),
-        expect.objectContaining({
-          id: "yazd-notion",
-          managedBy: "yazd",
-        }),
-      ]),
-    );
   });
 });
