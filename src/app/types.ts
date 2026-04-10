@@ -1,5 +1,11 @@
 import type {
-  YazdWorkflowActionDefinition,
+  YazdAskUserWorkflowAction,
+  YazdCommandWorkflowAction,
+  YazdSlackMessageWorkflowAction,
+  YazdTriggeredWorkflowAction,
+  YazdWebhookPayloadFormat,
+  YazdWebhookWorkflowAction,
+  YazdWorkflowActionBase,
   YazdWorkflowDefinition,
   YazdReviewIssue,
   YazdReviewIssueSeverity,
@@ -7,6 +13,8 @@ import type {
   YazdWorkflowRunStatus,
   YazdWorkflowTrigger,
   YazdWorkflowWhen,
+  YazdWriteFileFormat,
+  YazdWriteFileWorkflowAction,
 } from "@kkarimi/yazd-core";
 
 import type {
@@ -76,8 +84,8 @@ export type GranolaAutomationActionKind =
   | "webhook"
   | "write-file";
 export type GranolaAutomationActionRunStatus = YazdWorkflowRunStatus;
-export type GranolaAutomationWebhookPayloadFormat = "json" | "markdown" | "text";
-export type GranolaAutomationWriteFileFormat = "json" | "markdown" | "text";
+export type GranolaAutomationWebhookPayloadFormat = YazdWebhookPayloadFormat;
+export type GranolaAutomationWriteFileFormat = YazdWriteFileFormat;
 export type GranolaPkmTargetKind = "docs-folder" | "obsidian";
 export type GranolaPkmTargetTransport = "api" | "filesystem";
 export type GranolaPkmTargetReviewMode = "optional" | "recommended" | "required";
@@ -334,21 +342,14 @@ export interface GranolaAutomationRuleWhen extends Omit<
   transcriptLoaded?: boolean;
 }
 
-interface GranolaAutomationBaseAction extends YazdWorkflowActionDefinition {
-  id: string;
+interface GranolaAutomationBaseAction extends YazdWorkflowActionBase {
   kind: GranolaAutomationActionKind;
 }
 
-interface GranolaAutomationTriggeredAction extends GranolaAutomationBaseAction {
-  sourceActionId?: string;
-  trigger?: GranolaAutomationActionTrigger;
-}
+interface GranolaAutomationTriggeredAction
+  extends Omit<YazdTriggeredWorkflowAction, "kind">, GranolaAutomationBaseAction {}
 
-export interface GranolaAutomationAskUserAction extends GranolaAutomationBaseAction {
-  details?: string;
-  kind: "ask-user";
-  prompt: string;
-}
+export type GranolaAutomationAskUserAction = YazdAskUserWorkflowAction;
 
 export interface GranolaAutomationAgentAction extends GranolaAutomationBaseAction {
   approvalMode?: GranolaAutomationApprovalMode;
@@ -372,15 +373,7 @@ export interface GranolaAutomationPipelineConfig {
   kind: GranolaAutomationArtefactKind;
 }
 
-export interface GranolaAutomationCommandAction extends GranolaAutomationTriggeredAction {
-  args?: string[];
-  command: string;
-  cwd?: string;
-  env?: Record<string, string>;
-  kind: "command";
-  stdin?: "json" | "none";
-  timeoutMs?: number;
-}
+export type GranolaAutomationCommandAction = YazdCommandWorkflowAction;
 
 export interface GranolaAutomationExportNotesAction extends GranolaAutomationBaseAction {
   format?: NoteOutputFormat;
@@ -396,31 +389,11 @@ export interface GranolaAutomationExportTranscriptAction extends GranolaAutomati
   scopedOutput?: boolean;
 }
 
-export interface GranolaAutomationWebhookAction extends GranolaAutomationTriggeredAction {
-  bodyTemplate?: string;
-  headers?: Record<string, string>;
-  kind: "webhook";
-  method?: string;
-  payload?: GranolaAutomationWebhookPayloadFormat;
-  url?: string;
-  urlEnv?: string;
-}
+export type GranolaAutomationWebhookAction = YazdWebhookWorkflowAction;
 
-export interface GranolaAutomationSlackMessageAction extends GranolaAutomationTriggeredAction {
-  kind: "slack-message";
-  text?: string;
-  webhookUrl?: string;
-  webhookUrlEnv?: string;
-}
+export type GranolaAutomationSlackMessageAction = YazdSlackMessageWorkflowAction;
 
-export interface GranolaAutomationWriteFileAction extends GranolaAutomationTriggeredAction {
-  contentTemplate?: string;
-  filenameTemplate?: string;
-  format?: GranolaAutomationWriteFileFormat;
-  kind: "write-file";
-  outputDir: string;
-  overwrite?: boolean;
-}
+export type GranolaAutomationWriteFileAction = YazdWriteFileWorkflowAction;
 
 export interface GranolaAutomationPkmSyncAction extends GranolaAutomationTriggeredAction {
   kind: "pkm-sync";

@@ -40,6 +40,6 @@
     "typecheck": "vp exec tsc --noEmit"
   },
   "dependencies": {
-    "@kkarimi/yazd-core": "github:kkarimi/yazd#7fccf48"
+    "@kkarimi/yazd-core": "github:kkarimi/yazd#b776d93"
   }
 }
