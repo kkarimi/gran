@@ -34,6 +34,10 @@ function resolveFormat(value: string | boolean | undefined): MeetingListOutputFo
   }
 }
 
+function shouldPrintSearchStatus(format: MeetingListOutputFormat): boolean {
+  return format === "text";
+}
+
 function parseLimit(value: string | boolean | undefined): number {
   if (value === undefined) {
     return 20;
@@ -79,13 +83,15 @@ export const searchCommand: CommandDefinition = {
       search: query,
     });
 
-    console.log(
-      result.source === "index"
-        ? "Searched the local index"
-        : result.source === "snapshot"
-          ? "Search index unavailable, fell back to the local snapshot"
-          : "Search index unavailable, fell back to live meeting metadata",
-    );
+    if (shouldPrintSearchStatus(format)) {
+      console.log(
+        result.source === "index"
+          ? "Searched the local index"
+          : result.source === "snapshot"
+            ? "Search index unavailable, fell back to the local snapshot"
+            : "Search index unavailable, fell back to live meeting metadata",
+      );
+    }
     console.log(renderMeetingList(result.meetings, format).trimEnd());
     return 0;
   },

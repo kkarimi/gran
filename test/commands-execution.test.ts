@@ -987,6 +987,59 @@ describe("command execution", () => {
     expect(log.mock.calls.at(-1)?.[0]).toContain("Alpha Sync");
   });
 
+  test("meeting get emits clean json without status chatter", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getMeeting: vi.fn(async () => ({
+        meeting: {
+          createdAt: "2024-01-01T09:00:00Z",
+          folders: [],
+          id: "doc-alpha-1111",
+          notes: "Alpha notes",
+          title: "Alpha Sync",
+          transcript: null,
+          updatedAt: "2024-01-03T10:00:00Z",
+        },
+        source: {
+          cacheData: undefined,
+          document: {
+            content: "Fallback note body",
+            createdAt: "2024-01-01T09:00:00Z",
+            id: "doc-alpha-1111",
+            notes: undefined,
+            notesPlain: "Alpha notes",
+            tags: ["team"],
+            title: "Alpha Sync",
+            updatedAt: "2024-01-03T10:00:00Z",
+          },
+        },
+      })),
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await meetingCommand.run(
+      makeContext({
+        commandArgs: ["get", "doc-alpha-1111"],
+        commandFlags: {
+          format: "json",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.getMeeting).toHaveBeenCalledWith("doc-alpha-1111");
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0]?.[0]).toContain('"id": "doc-alpha-1111"');
+    expect(log.mock.calls[0]?.[0]).not.toContain("Fetching meeting from Granola API");
+  });
+
   test("serve command starts a server and reports security settings", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const app = {
@@ -1937,6 +1990,50 @@ describe("command execution", () => {
     });
     expect(log).toHaveBeenCalledWith("Searched the local index");
     expect(log).toHaveBeenCalledWith(expect.stringContaining("Alpha Sync"));
+  });
+
+  test("search command keeps json output free of status chatter", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getState: () => ({
+        auth: {
+          mode: "api-key",
+        },
+      }),
+      listMeetings: vi.fn(async () => ({
+        meetings: [
+          {
+            createdAt: "2024-01-01T09:00:00Z",
+            folders: [],
+            id: "doc-alpha-1111",
+            noteContentSource: "notes",
+            tags: ["team", "customer"],
+            title: "Alpha Sync",
+            transcriptLoaded: true,
+            transcriptSegmentCount: 1,
+            updatedAt: "2024-01-03T10:00:00Z",
+          },
+        ],
+        source: "index" as const,
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await searchCommand.run(
+      makeContext({
+        commandArgs: ["customer"],
+        commandFlags: {
+          format: "json",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0]?.[0]).toContain('"id": "doc-alpha-1111"');
+    expect(log.mock.calls[0]?.[0]).not.toContain("Searched the local index");
   });
 
   test("tui command runs a standalone workspace when foreground mode is requested", async () => {

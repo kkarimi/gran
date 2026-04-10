@@ -77,10 +77,9 @@ Hook failures warn and continue. They do not make the sync itself fail.
 Once your script sees an event, fetch the full meeting record in a machine-readable format:
 
 ```bash
-gran meeting view <id> --format json
+gran meeting get <id> --format json
 gran meeting notes <id> --format json
 gran meeting transcript <id> --format json
-gran meeting export <id> --format json
 ```
 
 Folder and search surfaces also support machine-readable output:
@@ -89,6 +88,9 @@ Folder and search surfaces also support machine-readable output:
 gran folder view Personal --format json
 gran search "merchant onboarding" --format json
 ```
+
+When you use `--format json` or `--format yaml`, Gran now keeps stdout clean and skips the human
+progress lines. That makes these commands safe to pipe directly into scripts.
 
 That keeps the boundary universal:
 

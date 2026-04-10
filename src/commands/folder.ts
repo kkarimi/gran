@@ -49,6 +49,12 @@ function resolveFolderDetailFormat(value: string | boolean | undefined): FolderD
   return resolveFolderListFormat(value);
 }
 
+function shouldPrintFolderStatus(
+  format: FolderListOutputFormat | FolderDetailOutputFormat,
+): boolean {
+  return format === "text";
+}
+
 function parseLimit(value: string | boolean | undefined): number {
   if (value === undefined) {
     return 20;
@@ -115,7 +121,9 @@ async function list(
   const app = await createGranolaApp(config);
   debug(config.debug, "authMode", app.getState().auth.mode);
 
-  console.log("Loading folders...");
+  if (shouldPrintFolderStatus(format)) {
+    console.log("Loading folders...");
+  }
   const result = await app.listFolders({ limit, search });
   console.log(renderFolderList(result.folders, format).trimEnd());
   return 0;
@@ -137,7 +145,9 @@ async function view(
   const app = await createGranolaApp(config);
   debug(config.debug, "authMode", app.getState().auth.mode);
 
-  console.log("Fetching folder from Granola API...");
+  if (shouldPrintFolderStatus(format)) {
+    console.log("Fetching folder from Granola API...");
+  }
   const result = await app.findFolder(query);
   console.log(renderFolderView(result, format).trimEnd());
   return 0;

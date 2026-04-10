@@ -20,11 +20,12 @@ function meetingHelp(): string {
   return `Gran meeting
 
 Usage:
-  gran meeting <list|view|export|notes|transcript|open> [options]
+  gran meeting <list|view|get|export|notes|transcript|open> [options]
 
 Subcommands:
   list                List meetings from the Granola API
   view <id>           Show a single meeting with notes and transcript text
+  get <id>            Fetch a single meeting as JSON or YAML
   export <id>         Export a single meeting as JSON or YAML
   notes <id>          Show a single meeting's notes
   transcript <id>     Show a single meeting's transcript
@@ -166,8 +167,9 @@ export const meetingCommand: CommandDefinition = {
         }
         return await view(id, commandFlags, globalFlags);
       case "export":
+      case "get":
         if (!id) {
-          throw new Error("meeting export requires an id");
+          throw new Error(`meeting ${action} requires an id`);
         }
         return await exportMeeting(id, commandFlags, globalFlags);
       case "notes":
@@ -190,11 +192,22 @@ export const meetingCommand: CommandDefinition = {
         return 1;
       default:
         throw new Error(
-          "invalid meeting command: expected list, view, export, notes, transcript, or open",
+          "invalid meeting command: expected list, view, get, export, notes, transcript, or open",
         );
     }
   },
 };
+
+function shouldPrintMeetingStatus(
+  format:
+    | MeetingListOutputFormat
+    | MeetingDetailOutputFormat
+    | MeetingExportOutputFormat
+    | MeetingNotesOutputFormat
+    | MeetingTranscriptOutputFormat,
+): boolean {
+  return format === "text" || format === "markdown" || format === "raw";
+}
 
 async function list(
   commandFlags: Record<string, string | boolean | undefined>,
@@ -210,14 +223,16 @@ async function list(
   const folder = folderQuery ? await app.findFolder(folderQuery) : undefined;
   const folderId = folder?.id;
   const result = await app.listMeetings({ folderId, limit, search });
-  console.log(
-    result.source === "index"
-      ? "Loaded meetings from the local index"
-      : result.source === "snapshot"
-        ? "Loaded meetings from the local snapshot"
-        : "Fetched meetings from Granola API",
-  );
-  if (folder) {
+  if (shouldPrintMeetingStatus(format)) {
+    console.log(
+      result.source === "index"
+        ? "Loaded meetings from the local index"
+        : result.source === "snapshot"
+          ? "Loaded meetings from the local snapshot"
+          : "Fetched meetings from Granola API",
+    );
+  }
+  if (folder && shouldPrintMeetingStatus(format)) {
     console.log(`Folder: ${folder.name} (${folder.id})`);
   }
 
@@ -233,7 +248,9 @@ async function view(
   const format = resolveViewFormat(commandFlags.format);
   const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
-  console.log("Fetching meeting from Granola API...");
+  if (shouldPrintMeetingStatus(format)) {
+    console.log("Fetching meeting from Granola API...");
+  }
   const result = await app.getMeeting(id);
 
   console.log(renderMeetingView(result.meeting, format).trimEnd());
@@ -248,7 +265,9 @@ async function exportMeeting(
   const format = resolveExportFormat(commandFlags.format);
   const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
-  console.log("Fetching meeting from Granola API...");
+  if (shouldPrintMeetingStatus(format)) {
+    console.log("Fetching meeting from Granola API...");
+  }
   const result = await app.getMeeting(id);
 
   console.log(renderMeetingExport(result.meeting, format).trimEnd());
@@ -263,7 +282,9 @@ async function notes(
   const format = resolveNotesFormat(commandFlags.format);
   const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
-  console.log("Fetching meeting from Granola API...");
+  if (shouldPrintMeetingStatus(format)) {
+    console.log("Fetching meeting from Granola API...");
+  }
   const result = await app.getMeeting(id);
 
   console.log(renderMeetingNotes(result.source.document, format).trimEnd());
@@ -278,7 +299,9 @@ async function transcript(
   const format = resolveTranscriptFormat(commandFlags.format);
   const { app } = await createMeetingAppContext(commandFlags, globalFlags);
 
-  console.log("Fetching meeting from Granola API...");
+  if (shouldPrintMeetingStatus(format)) {
+    console.log("Fetching meeting from Granola API...");
+  }
   const result = await app.getMeeting(id);
   const output = renderMeetingTranscript(
     result.source.document,
