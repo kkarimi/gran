@@ -91,4 +91,44 @@ describe("automation artefact store", () => {
       }),
     ]);
   });
+
+  test("preserves participant summaries when artefacts round-trip through disk", async () => {
+    const filePath = join(
+      await mkdtemp(join(tmpdir(), "granola-automation-artefacts-")),
+      "artefacts.json",
+    );
+    const store = new FileAutomationArtefactStore(filePath);
+
+    await store.writeArtefacts([
+      buildArtefact("notes-1", {
+        structured: {
+          actionItems: [],
+          decisions: [],
+          followUps: [],
+          highlights: [],
+          markdown: "# Alpha",
+          participantSummaries: [
+            {
+              actionItems: ["Follow up with ops"],
+              role: "attendee",
+              speaker: "Nima",
+              summary: "Asked for a rollout plan",
+            },
+          ],
+          sections: [{ body: "Alpha body", title: "Summary" }],
+          summary: "Alpha body",
+          title: "Alpha",
+        },
+      }),
+    ]);
+
+    expect((await store.readArtefact("notes-1"))?.structured.participantSummaries).toEqual([
+      {
+        actionItems: ["Follow up with ops"],
+        role: "attendee",
+        speaker: "Nima",
+        summary: "Asked for a rollout plan",
+      },
+    ]);
+  });
 });

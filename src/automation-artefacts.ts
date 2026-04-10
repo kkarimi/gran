@@ -1,20 +1,18 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { cloneYazdStructuredOutput } from "@kkarimi/yazd-core";
+import { cloneYazdStructuredOutput, normaliseYazdStructuredOutput } from "@kkarimi/yazd-core";
 import type {
   GranolaAutomationArtefact,
-  GranolaAutomationArtefactActionItem,
   GranolaAutomationArtefactAttempt,
   GranolaAutomationArtefactHistoryAction,
   GranolaAutomationArtefactHistoryEntry,
   GranolaAutomationArtefactKind,
-  GranolaAutomationArtefactSection,
   GranolaAutomationArtefactStatus,
   GranolaAutomationArtefactStructuredOutput,
 } from "./app/index.ts";
 import { defaultGranolaToolkitPersistenceLayout } from "./persistence/layout.ts";
-import { asRecord, parseJsonString, stringArray, stringValue } from "./utils.ts";
+import { asRecord, parseJsonString, stringValue } from "./utils.ts";
 
 const AUTOMATION_ARTEFACTS_VERSION = 1;
 const MAX_AUTOMATION_ARTEFACTS = 200;
@@ -77,42 +75,6 @@ function normaliseHistoryEntry(value: unknown): GranolaAutomationArtefactHistory
   };
 }
 
-function normaliseSection(value: unknown): GranolaAutomationArtefactSection | undefined {
-  const record = asRecord(value);
-  if (!record) {
-    return undefined;
-  }
-
-  const title = stringValue(record.title).trim();
-  const body = stringValue(record.body).trim();
-  if (!title || !body) {
-    return undefined;
-  }
-
-  return {
-    body,
-    title,
-  };
-}
-
-function normaliseActionItem(value: unknown): GranolaAutomationArtefactActionItem | undefined {
-  const record = asRecord(value);
-  if (!record) {
-    return undefined;
-  }
-
-  const title = stringValue(record.title).trim();
-  if (!title) {
-    return undefined;
-  }
-
-  return {
-    dueDate: stringValue(record.dueDate).trim() || undefined,
-    owner: stringValue(record.owner).trim() || undefined,
-    title,
-  };
-}
-
 function normaliseAttempt(value: unknown): GranolaAutomationArtefactAttempt | undefined {
   const record = asRecord(value);
   if (!record) {
@@ -141,42 +103,9 @@ function normaliseAttempt(value: unknown): GranolaAutomationArtefactAttempt | un
 function normaliseStructured(
   value: unknown,
 ): GranolaAutomationArtefactStructuredOutput | undefined {
-  const record = asRecord(value);
-  if (!record) {
-    return undefined;
-  }
-
-  const title = stringValue(record.title).trim();
-  const markdown = stringValue(record.markdown).trim();
-  if (!title || !markdown) {
-    return undefined;
-  }
-
-  return {
-    actionItems: Array.isArray(record.actionItems)
-      ? record.actionItems
-          .map((item) => normaliseActionItem(item))
-          .filter((item): item is GranolaAutomationArtefactActionItem => Boolean(item))
-      : [],
-    decisions: stringArray(record.decisions)
-      .map((item) => item.trim())
-      .filter(Boolean),
-    followUps: stringArray(record.followUps)
-      .map((item) => item.trim())
-      .filter(Boolean),
-    highlights: stringArray(record.highlights)
-      .map((item) => item.trim())
-      .filter(Boolean),
-    markdown,
-    metadata: asRecord(record.metadata),
-    sections: Array.isArray(record.sections)
-      ? record.sections
-          .map((section) => normaliseSection(section))
-          .filter((section): section is GranolaAutomationArtefactSection => Boolean(section))
-      : [],
-    summary: stringValue(record.summary).trim() || undefined,
-    title,
-  };
+  return normaliseYazdStructuredOutput(value) as
+    | GranolaAutomationArtefactStructuredOutput
+    | undefined;
 }
 
 function normaliseArtefact(value: unknown): GranolaAutomationArtefact | undefined {

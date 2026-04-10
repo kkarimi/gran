@@ -4,8 +4,9 @@ import type {
   GranolaAutomationArtefactStructuredOutput,
   MeetingRoleHelpersRecord,
 } from "./app/index.ts";
+import { normaliseYazdStringList, normaliseYazdStructuredOutput } from "@kkarimi/yazd-core";
 import { resolveMeetingOwnerCandidate } from "./meeting-roles.ts";
-import { asRecord, parseJsonString, stringArray, stringValue } from "./utils.ts";
+import { asRecord, parseJsonString, stringValue } from "./utils.ts";
 
 interface StructuredPayload {
   actionItems?: unknown;
@@ -60,12 +61,6 @@ function markdownSections(markdown: string): Array<{ body: string; title: string
 
   pushCurrent();
   return sections;
-}
-
-function normaliseStrings(value: unknown): string[] {
-  return stringArray(value)
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 function normaliseActionItems(
@@ -135,7 +130,7 @@ function normaliseParticipantSummaries(
 
       const role = stringValue(record.role).trim();
       return {
-        actionItems: normaliseStrings(record.actionItems),
+        actionItems: normaliseYazdStringList(record.actionItems),
         role:
           role === "attendee" ||
           role === "creator" ||
@@ -151,29 +146,6 @@ function normaliseParticipantSummaries(
     .filter(Boolean) as GranolaAutomationArtefactParticipantSummary[];
 
   return summaries.length > 0 ? summaries : undefined;
-}
-
-function normaliseSections(value: unknown): GranolaAutomationArtefactStructuredOutput["sections"] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((item) => {
-      const record = asRecord(item);
-      if (!record) {
-        return undefined;
-      }
-
-      const title = stringValue(record.title).trim();
-      const body = stringValue(record.body).trim();
-      if (!title || !body) {
-        return undefined;
-      }
-
-      return { body, title };
-    })
-    .filter((item) => Boolean(item)) as GranolaAutomationArtefactStructuredOutput["sections"];
 }
 
 function extractJsonPayload(rawOutput: string): StructuredPayload | undefined {
@@ -223,22 +195,18 @@ export function parsePipelineOutput(options: {
   const payload = extractJsonPayload(rawOutput);
 
   if (payload) {
-    const title = stringValue(payload.title).trim() || options.meetingTitle;
-    const markdown = stringValue(payload.markdown).trim();
-    if (markdown) {
+    const structured = normaliseYazdStructuredOutput(payload, {
+      actionItems: (value) => normaliseActionItems(value, options.roleHelpers),
+      fallbackTitle: options.meetingTitle,
+      participantSummaries: (value) => normaliseParticipantSummaries(value),
+    }) as GranolaAutomationArtefactStructuredOutput | undefined;
+
+    if (structured) {
       return {
         parseMode: "json",
         structured: {
-          actionItems: normaliseActionItems(payload.actionItems, options.roleHelpers),
-          decisions: normaliseStrings(payload.decisions),
-          followUps: normaliseStrings(payload.followUps),
-          highlights: normaliseStrings(payload.highlights),
-          markdown,
-          metadata: asRecord(payload.metadata),
-          participantSummaries: normaliseParticipantSummaries(payload.participantSummaries),
-          sections: normaliseSections(payload.sections),
-          summary: stringValue(payload.summary).trim() || firstParagraph(markdown),
-          title,
+          ...structured,
+          summary: structured.summary || firstParagraph(structured.markdown),
         },
       };
     }
