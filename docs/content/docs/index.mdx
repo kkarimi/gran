@@ -1,6 +1,6 @@
 ---
 title: Overview
-description: "The unofficial open-source Swiss army knife for Granola: sync locally, browse anywhere, export anything, and run your own agents."
+description: "Local-first workspace for Granola: sync locally, browse anywhere, export into knowledge bases you own, and connect external tools when needed."
 ---
 
 Gran 👵🏻 is an unofficial open-source toolkit for getting more out of Granola than the
@@ -18,12 +18,12 @@ It gives you a local-first workbench for your Granola archive:
 - keep local folder and Obsidian publishing inside Gran while handing more opinionated automation
   and remote destinations off to external tools when needed
 - reuse the same local-first core from a Node and TypeScript SDK
-- run your own agents and reviewable pipelines against meeting transcripts
-- script and extend the whole thing in plain TypeScript and local files
+- connect the archive to scripts, webhooks, and external tools through clean local seams
+- keep the whole thing open, local, and hackable in plain TypeScript and local files
 
 The fastest way to start is `gran init`. In an interactive terminal, it now guides you through
 connection, first import, and opening the browser workspace by default before you need to think
-about automation or knowledge bases.
+about advanced automation at all.
 
 It has three user-facing surfaces on one shared TypeScript core:
 
@@ -36,21 +36,21 @@ It has three user-facing surfaces on one shared TypeScript core:
 - keeping a local index, local snapshot, and sync loop around your Granola archive
 - opening the same meetings from scripts, the browser, and the terminal
 - exporting notes and transcripts into durable local files
-- running BYOA prompts and reviewable note pipelines
 - giving you an open-source seam when Granola itself is missing a feature you need
+- feeding external tools through events, hooks, and machine-readable fetch commands
 
 ## Start Here
 
 <Cards>
   <Card title="Getting started" href="/docs/getting-started" />
   <Card title="Workflows and examples" href="/docs/workflows" />
-  <Card title="Automation and BYOA" href="/docs/automation" />
-  <Card title="Integrations" href="/docs/integrations" />
-  <Card title="Shared local runtime" href="/docs/server-web-and-tui" />
-  <Card title="SDK and integrations" href="/docs/sdk" />
-  <Card title="Auth and configuration" href="/docs/auth-and-configuration" />
   <Card title="Export and own your data" href="/docs/exporting" />
+  <Card title="Integrations" href="/docs/integrations" />
   <Card title="Search, meetings, and folders" href="/docs/meetings-and-folders" />
+  <Card title="Shared local runtime" href="/docs/server-web-and-tui" />
+  <Card title="Auth and configuration" href="/docs/auth-and-configuration" />
+  <Card title="SDK and integrations" href="/docs/sdk" />
+  <Card title="Automation and BYOA" href="/docs/automation" />
   <Card title="Agent skills" href="/docs/agent-skills" />
   <Card title="Architecture" href="/docs/architecture" />
   <Card title="Development" href="/docs/development" />
@@ -58,8 +58,8 @@ It has three user-facing surfaces on one shared TypeScript core:
 </Cards>
 
 If you want practical setups first, open [`Workflows`](/docs/workflows). If you want to wire Gran
-into other local tools, open [`Integrations`](/docs/integrations). If you want to build on top of
-Gran in code, jump straight to [`SDK`](/docs/sdk).
+into other local tools, open [`Integrations`](/docs/integrations). If you want advanced reviewable
+pipelines later, open [`Automation`](/docs/automation).
 
 ## Core Ideas
 
@@ -69,15 +69,15 @@ Gran 👵🏻 is built around the idea that your meeting archive should be usabl
 runtime you control, with an explicit sync loop, a local index, local snapshots, search, exports,
 and background work.
 
-### Bring your own agents
+### Open integrations
 
-Transcripts and notes are not the end of the flow. You can layer local harnesses, `AGENT.md`-style
-prompts, review queues, and downstream actions on top of them.
+Gran exposes local seams on purpose. Events, hooks, machine-readable fetch commands, and the SDK
+let you connect the meeting archive to whatever else you want to run on top.
 
 ### One shared core across surfaces
 
 CLI commands, the browser workspace, and the TUI all talk to the same application core for auth,
-meeting discovery, folders, transcripts, notes, automation, and export jobs.
+meeting discovery, folders, transcripts, notes, and export jobs.
 
 ### Open and hackable by design
 

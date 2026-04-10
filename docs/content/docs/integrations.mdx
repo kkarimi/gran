@@ -5,6 +5,8 @@ description: Treat Gran as a local-first source app for scripts, webhooks, SDK c
 
 Gran works best as the local source of truth for your Granola archive.
 
+This is the preferred advanced extension path for external tools, including future Yazd workflows.
+
 That means the cleanest integration model is:
 
 - Gran syncs and indexes your meetings locally
@@ -120,7 +122,7 @@ Then, when it sees a `meeting.updated` or `transcript.ready` event, it can fetch
 run its own logic:
 
 ```bash
-gran meeting export <id> --format json
+gran meeting get <id> --format json
 ```
 
 That is enough to build:

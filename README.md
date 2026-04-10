@@ -5,10 +5,10 @@
 [![Docs](https://img.shields.io/badge/docs-live-0f766e)](https://kkarimi.github.io/gran/)
 [![License](https://img.shields.io/github/license/kkarimi/gran)](https://github.com/kkarimi/gran/blob/main/LICENSE)
 
-The unofficial open-source Swiss army knife for Granola.
+Local-first workspace for Granola.
 
 Sync your meeting archive locally, browse it in the browser or terminal, export it into knowledge
-bases you own, and run your own agents against transcripts and notes.
+bases you own, and connect it to other tools when you need more automation.
 
 ## Install
 
@@ -48,8 +48,9 @@ Start with:
 - [Overview](https://kkarimi.github.io/gran/docs/)
 - [Getting started](https://kkarimi.github.io/gran/docs/getting-started/)
 - [Workflows and examples](https://kkarimi.github.io/gran/docs/workflows/)
+- [Exporting](https://kkarimi.github.io/gran/docs/exporting/)
+- [Integrations](https://kkarimi.github.io/gran/docs/integrations/)
 - [SDK](https://kkarimi.github.io/gran/docs/sdk/)
-- [Automation and BYOA](https://kkarimi.github.io/gran/docs/automation/)
 - [Auth and configuration](https://kkarimi.github.io/gran/docs/auth-and-configuration/)
 
 Release history is also tracked in

@@ -1,8 +1,8 @@
 # Gran Vision
 
-`Gran` is not the automation product.
+`Gran` is the local Granola workspace and source runtime.
 
-It should be the best local runtime and source workspace for Granola:
+It should be the best local runtime for Granola:
 
 - connect to Granola
 - sync meetings locally
@@ -25,11 +25,11 @@ Gran should not become the place where source-agnostic workflow and PKM automati
 
 That belongs in `Yazd`.
 
-## Relationship With Yazd
+## Future Handoff
 
-`Yazd` is the user-facing knowledge automation layer.
+If and when a broader knowledge automation layer grows around Gran, that belongs in `Yazd`.
 
-It should own:
+That future layer should own:
 
 - workflow definitions
 - review and approval UX
@@ -38,6 +38,13 @@ It should own:
 - multi-destination knowledge-base plugins
 
 Gran should expose a stable local source contract that Yazd can consume.
+
+Gran does not need live feature parity or parallel implementation progress in Yazd to ship well.
+The practical rule is:
+
+- finish Gran as a strong standalone source app first
+- keep Yazd-compatible seams clean and generic
+- move new source-agnostic workflow complexity out of Gran instead of waiting to perfect Yazd
 
 ## Practical Rule
 

@@ -41,13 +41,11 @@ gran init
 That writes:
 
 - `~/.config/gran/config.json`
-- `~/.config/gran/agent-harnesses.json`
-- `~/.config/gran/automation-rules.json`
-- starter prompt files under `~/.config/gran/prompts/`
+- local support files under `~/.config/gran/`
 
 The generated files are intentionally local and editable. They give you a user-level home for
-config, knowledge-base profiles, prompts, and future automation without forcing you to reverse-engineer the JSON
-shape first.
+config, knowledge-base profiles, and future integrations without forcing you to reverse-engineer the
+JSON shape first.
 
 In an interactive terminal, `gran init` now offers guided setup immediately:
 
@@ -79,7 +77,7 @@ gran web
 ```
 
 Use this when you want the calmest first-run path and the easiest place to inspect sync state,
-folders, review queues, knowledge bases, and diagnostics.
+folders, knowledge bases, and diagnostics.
 
 ### Terminal Workspace
 
@@ -125,8 +123,9 @@ gran meeting list --limit 10
 
 - `gran export` when you want notes and transcripts in durable local files
 - `gran kb add ...` when you want a named destination like an Obsidian vault
-- `Settings -> Automation` when you want review-first AI notes
+- `gran events --format jsonl --follow` when you want to feed another local tool
 - `gran attach` when you want to reuse the running service in the terminal
+- `Settings -> Advanced` when you want the deeper automation and diagnostics surfaces
 
 For concrete examples, see [`Workflows`](/docs/workflows).
 
@@ -134,11 +133,12 @@ For concrete examples, see [`Workflows`](/docs/workflows).
 
 <Cards>
   <Card title="Workflows" href="/docs/workflows" />
-  <Card title="Automation" href="/docs/automation" />
+  <Card title="Export and own your data" href="/docs/exporting" />
+  <Card title="Integrations" href="/docs/integrations" />
   <Card title="Shared local runtime" href="/docs/server-web-and-tui" />
   <Card title="SDK" href="/docs/sdk" />
-  <Card title="Export and own your data" href="/docs/exporting" />
   <Card title="Agent skills" href="/docs/agent-skills" />
   <Card title="Auth and configuration" href="/docs/auth-and-configuration" />
+  <Card title="Automation" href="/docs/automation" />
   <Card title="Search, meetings, and folders" href="/docs/meetings-and-folders" />
 </Cards>
