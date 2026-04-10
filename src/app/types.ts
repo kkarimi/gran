@@ -1,9 +1,12 @@
 import type {
+  YazdWorkflowActionDefinition,
+  YazdWorkflowDefinition,
   YazdReviewIssue,
   YazdReviewIssueSeverity,
   YazdWorkflowRun,
   YazdWorkflowRunStatus,
   YazdWorkflowTrigger,
+  YazdWorkflowWhen,
 } from "@kkarimi/yazd-core";
 
 import type {
@@ -319,37 +322,42 @@ export interface GranolaYazdKnowledgeBasePublishResult extends GranolaYazdKnowle
   writtenCount: number;
 }
 
-export interface GranolaAutomationRuleWhen {
+export interface GranolaAutomationRuleWhen extends Omit<
+  YazdWorkflowWhen,
+  "eventKinds" | "itemIds" | "itemKinds" | "sourcePluginIds"
+> {
   eventKinds?: GranolaSyncEventKind[];
   folderIds?: string[];
   folderNames?: string[];
   meetingIds?: string[];
-  tags?: string[];
-  titleIncludes?: string[];
   titleMatches?: string;
   transcriptLoaded?: boolean;
 }
 
-export interface GranolaAutomationAskUserAction {
-  details?: string;
-  enabled?: boolean;
+interface GranolaAutomationBaseAction extends YazdWorkflowActionDefinition {
   id: string;
+  kind: GranolaAutomationActionKind;
+}
+
+interface GranolaAutomationTriggeredAction extends GranolaAutomationBaseAction {
+  sourceActionId?: string;
+  trigger?: GranolaAutomationActionTrigger;
+}
+
+export interface GranolaAutomationAskUserAction extends GranolaAutomationBaseAction {
+  details?: string;
   kind: "ask-user";
-  name?: string;
   prompt: string;
 }
 
-export interface GranolaAutomationAgentAction {
+export interface GranolaAutomationAgentAction extends GranolaAutomationBaseAction {
   approvalMode?: GranolaAutomationApprovalMode;
   cwd?: string;
   dryRun?: boolean;
-  enabled?: boolean;
   fallbackHarnessIds?: string[];
   harnessId?: string;
-  id: string;
   kind: "agent";
   model?: string;
-  name?: string;
   pipeline?: GranolaAutomationPipelineConfig;
   prompt?: string;
   promptFile?: string;
@@ -364,90 +372,59 @@ export interface GranolaAutomationPipelineConfig {
   kind: GranolaAutomationArtefactKind;
 }
 
-export interface GranolaAutomationCommandAction {
+export interface GranolaAutomationCommandAction extends GranolaAutomationTriggeredAction {
   args?: string[];
   command: string;
   cwd?: string;
-  enabled?: boolean;
   env?: Record<string, string>;
-  id: string;
   kind: "command";
-  name?: string;
-  sourceActionId?: string;
   stdin?: "json" | "none";
   timeoutMs?: number;
-  trigger?: GranolaAutomationActionTrigger;
 }
 
-export interface GranolaAutomationExportNotesAction {
-  enabled?: boolean;
+export interface GranolaAutomationExportNotesAction extends GranolaAutomationBaseAction {
   format?: NoteOutputFormat;
-  id: string;
   kind: "export-notes";
-  name?: string;
   outputDir?: string;
   scopedOutput?: boolean;
 }
 
-export interface GranolaAutomationExportTranscriptAction {
-  enabled?: boolean;
+export interface GranolaAutomationExportTranscriptAction extends GranolaAutomationBaseAction {
   format?: TranscriptOutputFormat;
-  id: string;
   kind: "export-transcript";
-  name?: string;
   outputDir?: string;
   scopedOutput?: boolean;
 }
 
-export interface GranolaAutomationWebhookAction {
+export interface GranolaAutomationWebhookAction extends GranolaAutomationTriggeredAction {
   bodyTemplate?: string;
-  enabled?: boolean;
   headers?: Record<string, string>;
-  id: string;
   kind: "webhook";
   method?: string;
-  name?: string;
   payload?: GranolaAutomationWebhookPayloadFormat;
-  sourceActionId?: string;
-  trigger?: GranolaAutomationActionTrigger;
   url?: string;
   urlEnv?: string;
 }
 
-export interface GranolaAutomationSlackMessageAction {
-  enabled?: boolean;
-  id: string;
+export interface GranolaAutomationSlackMessageAction extends GranolaAutomationTriggeredAction {
   kind: "slack-message";
-  name?: string;
-  sourceActionId?: string;
   text?: string;
-  trigger?: GranolaAutomationActionTrigger;
   webhookUrl?: string;
   webhookUrlEnv?: string;
 }
 
-export interface GranolaAutomationWriteFileAction {
+export interface GranolaAutomationWriteFileAction extends GranolaAutomationTriggeredAction {
   contentTemplate?: string;
-  enabled?: boolean;
   filenameTemplate?: string;
   format?: GranolaAutomationWriteFileFormat;
-  id: string;
   kind: "write-file";
-  name?: string;
   outputDir: string;
   overwrite?: boolean;
-  sourceActionId?: string;
-  trigger?: GranolaAutomationActionTrigger;
 }
 
-export interface GranolaAutomationPkmSyncAction {
-  enabled?: boolean;
-  id: string;
+export interface GranolaAutomationPkmSyncAction extends GranolaAutomationTriggeredAction {
   kind: "pkm-sync";
-  name?: string;
-  sourceActionId?: string;
   targetId: string;
-  trigger?: GranolaAutomationActionTrigger;
 }
 
 export interface GranolaPkmTarget {
@@ -488,11 +465,8 @@ export type GranolaAutomationAction =
   | GranolaAutomationSlackMessageAction
   | GranolaAutomationWriteFileAction;
 
-export interface GranolaAutomationRule {
+export interface GranolaAutomationRule extends Omit<YazdWorkflowDefinition, "actions" | "when"> {
   actions?: GranolaAutomationAction[];
-  enabled?: boolean;
-  id: string;
-  name: string;
   when: GranolaAutomationRuleWhen;
 }
 
