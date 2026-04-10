@@ -1,41 +1,39 @@
-# Gran x Yazd Integration TODO
+# Gran Integration Simplification TODO
 
-North star: keep `Gran` focused on being the best Granola source app and local workspace while integrating it cleanly with `Yazd`, the source-agnostic local-first knowledge automation product now living at `github.com/kkarimi/yazd`.
+North star: keep `Gran` focused on being the best local Granola source app. External automation should consume Gran through universal seams like events, machine-readable fetch commands, scripts, and webhooks instead of deep package coupling.
 
 ## Product Direction
 
-- `Yazd` is the generic automation and publishing system.
-- `Gran` stays the dedicated Granola app, source adapter, and local workspace.
-- Gran automation should move toward plugin boundaries instead of growing deeper inside the Gran app core.
-- Knowledge bases, review, and agent execution belong to `Yazd` over time.
-- Keep the integration seams small, typed, and shippable.
+- `Gran` owns Granola auth, sync, local indexing, browsing, and practical local publishing.
+- External tools such as `Yazd` should treat Gran like any other local source.
+- The main integration seams should be language-agnostic:
+  - event stream
+  - machine-readable CLI / HTTP fetch surfaces
+  - script and webhook hooks
+- Prefer universal local automation patterns before framework-specific contracts.
 
 ## Guardrails
 
-- Do not rename user-facing Gran features to Yazd prematurely.
-- Keep `main` working after every slice: full QA, commit, and push. Hold releases until the extraction batch feels coherent.
-- Prefer contract and package seams before moving behavior.
-- Keep Gran usable even if Yazd packages are not installed yet.
+- Do not remove existing capabilities just to make the architecture cleaner.
+- Keep `main` working after every slice: full QA, commit, and push. Hold releases until the simplification batch feels coherent.
+- Keep backward compatibility where it is cheap, but do not design around speculative legacy users.
+- Gran should stay useful even if no external automation tool is installed.
 
-| Priority | Status | Size | Published In | Area                  | Task                                                                                                        | Why                                                               |
-| -------- | ------ | ---- | ------------ | --------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| P1       | Done   | S    |              | Yazd / Strategy       | Lock the brand and architecture direction: Yazd as PKM automation core, Gran as a source app/plugin.        | The split should be intentional before code starts moving.        |
-| P1       | Done   | M    |              | Yazd / Repo Seed      | Create `github.com/kkarimi/yazd` and move the first `@kkarimi/yazd-core` contract package there.            | The boundary should be real, not just a workspace fiction.        |
-| P1       | Done   | M    |              | Gran / Source Seam    | Define how Gran surfaces meetings, transcripts, and sync events as a Yazd source plugin boundary.           | Gran should become one source, not the whole automation platform. |
-| P1       | Done   | M    |              | Gran / KB Plugin Seam | Move markdown vault and Obsidian-facing publish behavior behind Yazd knowledge-base plugin interfaces.      | Publishing should become source-agnostic.                         |
-| P1       | Done   | M    |              | SDK / Real Boundaries | Make the SDK depend on real external packages instead of re-exporting root source directly.                 | The SDK is not a real package boundary yet.                       |
-| P1       | Done   | M    |              | Gran / App Boundary   | Reduce Gran’s built-in automation ownership so it consumes Yazd-style contracts rather than inventing more. | This keeps Gran from staying the god-product forever.             |
-| P2       | Done   | M    |              | Yazd / Review Core    | Integrate Gran with Yazd review and publish decision models once they stabilize in the Yazd repo.           | Review is central to the generic product.                         |
-| P2       | Done   | M    |              | Yazd / Pi Plugin      | Integrate Gran with a future Pi/OpenClaw agent plugin package built on the Yazd agent contract.             | Pi support fits better as a Yazd ecosystem package.               |
-| P2       | Done   | M    |              | Yazd / KB Plugins     | Integrate second-wave knowledge-base plugins such as Notion, Capacities, or Tana via Yazd contracts.        | These should build on the generic KB seam, not custom Gran logic. |
-| P3       | Done   | M    |              | Docs / Product Story  | Reframe docs once the integration behavior actually moves: Gran as source app, Yazd as PKM automation.      | The public story should match the implementation, not get ahead.  |
+| Priority | Status  | Size | Published In | Area                      | Task                                                                                                                   | Why                                                                   |
+| -------- | ------- | ---- | ------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| P1       | Done    | S    |              | Integrations / Event Flow | Promote `gran events` to a first-class command with followable machine-readable output.                                | External tools need one obvious event seam before anything fancier.   |
+| P1       | Pending | M    |              | Integrations / Hooks      | Add generic script/webhook hooks for events like `meeting.updated` and `transcript.ready`.                             | A simple event runner is more universal than Yazd-shaped embedding.   |
+| P1       | Pending | M    |              | Integrations / Fetch      | Document and tighten machine-readable fetch surfaces for meetings, folders, and transcripts.                           | Events are only useful if consumers can fetch the payloads they need. |
+| P1       | Pending | M    |              | Architecture / Decouple   | Shrink or move Yazd-specific seams so Gran stops exporting package-specific automation contracts as the default story. | Gran should expose source seams, not become a second automation core. |
+| P2       | Pending | M    |              | Docs / Integrations       | Add a docs page showing Gran as a universal local source for scripts, hooks, and external tools like Yazd.             | The public story should match the simpler architecture.               |
+| P2       | Pending | M    |              | Web / Hooks UI            | Add a lightweight settings surface for inspecting and managing external event hooks.                                   | Hooks are more usable if people do not need to edit JSON by hand.     |
+| P3       | Pending | M    |              | CLI / Event Sources       | Expand the event stream beyond sync history to include publish/review/export events where it makes sense.              | A richer event bus can come later once the seam is stable.            |
 
 ## Recommended Build Order
 
-1. Gran source seam
-2. knowledge-base plugin seam
-3. SDK real package boundaries
-4. Gran app boundary cleanup
-5. review core integration
-6. Pi/OpenClaw plugin integration
-7. second-wave knowledge-base plugins
+1. first-class event stream
+2. script/webhook hooks
+3. machine-readable fetch contract
+4. docs + examples
+5. reduce Yazd-specific coupling
+6. optional hooks UI

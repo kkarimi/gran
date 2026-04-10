@@ -1,6 +1,7 @@
 import { createGranolaApp, type GranolaAppSyncResult } from "../app/index.ts";
 import { loadConfig } from "../config.ts";
 import { createGranolaSyncLoop } from "../sync-loop.ts";
+import { eventsFlags, runEventsSurface } from "./events.ts";
 
 import {
   debug,
@@ -19,8 +20,10 @@ Usage:
 
 Options:
   --watch             Keep syncing in the background until interrupted
-  --interval <value>  Poll interval for --watch, e.g. 60s or 5m (default: 60s)
+  --interval <value>  sync: poll interval for --watch (default: 60s); sync events: --follow interval (default: 5s)
   --limit <value>     Event count for sync events output (default: 20)
+  --format <value>    sync events: text, json, jsonl (default: text)
+  --follow            sync events: keep printing new events until interrupted
   --cache <path>      Path to Granola desktop transcript file
   --timeout <value>   Request timeout, e.g. 2m, 30s, 120000 (default: 2m)
   --supabase <path>   Path to supabase.json
@@ -58,6 +61,8 @@ export const syncCommand: CommandDefinition = {
   description: "Refresh the local meeting index and sync state",
   flags: {
     cache: { type: "string" },
+    follow: eventsFlags.follow,
+    format: eventsFlags.format,
     help: { type: "boolean" },
     interval: { type: "string" },
     limit: { type: "string" },
@@ -81,22 +86,7 @@ export const syncCommand: CommandDefinition = {
     debug(config.debug, "authMode", app.getState().auth.mode);
 
     if (commandArgs[0] === "events") {
-      const limit =
-        typeof commandFlags.limit === "string" && /^\d+$/.test(commandFlags.limit)
-          ? Number(commandFlags.limit)
-          : 20;
-      const result = await app.listSyncEvents({ limit });
-      if (result.events.length === 0) {
-        console.log("No sync events yet.");
-        return 0;
-      }
-
-      for (const event of result.events) {
-        console.log(
-          `${event.occurredAt} ${event.kind.padEnd(18)} ${event.title} (${event.meetingId})`,
-        );
-      }
-      return 0;
+      return await runEventsSurface({ app, commandFlags });
     }
 
     const result = await app.sync();

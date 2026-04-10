@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Bot, Code2, Globe, RefreshCw } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, Code2, Globe, RefreshCw, Zap } from "lucide-react";
 
 const surfaces = [
   {
@@ -36,6 +36,13 @@ const surfaces = [
       "Reuse Gran's local-first runtime, exports, and service connection model directly from Node and TypeScript.",
     href: "/docs/sdk",
     icon: Code2,
+  },
+  {
+    title: "Pipe Gran into other tools",
+    description:
+      "Follow the local event stream and fetch meeting payloads without tightly coupling Gran to another automation runtime.",
+    href: "/docs/integrations",
+    icon: Zap,
   },
 ];
 

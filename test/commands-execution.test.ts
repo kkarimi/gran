@@ -6,6 +6,7 @@ import { attachCommand } from "../src/commands/attach.ts";
 import { automationCommand } from "../src/commands/automation.ts";
 import type { CommandContext } from "../src/commands/types.ts";
 import { authCommand } from "../src/commands/auth.ts";
+import { eventsCommand } from "../src/commands/events.ts";
 import { exportCommand } from "../src/commands/export.ts";
 import { exportsCommand } from "../src/commands/exports.ts";
 import * as guidedSetupModule from "../src/commands/guided-setup.ts";
@@ -1285,6 +1286,62 @@ describe("command execution", () => {
     expect(app.listSyncEvents).toHaveBeenCalledWith({ limit: 10 });
     expect(log).toHaveBeenCalledWith(
       "2024-03-01T12:00:00.000Z meeting.created    Alpha Sync (doc-alpha-1111)",
+    );
+  });
+
+  test("events supports jsonl output", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const app = {
+      getState: () => ({
+        auth: {
+          mode: "stored-session",
+        },
+      }),
+      listSyncEvents: vi.fn(async () => ({
+        events: [
+          {
+            folders: [],
+            id: "sync-2:1",
+            kind: "transcript.ready",
+            meetingId: "doc-beta-2222",
+            occurredAt: "2024-03-02T12:00:00.000Z",
+            runId: "sync-2",
+            tags: ["customer"],
+            title: "Beta Transcript",
+            transcriptLoaded: true,
+            updatedAt: "2024-03-02T12:00:00.000Z",
+          },
+        ],
+      })),
+    };
+
+    vi.spyOn(configModule, "loadConfig").mockResolvedValue(makeConfig());
+    vi.spyOn(appModule, "createGranolaApp").mockResolvedValue(app as never);
+
+    const exitCode = await eventsCommand.run(
+      makeContext({
+        commandFlags: {
+          format: "jsonl",
+          limit: "5",
+        },
+      }),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(app.listSyncEvents).toHaveBeenCalledWith({ limit: 5 });
+    expect(log).toHaveBeenCalledWith(
+      JSON.stringify({
+        folders: [],
+        id: "sync-2:1",
+        kind: "transcript.ready",
+        meetingId: "doc-beta-2222",
+        occurredAt: "2024-03-02T12:00:00.000Z",
+        runId: "sync-2",
+        tags: ["customer"],
+        title: "Beta Transcript",
+        transcriptLoaded: true,
+        updatedAt: "2024-03-02T12:00:00.000Z",
+      }),
     );
   });
 

@@ -40,7 +40,8 @@ Obsidian vault publishing supports:
 - optional daily-note placement
 
 If you want API-backed destinations like Notion, Capacities, or Tana, treat Gran as the source app
-and hand those publish flows off to Yazd instead of expecting Gran to own them directly.
+and hand those publish flows off to an external automation tool instead of expecting Gran to own
+them directly.
 
 ## I Want Reviewable AI Notes Before Anything Gets Published
 
@@ -93,9 +94,26 @@ or TypeScript code instead of shell commands.
 
 See [`SDK`](/docs/sdk) for examples.
 
+## I Want Gran To Trigger Another Local Tool
+
+```bash
+gran events --format jsonl --follow
+```
+
+Use this when Gran should act as the local source app and something else should do the downstream
+automation.
+
+This is the simplest universal seam:
+
+- follow meeting and transcript change events as JSON lines
+- fetch the affected item with `gran meeting ... --format json`
+- keep your automation outside Gran instead of tightly coupling the runtimes
+
 ## Which Page Next?
 
 - Open [`Getting started`](/docs/getting-started) if you have not run `gran init` yet.
 - Open [`Automation`](/docs/automation) if you want review-first AI notes and BYOA pipelines.
+- Open [`Integrations`](/docs/integrations) if you want scripts, event followers, or external
+  automation tools on top of Gran.
 - Open [`Exporting`](/docs/exporting) if you want to publish into folders or Obsidian vaults.
 - Open [`SDK`](/docs/sdk) if you want to embed Gran in local scripts or apps.

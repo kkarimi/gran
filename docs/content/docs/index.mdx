@@ -7,16 +7,16 @@ Gran 👵🏻 is an unofficial open-source toolkit for getting more out of Grano
 desktop app and official exports expose on their own.
 
 Think of it as the Granola source app and local workspace. Gran owns local sync, browsing,
-exports, and source-side seams. Higher-level PKM automation and API-backed destinations can sit on
-top through Yazd.
+exports, and stable source-side seams. Higher-level PKM automation can sit on top through scripts,
+webhooks, SDK code, or tools like Yazd.
 
 It gives you a local-first workbench for your Granola archive:
 
 - sync meetings, notes, transcripts, folders, and change history into a local runtime
 - browse that state from the CLI, browser workspace, and terminal UI
 - export notes and transcripts without getting trapped in a closed format
-- keep local folder and Obsidian publishing inside Gran while leaving second-wave knowledge-base
-  plugins to Yazd
+- keep local folder and Obsidian publishing inside Gran while handing more opinionated automation
+  and remote destinations off to external tools when needed
 - reuse the same local-first core from a Node and TypeScript SDK
 - run your own agents and reviewable pipelines against meeting transcripts
 - script and extend the whole thing in plain TypeScript and local files
@@ -45,6 +45,7 @@ It has three user-facing surfaces on one shared TypeScript core:
   <Card title="Getting started" href="/docs/getting-started" />
   <Card title="Workflows and examples" href="/docs/workflows" />
   <Card title="Automation and BYOA" href="/docs/automation" />
+  <Card title="Integrations" href="/docs/integrations" />
   <Card title="Shared local runtime" href="/docs/server-web-and-tui" />
   <Card title="SDK and integrations" href="/docs/sdk" />
   <Card title="Auth and configuration" href="/docs/auth-and-configuration" />
@@ -56,8 +57,9 @@ It has three user-facing surfaces on one shared TypeScript core:
   <Card title="Releases" href="/docs/releases" />
 </Cards>
 
-If you want practical setups first, open [`Workflows`](/docs/workflows). If you want to build on
-top of Gran in code, jump straight to [`SDK`](/docs/sdk).
+If you want practical setups first, open [`Workflows`](/docs/workflows). If you want to wire Gran
+into other local tools, open [`Integrations`](/docs/integrations). If you want to build on top of
+Gran in code, jump straight to [`SDK`](/docs/sdk).
 
 ## Core Ideas
 

@@ -1,0 +1,113 @@
+---
+title: Integrations
+description: Treat Gran as a local-first source app for scripts, webhooks, SDK code, or external automation tools.
+---
+
+Gran works best as the local source of truth for your Granola archive.
+
+That means the cleanest integration model is:
+
+- Gran syncs and indexes your meetings locally
+- Gran exposes a small machine-readable seam
+- another tool decides what to automate or publish
+
+Today, the simplest seam is the local event stream plus machine-readable meeting commands.
+
+## Follow The Local Event Stream
+
+```bash
+gran events --format jsonl --follow
+```
+
+This prints one JSON object per event and keeps following new ones until you stop it.
+
+That gives another local process an easy way to notice:
+
+- new meetings
+- changed meetings
+- transcript readiness
+- other sync-derived changes
+
+If you only want a snapshot of recent events:
+
+```bash
+gran events --format jsonl --limit 50
+```
+
+`gran sync events` still works as a compatibility alias, but `gran events` is the primary command.
+
+## Fetch The Affected Meeting
+
+Once your script sees an event, fetch the full meeting record in a machine-readable format:
+
+```bash
+gran meeting view <id> --format json
+gran meeting notes <id> --format json
+gran meeting transcript <id> --format json
+gran meeting export <id> --format json
+```
+
+Folder and search surfaces also support machine-readable output:
+
+```bash
+gran folder view Personal --format json
+gran search "merchant onboarding" --format json
+```
+
+That keeps the boundary universal:
+
+- events tell you _what changed_
+- fetch commands tell you _what to process_
+
+## Good Fit For External Automation
+
+This model works well when you want:
+
+- a local script that watches transcript-ready events
+- a webhook bridge to another local service
+- a Node app built on the SDK
+- an external automation tool such as Yazd
+
+The important part is that Gran does not need to know the downstream tool's internal contracts.
+
+## Example Shape
+
+One process follows Gran events:
+
+```bash
+gran events --format jsonl --follow
+```
+
+Then, when it sees a `meeting.updated` or `transcript.ready` event, it can fetch the meeting and
+run its own logic:
+
+```bash
+gran meeting export <id> --format json
+```
+
+That is enough to build:
+
+- review-first note generators
+- PKM publishing pipelines
+- daily-note compilers
+- search indexes
+- custom notification flows
+
+## What Gran Should Own
+
+Gran should own:
+
+- Granola auth
+- sync and local indexing
+- browse/search/read workflows
+- practical local exports and vault publishing
+- stable local integration seams
+
+Downstream tools should own:
+
+- cross-source automation logic
+- agent orchestration
+- remote publishing APIs
+- complex review pipelines
+
+That keeps Gran simple and makes the integration more reusable.

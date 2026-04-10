@@ -45,6 +45,7 @@ Global options:
 
 Examples:
   gran attach http://127.0.0.1:4123
+  gran events --format jsonl --follow
   gran export --folder Team
   gran kb add --name "Work vault" --kind obsidian-vault --output ~/Vaults/Work
   gran folder list
