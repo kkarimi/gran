@@ -7,23 +7,17 @@ import {
 } from "@mariozechner/pi-tui";
 
 import type {
-  FolderSummaryRecord,
-  GranolaAutomationActionRun,
-  GranolaAutomationArtefact,
   GranolaAppApi,
   GranolaAppState,
   GranolaAppAuthState,
   GranolaAppStateEvent,
-  GranolaMeetingBundle,
-  GranolaProcessingIssue,
-  MeetingSummaryRecord,
-  MeetingSummarySource,
 } from "../app/index.ts";
 
 import { GranolaTuiAutomationOverlay } from "./automation.ts";
 import { GranolaTuiAuthOverlay, type GranolaTuiAuthActionId } from "./auth.ts";
 import { GranolaTuiQuickOpenPalette } from "./palette.ts";
 import { handleWorkspaceInput } from "./workspace-input.ts";
+import { GranolaTuiWorkspaceBrowseController } from "./workspace-browse.ts";
 import {
   currentDetailBody,
   detailScrollStep,
@@ -56,30 +50,10 @@ export interface GranolaTuiApp extends GranolaAppApi {
 export class GranolaTuiWorkspace implements Component {
   focused = false;
 
-  readonly #maxMeetings: number;
-
   #appState: GranolaAppState;
+  #browse: GranolaTuiWorkspaceBrowseController;
   #activePane: GranolaTuiFocusPane = "meetings";
-  #automationArtefacts: GranolaAutomationArtefact[] = [];
-  #processingIssues: GranolaProcessingIssue[] = [];
-  #automationRuns: GranolaAutomationActionRun[] = [];
-  #detailError = "";
-  #detailScroll = 0;
-  #detailToken = 0;
-  #folderError = "";
-  #folderToken = 0;
-  #folders: FolderSummaryRecord[] = [];
-  #listError = "";
-  #listToken = 0;
-  #loadingDetail = false;
-  #loadingMeetings = false;
-  #meetingSource: MeetingSummarySource = "live";
-  #meetings: MeetingSummaryRecord[] = [];
   #overlay?: OverlayHandle;
-  #recentMeetingIds: string[] = [];
-  #selectedFolderId?: string;
-  #selectedMeeting?: GranolaMeetingBundle;
-  #selectedMeetingId?: string;
   #statusMessage = "Loading meetings…";
   #statusTone: GranolaTuiStatusTone = "info";
   #tab: GranolaTuiWorkspaceTab = "notes";
@@ -91,7 +65,13 @@ export class GranolaTuiWorkspace implements Component {
     private readonly options: GranolaTuiWorkspaceOptions,
   ) {
     this.#appState = app.getState();
-    this.#maxMeetings = options.maxMeetings ?? 200;
+    this.#browse = new GranolaTuiWorkspaceBrowseController(app, {
+      maxMeetings: options.maxMeetings ?? 200,
+      setStatus: (message, tone) => {
+        this.setStatus(message, tone);
+      },
+      tui,
+    });
   }
 
   async initialise(): Promise<void> {
@@ -99,23 +79,23 @@ export class GranolaTuiWorkspace implements Component {
       this.handleAppUpdate(event);
     });
 
-    await this.loadAutomationRuns();
-    await this.loadAutomationArtefacts();
-    await this.loadProcessingIssues();
-    await this.loadFolders({
+    await this.#browse.loadAutomationRuns();
+    await this.#browse.loadAutomationArtefacts();
+    await this.#browse.loadProcessingIssues();
+    await this.#browse.loadFolders({
       setStatus: false,
     });
-    await this.loadMeetings({
+    await this.#browse.loadMeetings({
       preferredMeetingId: this.options.initialMeetingId,
       setStatus: true,
     });
 
     if (this.options.initialMeetingId) {
-      await this.loadMeeting(this.options.initialMeetingId, {
+      await this.#browse.loadMeeting(this.options.initialMeetingId, {
         ensureMeetingVisible: true,
       });
-    } else if (this.#selectedMeetingId && this.#appState.documents.loaded) {
-      void this.loadMeeting(this.#selectedMeetingId);
+    } else if (this.#browse.selectedMeetingId && this.#appState.documents.loaded) {
+      void this.#browse.loadMeeting(this.#browse.selectedMeetingId);
     }
   }
 
@@ -130,20 +110,20 @@ export class GranolaTuiWorkspace implements Component {
     const previousDocumentsLoadedAt = this.#appState.documents.loadedAt;
     this.#appState = event.state;
 
-    void this.loadAutomationRuns();
-    void this.loadAutomationArtefacts();
-    void this.loadProcessingIssues();
+    void this.#browse.loadAutomationRuns();
+    void this.#browse.loadAutomationArtefacts();
+    void this.#browse.loadProcessingIssues();
 
     if (
-      this.#meetingSource === "index" &&
+      this.#browse.meetingSource === "index" &&
       event.state.documents.loadedAt &&
       event.state.documents.loadedAt !== previousDocumentsLoadedAt &&
-      !this.#loadingMeetings
+      !this.#browse.loadingMeetings
     ) {
       void (async () => {
-        await this.loadFolders({ setStatus: false });
-        await this.loadMeetings({
-          preferredMeetingId: this.#selectedMeetingId,
+        await this.#browse.loadFolders({ setStatus: false });
+        await this.#browse.loadMeetings({
+          preferredMeetingId: this.#browse.selectedMeetingId,
         });
       })();
     }
@@ -157,410 +137,14 @@ export class GranolaTuiWorkspace implements Component {
     this.tui.requestRender();
   }
 
-  private normaliseSelectedIndex(): number {
-    if (this.#meetings.length === 0) {
-      return -1;
-    }
-
-    const selectedIndex = this.#selectedMeetingId
-      ? this.#meetings.findIndex((meeting) => meeting.id === this.#selectedMeetingId)
-      : -1;
-
-    return selectedIndex >= 0 ? selectedIndex : 0;
-  }
-
-  private normaliseSelectedFolderIndex(): number {
-    if (!this.#selectedFolderId) {
-      return 0;
-    }
-
-    const selectedIndex = this.#folders.findIndex((folder) => folder.id === this.#selectedFolderId);
-    return selectedIndex >= 0 ? selectedIndex + 1 : 0;
-  }
-
-  private recentMeetings(): MeetingSummaryRecord[] {
-    return this.#recentMeetingIds
-      .map((meetingId) => this.#meetings.find((meeting) => meeting.id === meetingId))
-      .filter((meeting): meeting is MeetingSummaryRecord => meeting !== undefined);
-  }
-
-  private normaliseSelectedRecentIndex(): number {
-    const recentMeetings = this.recentMeetings();
-    if (recentMeetings.length === 0) {
-      return -1;
-    }
-
-    const selectedIndex = this.#selectedMeetingId
-      ? recentMeetings.findIndex((meeting) => meeting.id === this.#selectedMeetingId)
-      : -1;
-
-    return selectedIndex >= 0 ? selectedIndex : 0;
-  }
-
-  private ensureMeetingVisible(meeting: MeetingSummaryRecord): void {
-    const existingIndex = this.#meetings.findIndex((item) => item.id === meeting.id);
-    if (existingIndex >= 0) {
-      this.#meetings[existingIndex] = meeting;
-    } else {
-      this.#meetings.push(meeting);
-    }
-
-    this.#meetings.sort((left, right) => {
-      if (left.updatedAt !== right.updatedAt) {
-        return right.updatedAt.localeCompare(left.updatedAt);
-      }
-
-      return left.title.localeCompare(right.title);
-    });
-  }
-
-  private async loadFolders(
-    options: {
-      forceRefresh?: boolean;
-      setStatus?: boolean;
-    } = {},
-  ): Promise<void> {
-    const token = ++this.#folderToken;
-    this.#folderError = "";
-    if (options.setStatus) {
-      this.setStatus(options.forceRefresh ? "Refreshing folders…" : "Loading folders…");
-    }
-
-    try {
-      const result = await this.app.listFolders({
-        forceRefresh: options.forceRefresh,
-        limit: 100,
-      });
-
-      if (token !== this.#folderToken) {
-        return;
-      }
-
-      this.#folders = [...result.folders];
-      if (
-        this.#selectedFolderId &&
-        !this.#folders.some((folder) => folder.id === this.#selectedFolderId)
-      ) {
-        this.#selectedFolderId = undefined;
-      }
-      this.#folderError = "";
-    } catch (error) {
-      if (token !== this.#folderToken) {
-        return;
-      }
-
-      const message = error instanceof Error ? error.message : String(error);
-      this.#folderError = message;
-      this.#folders = [];
-      this.#selectedFolderId = undefined;
-      this.setStatus(message, "error");
-    } finally {
-      if (token === this.#folderToken) {
-        this.tui.requestRender();
-      }
-    }
-  }
-
-  private async loadAutomationRuns(): Promise<void> {
-    try {
-      const result = await this.app.listAutomationRuns({ limit: 20 });
-      this.#automationRuns = [...result.runs];
-      this.tui.requestRender();
-    } catch {
-      // Automation visibility should not break the rest of the workspace.
-    }
-  }
-
-  private async loadAutomationArtefacts(): Promise<void> {
-    try {
-      const result = await this.app.listAutomationArtefacts({ limit: 20 });
-      this.#automationArtefacts = [...result.artefacts];
-      this.tui.requestRender();
-    } catch {
-      // Automation visibility should not break the rest of the workspace.
-    }
-  }
-
-  private async loadProcessingIssues(): Promise<void> {
-    try {
-      const result = await this.app.listProcessingIssues({ limit: 20 });
-      this.#processingIssues = [...result.issues];
-      this.tui.requestRender();
-    } catch {
-      // Processing visibility should not break the rest of the workspace.
-    }
-  }
-
-  private async loadMeetings(
-    options: {
-      forceRefresh?: boolean;
-      preferredMeetingId?: string;
-      setStatus?: boolean;
-    } = {},
-  ): Promise<void> {
-    const token = ++this.#listToken;
-    this.#loadingMeetings = true;
-    this.#listError = "";
-    if (options.setStatus !== false) {
-      this.setStatus(options.forceRefresh ? "Refreshing meetings…" : "Loading meetings…");
-    }
-
-    try {
-      const result = await this.app.listMeetings({
-        folderId: this.#selectedFolderId,
-        forceRefresh: options.forceRefresh,
-        limit: this.#maxMeetings,
-        preferIndex: true,
-      });
-
-      if (token !== this.#listToken) {
-        return;
-      }
-
-      this.#meetings = [...result.meetings];
-      this.#meetingSource = result.source;
-      let nextSelectedMeetingId: string | undefined;
-      if (
-        options.preferredMeetingId &&
-        this.#meetings.some((meeting) => meeting.id === options.preferredMeetingId)
-      ) {
-        nextSelectedMeetingId = options.preferredMeetingId;
-      } else if (
-        this.#selectedMeetingId &&
-        this.#meetings.some((meeting) => meeting.id === this.#selectedMeetingId)
-      ) {
-        nextSelectedMeetingId = this.#selectedMeetingId;
-      } else {
-        nextSelectedMeetingId = this.#meetings[0]?.id;
-      }
-      this.#selectedMeetingId = nextSelectedMeetingId;
-      if (!this.#selectedMeetingId) {
-        this.#selectedMeeting = undefined;
-        this.#detailError = "";
-        this.#detailScroll = 0;
-      }
-      this.#listError = "";
-      this.setStatus(
-        result.source === "index"
-          ? "Loaded meetings from the local index"
-          : result.source === "snapshot"
-            ? "Loaded meetings from the local snapshot"
-            : this.#selectedFolderId
-              ? "Connected to Granola (folder scope)"
-              : "Connected to Granola",
-      );
-    } catch (error) {
-      if (token !== this.#listToken) {
-        return;
-      }
-
-      const message = error instanceof Error ? error.message : String(error);
-      this.#listError = message;
-      this.setStatus(message, "error");
-      throw error;
-    } finally {
-      if (token === this.#listToken) {
-        this.#loadingMeetings = false;
-        this.tui.requestRender();
-      }
-    }
-  }
-
-  private async loadMeeting(
-    meetingId: string,
-    options: {
-      ensureMeetingVisible?: boolean;
-      recordRecent?: boolean;
-      resolveQuery?: boolean;
-    } = {},
-  ): Promise<void> {
-    const token = ++this.#detailToken;
-    this.#loadingDetail = true;
-    this.#detailError = "";
-    this.#selectedMeetingId = meetingId;
-    this.#detailScroll = 0;
-    this.setStatus(`Opening ${meetingId}…`);
-
-    try {
-      const bundle = options.resolveQuery
-        ? await this.app.findMeeting(meetingId)
-        : await this.app.getMeeting(meetingId);
-      if (token !== this.#detailToken) {
-        return;
-      }
-
-      this.#selectedMeeting = bundle;
-      this.#selectedMeetingId = bundle.source.document.id;
-      if (options.recordRecent !== false) {
-        this.#recentMeetingIds = [
-          bundle.source.document.id,
-          ...this.#recentMeetingIds.filter((candidate) => candidate !== bundle.source.document.id),
-        ].slice(0, 5);
-      }
-      if (options.ensureMeetingVisible) {
-        this.ensureMeetingVisible(bundle.meeting.meeting);
-      }
-      this.setStatus(`Opened ${bundle.meeting.meeting.title || bundle.meeting.meeting.id}`);
-    } catch (error) {
-      if (token !== this.#detailToken) {
-        return;
-      }
-
-      const message = error instanceof Error ? error.message : String(error);
-      this.#selectedMeeting = undefined;
-      this.#detailError = message;
-      this.setStatus(message, "error");
-    } finally {
-      if (token === this.#detailToken) {
-        this.#loadingDetail = false;
-        this.tui.requestRender();
-      }
-    }
-  }
-
-  private async refresh(forceRefresh: boolean): Promise<void> {
-    try {
-      if (forceRefresh) {
-        this.setStatus("Syncing…");
-        await this.app.sync();
-      }
-
-      await this.loadFolders({
-        forceRefresh,
-        setStatus: false,
-      });
-      await this.loadMeetings({
-        forceRefresh,
-        preferredMeetingId: this.#selectedMeetingId,
-      });
-
-      if (this.#selectedMeetingId) {
-        await this.loadMeeting(this.#selectedMeetingId, {
-          ensureMeetingVisible: true,
-        });
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        this.setStatus(error.message, "error");
-      }
-    }
-  }
-
-  private async moveMeetingSelection(delta: number): Promise<void> {
-    if (this.#meetings.length === 0) {
-      return;
-    }
-
-    const currentIndex = this.normaliseSelectedIndex();
-    const nextIndex = Math.max(0, Math.min(this.#meetings.length - 1, currentIndex + delta));
-    const nextMeeting = this.#meetings[nextIndex];
-    if (!nextMeeting || nextMeeting.id === this.#selectedMeetingId) {
-      return;
-    }
-
-    await this.loadMeeting(nextMeeting.id);
-  }
-
-  private async moveRecentSelection(delta: number): Promise<void> {
-    const recentMeetings = this.recentMeetings();
-    if (recentMeetings.length === 0) {
-      return;
-    }
-
-    const currentIndex = this.normaliseSelectedRecentIndex();
-    const nextIndex = Math.max(0, Math.min(recentMeetings.length - 1, currentIndex + delta));
-    const nextMeeting = recentMeetings[nextIndex];
-    if (!nextMeeting || nextMeeting.id === this.#selectedMeetingId) {
-      return;
-    }
-
-    await this.loadMeeting(nextMeeting.id, {
-      recordRecent: false,
-    });
-  }
-
-  private async moveFolderSelection(delta: number): Promise<void> {
-    const total = this.#folders.length + 1;
-    const currentIndex = this.normaliseSelectedFolderIndex();
-    const nextIndex = Math.max(0, Math.min(total - 1, currentIndex + delta));
-    const nextFolderId = nextIndex === 0 ? undefined : this.#folders[nextIndex - 1]?.id;
-
-    if (nextFolderId === this.#selectedFolderId) {
-      return;
-    }
-
-    this.#selectedFolderId = nextFolderId;
-    this.#selectedMeeting = undefined;
-    this.#detailError = "";
-    this.#detailScroll = 0;
-    this.#selectedMeetingId = undefined;
-    await this.loadMeetings({
-      setStatus: false,
-    });
-
-    const visibleMeetingId =
-      this.#selectedMeetingId &&
-      this.#meetings.some((meeting) => meeting.id === this.#selectedMeetingId)
-        ? this.#selectedMeetingId
-        : this.#meetings[0]?.id;
-
-    if (visibleMeetingId) {
-      this.#selectedMeetingId = visibleMeetingId;
-      await this.loadMeeting(visibleMeetingId, {
-        ensureMeetingVisible: true,
-      });
-      return;
-    }
-
-    this.#selectedMeetingId = undefined;
-    this.tui.requestRender();
-  }
-
-  private async moveSelection(delta: number): Promise<void> {
-    if (this.#activePane === "folders") {
-      await this.moveFolderSelection(delta);
-      return;
-    }
-
-    if (this.#activePane === "recent") {
-      await this.moveRecentSelection(delta);
-      return;
-    }
-
-    await this.moveMeetingSelection(delta);
-  }
-
-  private async openSelectedMeeting(): Promise<void> {
-    if (!this.#selectedMeetingId) {
-      return;
-    }
-
-    await this.loadMeeting(this.#selectedMeetingId, {
-      ensureMeetingVisible: true,
-    });
-  }
-
   private viewModel(): GranolaTuiWorkspaceViewModel {
-    return {
-      activePane: this.#activePane,
-      appState: this.#appState,
-      detailError: this.#detailError,
-      detailScroll: this.#detailScroll,
-      folderError: this.#folderError,
-      folders: this.#folders,
-      listError: this.#listError,
-      loadingDetail: this.#loadingDetail,
-      loadingMeetings: this.#loadingMeetings,
-      meetingSource: this.#meetingSource,
-      meetings: this.#meetings,
-      recentMeetingIds: this.#recentMeetingIds,
-      selectedFolderId: this.#selectedFolderId,
-      selectedMeeting: this.#selectedMeeting,
-      selectedMeetingId: this.#selectedMeetingId,
-      statusMessage: this.#statusMessage,
-      statusTone: this.#statusTone,
-      tab: this.#tab,
-    };
+    return this.#browse.viewModel(
+      this.#activePane,
+      this.#appState,
+      this.#statusMessage,
+      this.#statusTone,
+      this.#tab,
+    );
   }
 
   private scrollStep(): number {
@@ -576,9 +160,9 @@ export class GranolaTuiWorkspace implements Component {
     const detailLines = currentDetailBody(this.viewModel(), Math.max(1, detailWidth - 2));
     const visibleBodyLines = Math.max(1, bodyHeight - 2);
     const maxScroll = Math.max(0, detailLines.length - visibleBodyLines);
+    const nextScroll = Math.max(0, Math.min(maxScroll, this.#browse.detailScroll + delta));
 
-    this.#detailScroll = Math.max(0, Math.min(maxScroll, this.#detailScroll + delta));
-    this.tui.requestRender();
+    this.#browse.scrollDetail(nextScroll - this.#browse.detailScroll);
   }
 
   private cycleTab(delta: number): void {
@@ -586,34 +170,33 @@ export class GranolaTuiWorkspace implements Component {
     const index = tabs.indexOf(this.#tab);
     const nextIndex = (index + delta + tabs.length) % tabs.length;
     this.#tab = tabs[nextIndex] ?? "notes";
-    this.#detailScroll = 0;
+    this.#browse.resetDetailScroll();
     this.tui.requestRender();
   }
 
   private async reloadAfterAuthChange(): Promise<void> {
-    const preferredMeetingId = this.#selectedMeeting?.source.document.id ?? this.#selectedMeetingId;
+    const preferredMeetingId =
+      this.#browse.selectedMeeting?.source.document.id ?? this.#browse.selectedMeetingId;
 
     try {
-      await this.loadFolders({
+      await this.#browse.loadFolders({
         forceRefresh: true,
         setStatus: false,
       });
-      await this.loadMeetings({
+      await this.#browse.loadMeetings({
         forceRefresh: true,
         preferredMeetingId,
         setStatus: false,
       });
 
-      if (this.#selectedMeetingId) {
-        await this.loadMeeting(this.#selectedMeetingId, {
+      if (this.#browse.selectedMeetingId) {
+        await this.#browse.loadMeeting(this.#browse.selectedMeetingId, {
           ensureMeetingVisible: true,
         });
         return;
       }
 
-      this.#selectedMeeting = undefined;
-      this.#detailError = "";
-      this.#detailScroll = 0;
+      this.#browse.resetDetailScroll();
       this.tui.requestRender();
     } catch {
       // Status is already updated by the loaders.
@@ -707,8 +290,9 @@ export class GranolaTuiWorkspace implements Component {
       this.tui.requestRender();
     };
 
+    const view = this.viewModel();
     const palette = new GranolaTuiQuickOpenPalette({
-      meetings: this.#meetings,
+      meetings: view.meetings,
       onAction: async (actionId) => {
         closeOverlay();
         await this.runQuickOpenAction(actionId);
@@ -716,18 +300,18 @@ export class GranolaTuiWorkspace implements Component {
       onCancel: closeOverlay,
       onPick: async (meetingId) => {
         closeOverlay();
-        await this.loadMeeting(meetingId, {
+        await this.#browse.loadMeeting(meetingId, {
           ensureMeetingVisible: true,
         });
       },
       onResolveQuery: async (query) => {
         closeOverlay();
-        await this.loadMeeting(query, {
+        await this.#browse.loadMeeting(query, {
           ensureMeetingVisible: true,
           resolveQuery: true,
         });
       },
-      recentMeetingIds: this.#recentMeetingIds,
+      recentMeetingIds: view.recentMeetingIds,
     });
 
     this.#overlay = this.tui.showOverlay(palette, {
@@ -740,28 +324,7 @@ export class GranolaTuiWorkspace implements Component {
   }
 
   private async exportArchive(): Promise<void> {
-    const folderId = this.#selectedFolderId;
-    const scopeLabel = folderId
-      ? this.#folders.find((folder) => folder.id === folderId)?.name || folderId
-      : "all meetings";
-    this.setStatus(`Exporting ${scopeLabel}…`);
-
-    try {
-      const notesResult = await this.app.exportNotes("markdown", {
-        folderId,
-        scopedOutput: true,
-      });
-      const transcriptsResult = await this.app.exportTranscripts("text", {
-        folderId,
-        scopedOutput: true,
-      });
-      this.setStatus(
-        `Exported ${notesResult.documentCount} notes and ${transcriptsResult.transcriptCount} transcripts`,
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.setStatus(message, "error");
-    }
+    await this.#browse.exportArchive();
   }
 
   private async runQuickOpenAction(
@@ -778,25 +341,12 @@ export class GranolaTuiWorkspace implements Component {
         await this.exportArchive();
         return;
       case "clear-scope":
-        this.#selectedFolderId = undefined;
-        this.#selectedMeeting = undefined;
-        this.#detailError = "";
-        this.#detailScroll = 0;
-        this.#selectedMeetingId = undefined;
-        await this.loadMeetings({
-          preferredMeetingId: this.#recentMeetingIds[0],
-          setStatus: false,
-        });
-        if (this.#selectedMeetingId) {
-          await this.loadMeeting(this.#selectedMeetingId, {
-            ensureMeetingVisible: true,
-          });
-        }
+        await this.#browse.clearScope(this.viewModel().recentMeetingIds[0]);
         this.setStatus("Showing all meetings");
         return;
       case "sync":
       default:
-        await this.refresh(true);
+        await this.#browse.refresh(true);
     }
   }
 
@@ -813,39 +363,39 @@ export class GranolaTuiWorkspace implements Component {
     };
 
     const overlay = new GranolaTuiAutomationOverlay({
-      artefacts: this.#automationArtefacts,
-      issues: this.#processingIssues,
+      artefacts: this.#browse.automationArtefacts,
+      issues: this.#browse.processingIssues,
       onApproveArtefact: async (id) => {
         closeOverlay();
         await this.app.resolveAutomationArtefact(id, "approve");
-        await this.loadAutomationArtefacts();
+        await this.#browse.loadAutomationArtefacts();
         this.setStatus("Artefact approved");
       },
       onApproveRun: async (id) => {
         closeOverlay();
         await this.app.resolveAutomationRun(id, "approve");
-        await this.loadAutomationRuns();
+        await this.#browse.loadAutomationRuns();
         this.setStatus("Automation approved");
       },
       onCancel: closeOverlay,
       onRejectArtefact: async (id) => {
         closeOverlay();
         await this.app.resolveAutomationArtefact(id, "reject");
-        await this.loadAutomationArtefacts();
+        await this.#browse.loadAutomationArtefacts();
         this.setStatus("Artefact rejected");
       },
       onRejectRun: async (id) => {
         closeOverlay();
         await this.app.resolveAutomationRun(id, "reject");
-        await this.loadAutomationRuns();
+        await this.#browse.loadAutomationRuns();
         this.setStatus("Automation rejected");
       },
       onRecoverIssue: async (id) => {
         closeOverlay();
         const result = await this.app.recoverProcessingIssue(id);
-        await this.loadProcessingIssues();
-        await this.loadAutomationArtefacts();
-        await this.loadAutomationRuns();
+        await this.#browse.loadProcessingIssues();
+        await this.#browse.loadAutomationArtefacts();
+        await this.#browse.loadAutomationRuns();
         this.setStatus(
           result.runCount > 0
             ? `Recovered ${result.issue.kind} and re-ran ${result.runCount} pipeline${result.runCount === 1 ? "" : "s"}`
@@ -855,11 +405,11 @@ export class GranolaTuiWorkspace implements Component {
       onRerunArtefact: async (id) => {
         closeOverlay();
         await this.app.rerunAutomationArtefact(id);
-        await this.loadAutomationArtefacts();
-        await this.loadAutomationRuns();
+        await this.#browse.loadAutomationArtefacts();
+        await this.#browse.loadAutomationRuns();
         this.setStatus("Artefact rerun complete");
       },
-      runs: this.#automationRuns,
+      runs: this.#browse.automationRuns,
     });
 
     this.#overlay = this.tui.showOverlay(overlay, {
@@ -884,10 +434,10 @@ export class GranolaTuiWorkspace implements Component {
         this.options.onExit();
       },
       moveSelection: (delta) => {
-        void this.moveSelection(delta);
+        void this.#browse.moveSelection(this.#activePane, delta);
       },
       openSelectedMeeting: () => {
-        void this.openSelectedMeeting();
+        void this.#browse.openSelectedMeeting();
       },
       openAuth: () => {
         this.openAuthPanel();
@@ -899,7 +449,7 @@ export class GranolaTuiWorkspace implements Component {
         this.openQuickOpen();
       },
       refresh: (forceRefresh) => {
-        void this.refresh(forceRefresh);
+        void this.#browse.refresh(forceRefresh);
       },
       requestRender: () => {
         this.tui.requestRender();
@@ -910,7 +460,7 @@ export class GranolaTuiWorkspace implements Component {
       scrollStep: () => this.scrollStep(),
       selectTab: (tab) => {
         this.#tab = tab;
-        this.#detailScroll = 0;
+        this.#browse.resetDetailScroll();
         this.tui.requestRender();
       },
       setActivePane: (pane) => {
