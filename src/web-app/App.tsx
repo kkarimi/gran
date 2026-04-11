@@ -21,12 +21,6 @@ import {
 } from "../app/plugin-state.ts";
 import { defaultPluginDefinitions } from "../plugin-registry.ts";
 import {
-  defaultExportTargetNotesFormat,
-  defaultExportTargetNotesSubdir,
-  defaultExportTargetTranscriptsFormat,
-  defaultExportTargetTranscriptsSubdir,
-} from "../export-target-registry.ts";
-import {
   AppStatePanel,
   PrimaryNav,
   SecurityPanel,
@@ -40,6 +34,7 @@ import {
   useWebClientController,
 } from "./browser-hooks.ts";
 import { useReviewController } from "./browser-review.ts";
+import { useSettingsController } from "./browser-settings.ts";
 import {
   folderFreshnessNote,
   meetingContextSummary,
@@ -230,140 +225,6 @@ export function App() {
     updatePreferences,
   });
 
-  const loadExportTargets = async () => {
-    const client = clientController.clientAccessor();
-    if (!client) {
-      return;
-    }
-
-    const result = await client.listExportTargets();
-    setState("exportTargets", result.targets);
-    if (
-      state.selectedExportTargetId &&
-      !result.targets.some((target) => target.id === state.selectedExportTargetId)
-    ) {
-      setState("selectedExportTargetId", null);
-    }
-  };
-
-  const selectedExportTarget = () =>
-    state.exportTargets.find((target) => target.id === state.selectedExportTargetId) ?? null;
-  const currentExportScopeLabel = () =>
-    state.selectedFolderId
-      ? state.folders.find((folder) => folder.id === state.selectedFolderId)?.name ||
-        state.selectedFolderId
-      : "All meetings";
-  const exportDestinationSummary = () => {
-    const target = selectedExportTarget();
-    if (target) {
-      const notesSubdir = target.notesSubdir || defaultExportTargetNotesSubdir(target.kind);
-      const transcriptsSubdir =
-        target.transcriptsSubdir || defaultExportTargetTranscriptsSubdir(target.kind);
-      return `${target.name ?? target.id} · ${notesSubdir} + ${transcriptsSubdir}`;
-    }
-
-    const notesPath = state.appState?.config.notes.output || "Configured notes output";
-    const transcriptsPath =
-      state.appState?.config.transcripts.output || "Configured transcript output";
-    return `${notesPath} + ${transcriptsPath}`;
-  };
-  const defaultArchiveSummary = () => {
-    const notesPath = state.appState?.config.notes.output || "Configured notes output";
-    const transcriptsPath =
-      state.appState?.config.transcripts.output || "Configured transcript output";
-    return `${notesPath} + ${transcriptsPath}`;
-  };
-
-  const saveKnowledgeBase = async (target: import("../app/index.ts").GranolaExportTarget) => {
-    const client = clientController.clientAccessor();
-    if (!client) {
-      return;
-    }
-
-    const existing = await client.listExportTargets();
-    const nextTargets = [
-      target,
-      ...existing.targets.filter((candidate) => candidate.id !== target.id),
-    ].sort((left, right) => left.id.localeCompare(right.id));
-    const result = await client.saveExportTargets(nextTargets);
-    setState("exportTargets", result.targets);
-    setState("selectedExportTargetId", target.id);
-    setStatus(`Saved knowledge base ${target.name ?? target.id}`, "ok");
-  };
-
-  const removeKnowledgeBase = async (id: string) => {
-    const client = clientController.clientAccessor();
-    if (!client) {
-      return;
-    }
-
-    const existing = await client.listExportTargets();
-    const nextTargets = existing.targets.filter((candidate) => candidate.id !== id);
-    const result = await client.saveExportTargets(nextTargets);
-    setState("exportTargets", result.targets);
-    if (state.selectedExportTargetId === id) {
-      setState("selectedExportTargetId", null);
-    }
-    setStatus("Removed knowledge base", "ok");
-  };
-
-  const runBundledExport = async () => {
-    const client = clientController.clientAccessor();
-    if (!client) {
-      return;
-    }
-
-    const target = selectedExportTarget();
-    const folderId = state.selectedFolderId || undefined;
-    const scopeLabel = folderId ? currentExportScopeLabel() : "all meetings";
-    setStatus(`Exporting ${scopeLabel}…`, "busy");
-    try {
-      if (state.exportMode !== "transcripts") {
-        await client.exportNotes(
-          target ? (target.notesFormat ?? defaultExportTargetNotesFormat(target.kind)) : "markdown",
-          {
-            folderId,
-            scopedOutput: true,
-            targetId: target?.id,
-          },
-        );
-      }
-      if (state.exportMode !== "notes") {
-        await client.exportTranscripts(
-          target
-            ? (target.transcriptsFormat ?? defaultExportTargetTranscriptsFormat(target.kind))
-            : "text",
-          {
-            folderId,
-            scopedOutput: true,
-            targetId: target?.id,
-          },
-        );
-      }
-      await refreshAll();
-      setStatus(target ? `Exported via ${target.name ?? target.id}` : "Export complete", "ok");
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Export failed", "error");
-    }
-  };
-
-  const rerunJob = async (jobId: string) => {
-    const client = clientController.clientAccessor();
-    if (!client) {
-      return;
-    }
-
-    setStatus("Rerunning export…", "busy");
-    try {
-      await client.rerunExportJob(jobId);
-      await refreshAll();
-    } catch (error) {
-      setState("detailError", error instanceof Error ? error.message : String(error));
-      setStatus("Rerun failed", "error");
-    }
-  };
-
   const resolveAutomationRun = async (id: string, decision: "approve" | "reject") => {
     try {
       await reviewController.resolveAutomationRun(id, decision);
@@ -382,7 +243,7 @@ export function App() {
     }
   };
 
-  const refreshAll = async (forceRefresh = false) => {
+  async function refreshAll(forceRefresh = false) {
     if (!clientController.clientAccessor()) {
       await clientController.attachClient();
     }
@@ -400,7 +261,7 @@ export function App() {
       browseController.loadFolders(forceRefresh),
       browseController.loadHomeMeetings(forceRefresh),
       clientController.mergeAuthState(),
-      loadExportTargets(),
+      settingsController.loadKnowledgeBases(),
     ];
 
     if (automationEnabled()) {
@@ -433,16 +294,24 @@ export function App() {
             : "Connected",
       "ok",
     );
-  };
+  }
 
-  const connectAndRefresh = async (forceRefresh = false) => {
+  const settingsController = useSettingsController({
+    clientAccessor: clientController.clientAccessor,
+    refreshAll,
+    setState,
+    setStatus,
+    state,
+  });
+
+  async function connectAndRefresh(forceRefresh = false) {
     try {
       await refreshAll(forceRefresh);
     } catch (error) {
       setStatus("Connection failed", "error");
       setState("detailError", error instanceof Error ? error.message : String(error));
     }
-  };
+  }
 
   createEffect(() => {
     const nextPath = buildBrowserUrlPath(window.location.href, {
@@ -638,9 +507,9 @@ export function App() {
       appState={state.appState}
       auth={state.appState?.auth}
       automationRuns={state.automationRuns}
-      currentExportScopeLabel={currentExportScopeLabel()}
-      defaultArchiveSummary={defaultArchiveSummary()}
-      exportDestinationSummary={exportDestinationSummary()}
+      currentExportScopeLabel={settingsController.currentExportScopeLabel()}
+      defaultArchiveSummary={settingsController.defaultArchiveSummary()}
+      exportDestinationSummary={settingsController.exportDestinationSummary()}
       exportMode={state.exportMode}
       exportTargets={state.exportTargets}
       harnessDirty={state.harnessDirty}
@@ -694,13 +563,13 @@ export function App() {
       }}
       onRemoveHarness={harnessController.removeHarness}
       onRemoveKnowledgeBase={(id) => {
-        void removeKnowledgeBase(id);
+        void settingsController.removeKnowledgeBase(id);
       }}
       onRerunJob={(jobId) => {
-        void rerunJob(jobId);
+        void settingsController.rerunExportJob(jobId);
       }}
       onRunExport={() => {
-        void runBundledExport();
+        void settingsController.runBundledExport();
       }}
       onSaveApiKey={() => {
         void clientController.saveApiKey();
@@ -709,7 +578,7 @@ export function App() {
         void harnessController.saveHarnesses();
       }}
       onSaveKnowledgeBase={(target) => {
-        void saveKnowledgeBase(target);
+        void settingsController.saveKnowledgeBase(target);
       }}
       onSelectExportTarget={(id) => {
         setState("selectedExportTargetId", id);
