@@ -6,24 +6,17 @@ import {
   type OverlayHandle,
 } from "@mariozechner/pi-tui";
 
-import type {
-  GranolaAppApi,
-  GranolaAppState,
-  GranolaAppAuthState,
-  GranolaAppStateEvent,
-} from "../app/index.ts";
+import type { GranolaAppApi, GranolaAppState, GranolaAppStateEvent } from "../app/index.ts";
 
-import { GranolaTuiAutomationOverlay } from "./automation.ts";
-import { GranolaTuiAuthOverlay, type GranolaTuiAuthActionId } from "./auth.ts";
-import { GranolaTuiQuickOpenPalette } from "./palette.ts";
 import { handleWorkspaceInput } from "./workspace-input.ts";
 import { GranolaTuiWorkspaceBrowseController } from "./workspace-browse.ts";
+import { GranolaTuiWorkspaceOverlayController } from "./workspace-overlays.ts";
 import {
   currentDetailBody,
   detailScrollStep,
   renderWorkspace,
-  resolveWorkspaceLayout,
   type GranolaTuiWorkspaceViewModel,
+  resolveWorkspaceLayout,
 } from "./workspace-render.ts";
 import type { GranolaTuiFocusPane, GranolaTuiStatusTone, GranolaTuiWorkspaceTab } from "./types.ts";
 
@@ -53,7 +46,7 @@ export class GranolaTuiWorkspace implements Component {
   #appState: GranolaAppState;
   #browse: GranolaTuiWorkspaceBrowseController;
   #activePane: GranolaTuiFocusPane = "meetings";
-  #overlay?: OverlayHandle;
+  #overlays: GranolaTuiWorkspaceOverlayController;
   #statusMessage = "Loading meetings…";
   #statusTone: GranolaTuiStatusTone = "info";
   #tab: GranolaTuiWorkspaceTab = "notes";
@@ -67,6 +60,18 @@ export class GranolaTuiWorkspace implements Component {
     this.#appState = app.getState();
     this.#browse = new GranolaTuiWorkspaceBrowseController(app, {
       maxMeetings: options.maxMeetings ?? 200,
+      setStatus: (message, tone) => {
+        this.setStatus(message, tone);
+      },
+      tui,
+    });
+    this.#overlays = new GranolaTuiWorkspaceOverlayController({
+      app,
+      browse: this.#browse,
+      getViewModel: () => this.viewModel(),
+      onWorkspaceFocus: () => {
+        this.tui.setFocus(this);
+      },
       setStatus: (message, tone) => {
         this.setStatus(message, tone);
       },
@@ -102,6 +107,7 @@ export class GranolaTuiWorkspace implements Component {
   dispose(): void {
     this.#unsubscribe?.();
     this.#unsubscribe = undefined;
+    this.#overlays.dispose();
   }
 
   invalidate(): void {}
@@ -174,253 +180,6 @@ export class GranolaTuiWorkspace implements Component {
     this.tui.requestRender();
   }
 
-  private async reloadAfterAuthChange(): Promise<void> {
-    const preferredMeetingId =
-      this.#browse.selectedMeeting?.source.document.id ?? this.#browse.selectedMeetingId;
-
-    try {
-      await this.#browse.loadFolders({
-        forceRefresh: true,
-        setStatus: false,
-      });
-      await this.#browse.loadMeetings({
-        forceRefresh: true,
-        preferredMeetingId,
-        setStatus: false,
-      });
-
-      if (this.#browse.selectedMeetingId) {
-        await this.#browse.loadMeeting(this.#browse.selectedMeetingId, {
-          ensureMeetingVisible: true,
-        });
-        return;
-      }
-
-      this.#browse.resetDetailScroll();
-      this.tui.requestRender();
-    } catch {
-      // Status is already updated by the loaders.
-    }
-  }
-
-  private async runAuthAction(actionId: GranolaTuiAuthActionId): Promise<void> {
-    let successMessage = "";
-
-    try {
-      switch (actionId) {
-        case "login":
-          this.setStatus("Importing desktop session…");
-          await this.app.loginAuth();
-          successMessage = "Stored session imported";
-          break;
-        case "refresh":
-          this.setStatus("Refreshing stored session…");
-          await this.app.refreshAuth();
-          successMessage = "Stored session refreshed";
-          break;
-        case "use-api-key":
-          this.setStatus("Switching to stored API key…");
-          await this.app.switchAuthMode("api-key");
-          successMessage = "Using stored API key";
-          break;
-        case "use-stored":
-          this.setStatus("Switching to stored session…");
-          await this.app.switchAuthMode("stored-session");
-          successMessage = "Using stored session";
-          break;
-        case "use-supabase":
-          this.setStatus("Switching to supabase.json…");
-          await this.app.switchAuthMode("supabase-file");
-          successMessage = "Using supabase.json";
-          break;
-        case "logout":
-          this.setStatus("Signing out…");
-          await this.app.logoutAuth();
-          successMessage = "Stored credentials removed";
-          break;
-      }
-
-      await this.reloadAfterAuthChange();
-      this.setStatus(successMessage);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.setStatus(message, "error");
-    }
-  }
-
-  private openAuthPanel(auth: GranolaAppAuthState = this.#appState.auth): void {
-    if (this.#overlay) {
-      return;
-    }
-
-    const closeOverlay = () => {
-      this.#overlay?.hide();
-      this.#overlay = undefined;
-      this.tui.setFocus(this);
-      this.tui.requestRender();
-    };
-
-    const overlay = new GranolaTuiAuthOverlay({
-      auth,
-      onCancel: closeOverlay,
-      onRun: async (actionId) => {
-        closeOverlay();
-        await this.runAuthAction(actionId);
-      },
-    });
-
-    this.#overlay = this.tui.showOverlay(overlay, {
-      anchor: "center",
-      maxHeight: "70%",
-      minWidth: 52,
-      width: "72%",
-    });
-    this.setStatus("Auth session");
-  }
-
-  private openQuickOpen(): void {
-    if (this.#overlay) {
-      return;
-    }
-
-    const closeOverlay = () => {
-      this.#overlay?.hide();
-      this.#overlay = undefined;
-      this.tui.setFocus(this);
-      this.tui.requestRender();
-    };
-
-    const view = this.viewModel();
-    const palette = new GranolaTuiQuickOpenPalette({
-      meetings: view.meetings,
-      onAction: async (actionId) => {
-        closeOverlay();
-        await this.runQuickOpenAction(actionId);
-      },
-      onCancel: closeOverlay,
-      onPick: async (meetingId) => {
-        closeOverlay();
-        await this.#browse.loadMeeting(meetingId, {
-          ensureMeetingVisible: true,
-        });
-      },
-      onResolveQuery: async (query) => {
-        closeOverlay();
-        await this.#browse.loadMeeting(query, {
-          ensureMeetingVisible: true,
-          resolveQuery: true,
-        });
-      },
-      recentMeetingIds: view.recentMeetingIds,
-    });
-
-    this.#overlay = this.tui.showOverlay(palette, {
-      anchor: "center",
-      maxHeight: "60%",
-      minWidth: 48,
-      width: "70%",
-    });
-    this.setStatus("Quick open");
-  }
-
-  private async exportArchive(): Promise<void> {
-    await this.#browse.exportArchive();
-  }
-
-  private async runQuickOpenAction(
-    actionId: "auth" | "automation" | "clear-scope" | "export" | "sync",
-  ) {
-    switch (actionId) {
-      case "auth":
-        this.openAuthPanel();
-        return;
-      case "automation":
-        this.openAutomationPanel();
-        return;
-      case "export":
-        await this.exportArchive();
-        return;
-      case "clear-scope":
-        await this.#browse.clearScope(this.viewModel().recentMeetingIds[0]);
-        this.setStatus("Showing all meetings");
-        return;
-      case "sync":
-      default:
-        await this.#browse.refresh(true);
-    }
-  }
-
-  private openAutomationPanel(): void {
-    if (this.#overlay) {
-      return;
-    }
-
-    const closeOverlay = () => {
-      this.#overlay?.hide();
-      this.#overlay = undefined;
-      this.tui.setFocus(this);
-      this.tui.requestRender();
-    };
-
-    const overlay = new GranolaTuiAutomationOverlay({
-      artefacts: this.#browse.automationArtefacts,
-      issues: this.#browse.processingIssues,
-      onApproveArtefact: async (id) => {
-        closeOverlay();
-        await this.app.resolveAutomationArtefact(id, "approve");
-        await this.#browse.loadAutomationArtefacts();
-        this.setStatus("Artefact approved");
-      },
-      onApproveRun: async (id) => {
-        closeOverlay();
-        await this.app.resolveAutomationRun(id, "approve");
-        await this.#browse.loadAutomationRuns();
-        this.setStatus("Automation approved");
-      },
-      onCancel: closeOverlay,
-      onRejectArtefact: async (id) => {
-        closeOverlay();
-        await this.app.resolveAutomationArtefact(id, "reject");
-        await this.#browse.loadAutomationArtefacts();
-        this.setStatus("Artefact rejected");
-      },
-      onRejectRun: async (id) => {
-        closeOverlay();
-        await this.app.resolveAutomationRun(id, "reject");
-        await this.#browse.loadAutomationRuns();
-        this.setStatus("Automation rejected");
-      },
-      onRecoverIssue: async (id) => {
-        closeOverlay();
-        const result = await this.app.recoverProcessingIssue(id);
-        await this.#browse.loadProcessingIssues();
-        await this.#browse.loadAutomationArtefacts();
-        await this.#browse.loadAutomationRuns();
-        this.setStatus(
-          result.runCount > 0
-            ? `Recovered ${result.issue.kind} and re-ran ${result.runCount} pipeline${result.runCount === 1 ? "" : "s"}`
-            : `Recovered ${result.issue.kind}`,
-        );
-      },
-      onRerunArtefact: async (id) => {
-        closeOverlay();
-        await this.app.rerunAutomationArtefact(id);
-        await this.#browse.loadAutomationArtefacts();
-        await this.#browse.loadAutomationRuns();
-        this.setStatus("Artefact rerun complete");
-      },
-      runs: this.#browse.automationRuns,
-    });
-
-    this.#overlay = this.tui.showOverlay(overlay, {
-      anchor: "center",
-      maxHeight: "70%",
-      minWidth: 56,
-      width: "76%",
-    });
-    this.setStatus("Review inbox");
-  }
-
   handleInput(data: string): void {
     handleWorkspaceInput(data, {
       activePane: this.#activePane,
@@ -428,7 +187,7 @@ export class GranolaTuiWorkspace implements Component {
         this.cycleTab(delta);
       },
       exportArchive: () => {
-        void this.exportArchive();
+        void this.#overlays.exportArchive();
       },
       exit: () => {
         this.options.onExit();
@@ -440,13 +199,13 @@ export class GranolaTuiWorkspace implements Component {
         void this.#browse.openSelectedMeeting();
       },
       openAuth: () => {
-        this.openAuthPanel();
+        this.#overlays.openAuthPanel();
       },
       openAutomation: () => {
-        this.openAutomationPanel();
+        this.#overlays.openAutomationPanel();
       },
       openQuickOpen: () => {
-        this.openQuickOpen();
+        this.#overlays.openQuickOpen();
       },
       refresh: (forceRefresh) => {
         void this.#browse.refresh(forceRefresh);
