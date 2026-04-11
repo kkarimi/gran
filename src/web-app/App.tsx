@@ -632,6 +632,124 @@ export function App() {
     }
   };
 
+  const renderSettingsPage = (settingsTabOverride?: GranolaWebAppState["settingsTab"]) => (
+    <SettingsPageController
+      apiKeyDraft={state.apiKeyDraft}
+      appState={state.appState}
+      auth={state.appState?.auth}
+      automationRuns={state.automationRuns}
+      currentExportScopeLabel={currentExportScopeLabel()}
+      defaultArchiveSummary={defaultArchiveSummary()}
+      exportDestinationSummary={exportDestinationSummary()}
+      exportMode={state.exportMode}
+      exportTargets={state.exportTargets}
+      harnessDirty={state.harnessDirty}
+      harnessError={state.harnessError}
+      harnessExplanations={state.harnessExplanations}
+      harnessExplanationEventKind={state.harnessExplainEventKind}
+      harnesses={state.harnesses}
+      harnessTestKind={state.harnessTestKind}
+      harnessTestResult={state.harnessTestResult}
+      onApiKeyDraftChange={(value) => {
+        setState("apiKeyDraft", value);
+      }}
+      onApproveRun={(runId) => {
+        void resolveAutomationRun(runId, "approve");
+      }}
+      onChangeHarness={harnessController.updateHarness}
+      onClearApiKey={() => {
+        void clientController.clearApiKey(refreshAll);
+      }}
+      onDuplicateHarness={harnessController.duplicateHarness}
+      onExportModeChange={(mode) => {
+        setState("exportMode", mode);
+      }}
+      onImportDesktopSession={() => {
+        void clientController.importDesktopSession();
+      }}
+      onLock={() => {
+        void clientController.lockServer();
+      }}
+      onLogout={() => {
+        void clientController.logout(refreshAll);
+      }}
+      onNewHarness={harnessController.createHarness}
+      onOpenMeeting={(meetingId) => {
+        void browseController.openMeetingFromPage(meetingId, "settings");
+      }}
+      onPasswordChange={(value) => {
+        setState("serverPassword", value);
+      }}
+      onRecover={(issueId) => {
+        void recoverProcessingIssue(issueId);
+      }}
+      onRefreshAuth={() => {
+        void clientController.refreshAuth(refreshAll);
+      }}
+      onRejectRun={(runId) => {
+        void resolveAutomationRun(runId, "reject");
+      }}
+      onReloadHarnesses={() => {
+        void harnessController.reloadHarnesses();
+      }}
+      onRemoveHarness={harnessController.removeHarness}
+      onRemoveKnowledgeBase={(id) => {
+        void removeKnowledgeBase(id);
+      }}
+      onRerunJob={(jobId) => {
+        void rerunJob(jobId);
+      }}
+      onRunExport={() => {
+        void runBundledExport();
+      }}
+      onSaveApiKey={() => {
+        void clientController.saveApiKey();
+      }}
+      onSaveHarnesses={() => {
+        void harnessController.saveHarnesses();
+      }}
+      onSaveKnowledgeBase={(target) => {
+        void saveKnowledgeBase(target);
+      }}
+      onSelectExportTarget={(id) => {
+        setState("selectedExportTargetId", id);
+      }}
+      onSelectHarness={(id) => {
+        setState("selectedHarnessId", id);
+        setState("harnessTestResult", null);
+      }}
+      onSwitchMode={(mode) => {
+        void clientController.switchAuthMode(mode, refreshAll);
+      }}
+      onTestHarness={() => {
+        void harnessController.testHarness();
+      }}
+      onTestKindChange={(kind) => {
+        setState("harnessTestKind", kind);
+      }}
+      onTogglePlugin={(id, enabled) => {
+        void togglePlugin(id, enabled);
+      }}
+      onUnlock={() => {
+        void clientController.unlockServer(connectAndRefresh);
+      }}
+      password={state.serverPassword}
+      plugins={plugins()}
+      processingIssues={state.processingIssues}
+      selectedExportTargetId={state.selectedExportTargetId}
+      selectedHarness={harnessController.selectedHarness()}
+      selectedHarnessId={state.selectedHarnessId}
+      selectedMeeting={state.selectedMeeting}
+      serverInfo={state.serverInfo}
+      serverLocked={state.serverLocked}
+      settingsTab={settingsTabOverride ?? state.settingsTab}
+      setSettingsTab={(tab) => {
+        setState("settingsTab", tab);
+      }}
+      statusLabel={state.statusLabel}
+    />
+  );
+
   return (
     <Show
       when={!state.serverLocked && !showOnboarding()}
@@ -818,126 +936,7 @@ export function App() {
               />
             </Match>
             <Match when={state.activePage === "review"}>
-              <Show
-                when={automationEnabled()}
-                fallback={
-                  <SettingsPageController
-                    apiKeyDraft={state.apiKeyDraft}
-                    appState={state.appState}
-                    auth={state.appState?.auth}
-                    automationRuns={state.automationRuns}
-                    harnessDirty={state.harnessDirty}
-                    harnessError={state.harnessError}
-                    harnessExplanations={state.harnessExplanations}
-                    harnessExplanationEventKind={state.harnessExplainEventKind}
-                    harnesses={state.harnesses}
-                    harnessTestKind={state.harnessTestKind}
-                    harnessTestResult={state.harnessTestResult}
-                    onApiKeyDraftChange={(value) => {
-                      setState("apiKeyDraft", value);
-                    }}
-                    onApproveRun={(runId) => {
-                      void resolveAutomationRun(runId, "approve");
-                    }}
-                    onChangeHarness={harnessController.updateHarness}
-                    onClearApiKey={() => {
-                      void clientController.clearApiKey(refreshAll);
-                    }}
-                    onDuplicateHarness={harnessController.duplicateHarness}
-                    onImportDesktopSession={() => {
-                      void clientController.importDesktopSession();
-                    }}
-                    onLock={() => {
-                      void clientController.lockServer();
-                    }}
-                    onLogout={() => {
-                      void clientController.logout(refreshAll);
-                    }}
-                    onNewHarness={harnessController.createHarness}
-                    onOpenMeeting={(meetingId) => {
-                      void browseController.openMeetingFromPage(meetingId, "settings");
-                    }}
-                    onPasswordChange={(value) => {
-                      setState("serverPassword", value);
-                    }}
-                    onRecover={(issueId) => {
-                      void recoverProcessingIssue(issueId);
-                    }}
-                    onRefreshAuth={() => {
-                      void clientController.refreshAuth(refreshAll);
-                    }}
-                    onRejectRun={(runId) => {
-                      void resolveAutomationRun(runId, "reject");
-                    }}
-                    onReloadHarnesses={() => {
-                      void harnessController.reloadHarnesses();
-                    }}
-                    onRemoveHarness={harnessController.removeHarness}
-                    onRerunJob={(jobId) => {
-                      void rerunJob(jobId);
-                    }}
-                    onSaveApiKey={() => {
-                      void clientController.saveApiKey();
-                    }}
-                    onSaveHarnesses={() => {
-                      void harnessController.saveHarnesses();
-                    }}
-                    onSelectHarness={(id) => {
-                      setState("selectedHarnessId", id);
-                      setState("harnessTestResult", null);
-                    }}
-                    onTogglePlugin={(id, enabled) => {
-                      void togglePlugin(id, enabled);
-                    }}
-                    onSwitchMode={(mode) => {
-                      void clientController.switchAuthMode(mode, refreshAll);
-                    }}
-                    onTestHarness={() => {
-                      void harnessController.testHarness();
-                    }}
-                    onTestKindChange={(kind) => {
-                      setState("harnessTestKind", kind);
-                    }}
-                    onUnlock={() => {
-                      void clientController.unlockServer(connectAndRefresh);
-                    }}
-                    password={state.serverPassword}
-                    plugins={plugins()}
-                    processingIssues={state.processingIssues}
-                    currentExportScopeLabel={currentExportScopeLabel()}
-                    defaultArchiveSummary={defaultArchiveSummary()}
-                    exportDestinationSummary={exportDestinationSummary()}
-                    exportMode={state.exportMode}
-                    exportTargets={state.exportTargets}
-                    onExportModeChange={(mode) => {
-                      setState("exportMode", mode);
-                    }}
-                    onRunExport={() => {
-                      void runBundledExport();
-                    }}
-                    onSaveKnowledgeBase={(target) => {
-                      void saveKnowledgeBase(target);
-                    }}
-                    onSelectExportTarget={(id) => {
-                      setState("selectedExportTargetId", id);
-                    }}
-                    onRemoveKnowledgeBase={(id) => {
-                      void removeKnowledgeBase(id);
-                    }}
-                    selectedExportTargetId={state.selectedExportTargetId}
-                    selectedHarness={harnessController.selectedHarness()}
-                    selectedHarnessId={state.selectedHarnessId}
-                    selectedMeeting={state.selectedMeeting}
-                    serverInfo={state.serverInfo}
-                    serverLocked={state.serverLocked}
-                    settingsTab="diagnostics"
-                    setSettingsTab={(tab) => {
-                      setState("settingsTab", tab);
-                    }}
-                    statusLabel={state.statusLabel}
-                  />
-                }
-              >
+              <Show when={automationEnabled()} fallback={renderSettingsPage("diagnostics")}>
                 <ReviewPageController
                   artefactDraftMarkdown={state.automationArtefactDraftMarkdown}
                   artefactDraftSummary={state.automationArtefactDraftSummary}
@@ -1007,123 +1006,7 @@ export function App() {
                 />
               </Show>
             </Match>
-            <Match when={state.activePage === "settings"}>
-              <SettingsPageController
-                apiKeyDraft={state.apiKeyDraft}
-                appState={state.appState}
-                auth={state.appState?.auth}
-                automationRuns={state.automationRuns}
-                harnessDirty={state.harnessDirty}
-                harnessError={state.harnessError}
-                harnessExplanations={state.harnessExplanations}
-                harnessExplanationEventKind={state.harnessExplainEventKind}
-                harnesses={state.harnesses}
-                harnessTestKind={state.harnessTestKind}
-                harnessTestResult={state.harnessTestResult}
-                onApiKeyDraftChange={(value) => {
-                  setState("apiKeyDraft", value);
-                }}
-                onApproveRun={(runId) => {
-                  void resolveAutomationRun(runId, "approve");
-                }}
-                onChangeHarness={harnessController.updateHarness}
-                onClearApiKey={() => {
-                  void clientController.clearApiKey(refreshAll);
-                }}
-                onDuplicateHarness={harnessController.duplicateHarness}
-                onImportDesktopSession={() => {
-                  void clientController.importDesktopSession();
-                }}
-                onLock={() => {
-                  void clientController.lockServer();
-                }}
-                onLogout={() => {
-                  void clientController.logout(refreshAll);
-                }}
-                onNewHarness={harnessController.createHarness}
-                onOpenMeeting={(meetingId) => {
-                  void browseController.openMeetingFromPage(meetingId, "settings");
-                }}
-                onPasswordChange={(value) => {
-                  setState("serverPassword", value);
-                }}
-                onRecover={(issueId) => {
-                  void recoverProcessingIssue(issueId);
-                }}
-                onRefreshAuth={() => {
-                  void clientController.refreshAuth(refreshAll);
-                }}
-                onRejectRun={(runId) => {
-                  void resolveAutomationRun(runId, "reject");
-                }}
-                onReloadHarnesses={() => {
-                  void harnessController.reloadHarnesses();
-                }}
-                onRemoveHarness={harnessController.removeHarness}
-                onRerunJob={(jobId) => {
-                  void rerunJob(jobId);
-                }}
-                onSaveApiKey={() => {
-                  void clientController.saveApiKey();
-                }}
-                onSaveHarnesses={() => {
-                  void harnessController.saveHarnesses();
-                }}
-                onSelectHarness={(id) => {
-                  setState("selectedHarnessId", id);
-                  setState("harnessTestResult", null);
-                }}
-                onTogglePlugin={(id, enabled) => {
-                  void togglePlugin(id, enabled);
-                }}
-                onSwitchMode={(mode) => {
-                  void clientController.switchAuthMode(mode, refreshAll);
-                }}
-                onTestHarness={() => {
-                  void harnessController.testHarness();
-                }}
-                onTestKindChange={(kind) => {
-                  setState("harnessTestKind", kind);
-                }}
-                onUnlock={() => {
-                  void clientController.unlockServer(connectAndRefresh);
-                }}
-                password={state.serverPassword}
-                plugins={plugins()}
-                processingIssues={state.processingIssues}
-                currentExportScopeLabel={currentExportScopeLabel()}
-                defaultArchiveSummary={defaultArchiveSummary()}
-                exportDestinationSummary={exportDestinationSummary()}
-                exportMode={state.exportMode}
-                exportTargets={state.exportTargets}
-                onExportModeChange={(mode) => {
-                  setState("exportMode", mode);
-                }}
-                onRunExport={() => {
-                  void runBundledExport();
-                }}
-                onSaveKnowledgeBase={(target) => {
-                  void saveKnowledgeBase(target);
-                }}
-                onSelectExportTarget={(id) => {
-                  setState("selectedExportTargetId", id);
-                }}
-                onRemoveKnowledgeBase={(id) => {
-                  void removeKnowledgeBase(id);
-                }}
-                selectedExportTargetId={state.selectedExportTargetId}
-                selectedHarness={harnessController.selectedHarness()}
-                selectedHarnessId={state.selectedHarnessId}
-                selectedMeeting={state.selectedMeeting}
-                serverInfo={state.serverInfo}
-                serverLocked={state.serverLocked}
-                settingsTab={state.settingsTab}
-                setSettingsTab={(tab) => {
-                  setState("settingsTab", tab);
-                }}
-                statusLabel={state.statusLabel}
-              />
-            </Match>
+            <Match when={state.activePage === "settings"}>{renderSettingsPage()}</Match>
             <Match when={state.activePage === "meeting"}>
               <MeetingPageController
                 detailError={state.detailError}
