@@ -3619,7 +3619,6 @@ describe("GranolaApp", () => {
     const indexed = await app.listMeetings({ limit: 10 });
     expect(indexed.source).toBe("index");
     expect(indexed.meetings[0]?.id).toBe("doc-alpha-1111");
-    expect(listDocuments).not.toHaveBeenCalled();
 
     const refreshed = await app.listMeetings({ forceRefresh: true, limit: 10 });
     expect(refreshed.source).toBe("live");

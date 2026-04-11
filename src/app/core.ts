@@ -49,14 +49,6 @@ import {
   type ExportJobStore,
 } from "../export-jobs.ts";
 import { createDefaultExportTargetStore, type ExportTargetStore } from "../export-targets.ts";
-import { filterMeetingSummaries, listMeetings } from "../meetings.ts";
-import {
-  buildFolderRecord,
-  buildFolderSummary,
-  filterFolders,
-  resolveFolder,
-  resolveFolderQuery,
-} from "../folders.ts";
 import type { GranolaFolder } from "../types.ts";
 import {
   createDefaultMeetingIndexStore,
@@ -175,6 +167,7 @@ import { GranolaIndexService } from "./index-service.ts";
 import { GranolaAutomationService } from "./automation-service.ts";
 import { GranolaAutomationRuntime } from "./automation-runtime.ts";
 import { cloneSyncState, GranolaSyncService } from "./sync-service.ts";
+import { GranolaWorkspaceService } from "./workspace-service.ts";
 import { GranolaYazdService } from "./yazd-service.ts";
 
 interface GranolaAppDependencies {
@@ -222,55 +215,6 @@ interface GranolaAppDependencies {
 
 function cloneFolderSummary(folder: FolderSummaryRecord): FolderSummaryRecord {
   return { ...folder };
-}
-
-function deriveFolderSummariesFromMeetings(
-  meetings: MeetingSummaryRecord[],
-): FolderSummaryRecord[] {
-  const foldersById = new Map<
-    string,
-    {
-      folder: FolderSummaryRecord;
-      meetingIds: Set<string>;
-    }
-  >();
-
-  for (const meeting of meetings) {
-    for (const folder of meeting.folders) {
-      const existing = foldersById.get(folder.id);
-      if (existing) {
-        existing.meetingIds.add(meeting.id);
-        existing.folder = {
-          ...existing.folder,
-          createdAt:
-            existing.folder.createdAt.localeCompare(folder.createdAt) <= 0
-              ? existing.folder.createdAt
-              : folder.createdAt,
-          description: existing.folder.description ?? folder.description,
-          documentCount: Math.max(existing.folder.documentCount, folder.documentCount),
-          isFavourite: existing.folder.isFavourite || folder.isFavourite,
-          updatedAt:
-            existing.folder.updatedAt.localeCompare(folder.updatedAt) >= 0
-              ? existing.folder.updatedAt
-              : folder.updatedAt,
-          workspaceId: existing.folder.workspaceId ?? folder.workspaceId,
-        };
-        continue;
-      }
-
-      foldersById.set(folder.id, {
-        folder: cloneFolderSummary(folder),
-        meetingIds: new Set([meeting.id]),
-      });
-    }
-  }
-
-  return [...foldersById.values()]
-    .map(({ folder, meetingIds }) => ({
-      ...folder,
-      documentCount: Math.max(folder.documentCount, meetingIds.size),
-    }))
-    .sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function cloneMeetingSummary(meeting: MeetingSummaryRecord): MeetingSummaryRecord {
@@ -409,6 +353,7 @@ export class GranolaApp implements GranolaAppApi {
   readonly #pluginRegistry: GranolaPluginRegistry;
   readonly #sync: GranolaSyncService;
   readonly #state: GranolaAppState;
+  readonly #workspace: GranolaWorkspaceService;
   readonly #yazd: GranolaYazdService;
 
   constructor(
@@ -577,6 +522,18 @@ export class GranolaApp implements GranolaAppApi {
       state: this.#state.sync,
       syncEventStore: deps.syncEventStore,
       syncStateStore: deps.syncStateStore,
+    });
+    this.#workspace = new GranolaWorkspaceService({
+      catalog: this.#catalog,
+      emitStateUpdate: () => {
+        this.emitStateUpdate();
+      },
+      index: this.#index,
+      nowIso: () => this.nowIso(),
+      state: this.#state,
+      syncInBackground: async () => {
+        await this.#sync.sync({ foreground: false });
+      },
     });
     this.#yazd = new GranolaYazdService({
       automationActionRegistry: deps.automationActionRegistry,
@@ -975,137 +932,19 @@ export class GranolaApp implements GranolaAppApi {
   }
 
   async listFolders(options: GranolaFolderListOptions = {}): Promise<GranolaFolderListResult> {
-    if (!options.forceRefresh && this.#index.hasMeetings()) {
-      const summaries = filterFolders(deriveFolderSummariesFromMeetings(this.#index.meetings()), {
-        limit: options.limit,
-        search: options.search,
-      });
-
-      if (summaries.length > 0) {
-        this.#state.folders = {
-          count: summaries.length,
-          loaded: true,
-          loadedAt: this.nowIso(),
-          source: "index",
-        };
-        this.emitStateUpdate();
-        return {
-          folders: summaries,
-        };
-      }
-    }
-
-    const folders = await this.loadFolders({
-      forceRefresh: options.forceRefresh,
-      required: true,
-    });
-    const summaries = filterFolders(
-      (folders ?? []).map((folder) => buildFolderSummary(folder)),
-      {
-        limit: options.limit,
-        search: options.search,
-      },
-    );
-
-    return {
-      folders: summaries,
-    };
+    return await this.#workspace.listFolders(options);
   }
 
   async getFolder(id: string): Promise<FolderRecord> {
-    const folders = await this.loadFolders({ required: true });
-    const cacheData = await this.loadCache();
-    const documents = await this.listDocuments();
-    const summaries = (folders ?? []).map((folder) => buildFolderSummary(folder));
-    const folder = resolveFolder(summaries, id);
-    const rawFolder = (folders ?? []).find((candidate) => candidate.id === folder.id);
-    if (!rawFolder) {
-      throw new Error(`folder not found: ${id}`);
-    }
-
-    const meetings = listMeetings(documents, {
-      cacheData,
-      folderId: folder.id,
-      foldersByDocumentId: this.buildFoldersByDocumentId(folders),
-      limit: Math.max(rawFolder.documentIds.length, 1),
-      sort: "updated-desc",
-    });
-    const record = buildFolderRecord(rawFolder, meetings);
-
-    return record;
+    return await this.#workspace.getFolder(id);
   }
 
   async findFolder(query: string): Promise<FolderRecord> {
-    const folders = await this.loadFolders({ required: true });
-    const summary = resolveFolderQuery(
-      (folders ?? []).map((folder) => buildFolderSummary(folder)),
-      query,
-    );
-    return await this.getFolder(summary.id);
+    return await this.#workspace.findFolder(query);
   }
 
   async listMeetings(options: GranolaMeetingListOptions = {}): Promise<GranolaMeetingListResult> {
-    const preferIndex =
-      options.preferIndex ??
-      (this.#state.ui.surface === "web" || this.#state.ui.surface === "server");
-    const canUseSearchIndex =
-      Boolean(options.search?.trim()) && !options.forceRefresh && this.#index.hasSearchIndex();
-
-    if (
-      !options.forceRefresh &&
-      preferIndex &&
-      this.#index.hasMeetings() &&
-      (canUseSearchIndex || !this.#state.documents.loaded)
-    ) {
-      const meetings = canUseSearchIndex
-        ? this.#index.indexedMeetingsForSearch({
-            folderId: options.folderId,
-            limit: options.limit,
-            search: options.search!,
-            sort: options.sort,
-            updatedFrom: options.updatedFrom,
-            updatedTo: options.updatedTo,
-          })
-        : filterMeetingSummaries(this.#index.meetings(), options);
-      if (!(options.folderId && meetings.length === 0)) {
-        this.#index.triggerBackgroundRefresh(async () => {
-          try {
-            await this.#sync.sync({ foreground: false });
-          } catch {
-            // Opportunistic background sync should not break the foreground view.
-          }
-        });
-        return {
-          meetings,
-          source: "index",
-        };
-      }
-    }
-
-    const snapshot = await this.liveMeetingSnapshot({
-      forceRefresh: options.forceRefresh,
-    });
-    if (options.folderId && !snapshot.folders) {
-      throw new Error("Gran folder API is not configured");
-    }
-
-    const meetings = listMeetings(snapshot.documents, {
-      cacheData: snapshot.cacheData,
-      folderId: options.folderId,
-      foldersByDocumentId: this.buildFoldersByDocumentId(snapshot.folders),
-      limit: options.limit,
-      search: options.search,
-      sort: options.sort,
-      updatedFrom: options.updatedFrom,
-      updatedTo: options.updatedTo,
-    });
-
-    await this.#index.persistMeetingIndex(snapshot.meetings);
-
-    return {
-      meetings,
-      source: this.#state.documents.source === "snapshot" ? "snapshot" : "live",
-    };
+    return await this.#workspace.listMeetings(options);
   }
 
   private async readMeetingBundleById(
@@ -1126,26 +965,14 @@ export class GranolaApp implements GranolaAppApi {
     id: string,
     options: { requireCache?: boolean } = {},
   ): Promise<GranolaMeetingBundle> {
-    return await this.readMeetingBundleById(id, options);
+    return await this.#workspace.getMeeting(id, options);
   }
 
   async findMeeting(
     query: string,
     options: { requireCache?: boolean } = {},
   ): Promise<GranolaMeetingBundle> {
-    let bundle: GranolaMeetingBundle;
-    try {
-      bundle = await this.readMeetingBundleByQuery(query, options);
-    } catch (error) {
-      const fallbackId = this.#index.searchFallbackMeetingId(query);
-      if (!fallbackId) {
-        throw error;
-      }
-
-      bundle = await this.readMeetingBundleById(fallbackId, options);
-    }
-
-    return bundle;
+    return await this.#workspace.findMeeting(query, options);
   }
 
   async runIntelligencePreset(
